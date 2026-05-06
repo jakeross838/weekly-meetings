@@ -1,0 +1,14 @@
+{
+  "pm_emails": {
+    "Martin Mannix": "martin@rossbuilt.com",
+    "Jason Szykulski": "jason@rossbuilt.com",
+    "Lee Worthy": "lworthy@rossbuilt.com",
+    "Bob Mozine": "bob@rossbuilt.com",
+    "Nelson Belanger": "nelson@rossbuilt.com"
+  },
+  "always_cc": [
+    "lee@rossbuilt.com",
+    "andrew@rossbuilt.com",
+    "jake@rossbuilt.com"
+  ]
+}

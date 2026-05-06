@@ -1,0 +1,18 @@
+{
+  "manatee county utilitiy department": "Manatee County Utility Department",
+  "altered state of mine , llc": "Altered State Of Mine, LLC",
+  "sight to see construction, llc": "Sight to See Construction LLC",
+  "db improvement services, llc": "DB Improvement Services",
+  "auto_reclassified": [
+    {"name": "Sight to See Construction LLC", "from": "Other Trade", "to": "Trim/Finish", "evidence": "60% Interior Trim across 2 jobs"},
+    {"name": "DB Improvement Services", "from": "Other Trade", "to": "Trim/Finish", "evidence": "87% Interior Trim"},
+    {"name": "SMS Construction Corp", "from": "Other Trade", "to": "Trim/Finish", "evidence": "92% Interior Trim"},
+    {"name": "Creative CC Inc.", "from": "Other Trade", "to": "Trim/Finish", "evidence": "54% Interior Trim"},
+    {"name": "Elizabeth Key Rosser", "from": "Other Trade", "to": "Tile/Floor", "evidence": "61% Interior Tile"},
+    {"name": "WG QUALITY INC", "from": "Other Trade", "to": "Drywall", "evidence": "59% Drywall"},
+    {"name": "Gonzalez Construction Services FL LLC", "from": "Other Trade", "to": "Windows/Doors", "evidence": "46% Exterior Windows/Doors"},
+    {"name": "Integrity Floors LLC", "from": "Other Trade", "to": "Tile/Floor", "evidence": "75% Wood Flooring"},
+    {"name": "M&J Florida Enterprise LLC", "from": "Other Trade", "to": "Siding", "evidence": "44% Siding (new category)"},
+    {"name": "Derosias Custom Builders LLC", "from": "Other Trade", "to": "Pool/Spa", "evidence": "45% Pool"}
+  ]
+}

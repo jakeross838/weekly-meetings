@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pre-Construction · Ross Built</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+<link rel="stylesheet" href="../assets/nightwork-tokens.css">
+<script src="../assets/components.js"></script>
+<style>
+@page { size: letter landscape; margin: 0.4in 0.5in; }
+.mp { max-width: 10.5in; margin: 0 auto; padding: 12px 0 18px; font-size: 11.5px; line-height: 1.4; }
+
+.mp-band {
+  border: 1.5px solid var(--ink);
+  padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+  background: var(--bg-card);
+}
+.mp-band h1 {
+  font-family: var(--font-head);
+  font-size: 17px; font-weight: 700; letter-spacing: 0.5px;
+  margin: 0; color: var(--ink);
+}
+.mp-band .right { text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.mp-band .right .when { font-size: 13px; color: var(--ink); margin-bottom: 2px; }
+
+.mp-sec { margin-top: 14px; }
+.mp-sec h2 {
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink); margin: 0 0 8px;
+  padding: 6px 0;
+  border-top: 1.2px solid var(--ink);
+  border-bottom: 1.2px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline;
+  break-after: avoid; page-break-after: avoid;
+}
+.mp-sec h2 .badge {
+  font-family: var(--font-mono);
+  font-size: 10px; text-transform: none; letter-spacing: 0.4px;
+  color: var(--ink-3); font-weight: 500;
+}
+
+table.upcoming {
+  width: 100%; border-collapse: collapse;
+  font-size: 11.5px; font-family: var(--font-mono);
+}
+table.upcoming th, table.upcoming td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-2);
+}
+table.upcoming th {
+  color: var(--ink-3);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  border-bottom-color: var(--line);
+  font-weight: 500;
+}
+table.upcoming .job {
+  font-family: var(--font-head);
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+table.upcoming .ready { color: var(--success); font-weight: 600; }
+table.upcoming .partial { color: var(--warn); font-weight: 600; }
+table.upcoming .gap { color: var(--nw-danger); font-weight: 600; }
+
+.gap-row {
+  display: grid;
+  grid-template-columns: 130px 90px 1fr 90px;
+  column-gap: 12px;
+  padding: 4px 0;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  border-bottom: 1px dotted var(--line-2);
+  break-inside: avoid; page-break-inside: avoid;
+}
+.gap-row .job { font-family: var(--font-head); font-weight: 600; text-transform: uppercase; color: var(--ink); letter-spacing: 0.7px; }
+.gap-row .phase { color: var(--ink-2); }
+.gap-row .needed-subs { color: var(--ink); }
+.gap-row .days-out { text-align: right; color: var(--ink-3); font-size: 10.5px; }
+
+.deferred-card {
+  background: var(--bg-soft);
+  border-left: 3px solid var(--accent);
+  padding: 10px 14px;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.deferred-card .key { color: var(--ink); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.act-row {
+  display: grid;
+  grid-template-columns: 22px 80px 1fr 90px 60px;
+  column-gap: 8px;
+  padding: 3px 0;
+  font-size: 11.5px;
+  align-items: baseline;
+  border-bottom: 1px dotted var(--line-2);
+  font-family: var(--font-mono);
+  break-inside: avoid; page-break-inside: avoid;
+}
+.act-row:last-child { border-bottom: none; }
+.act-row .check { color: var(--ink-2); }
+.act-row .id { color: var(--ink-2); font-size: 10.5px; }
+.act-row .desc { color: var(--ink); }
+.act-row .pri { text-align: right; color: var(--ink-3); font-size: 10.5px; }
+.act-row .pri.URGENT { color: var(--nw-danger); font-weight: 600; }
+.act-row .pri.HIGH { color: var(--warn); font-weight: 600; }
+.act-row .age { text-align: right; color: var(--ink-3); font-size: 10.5px; }
+
+.empty-line {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink-muted); font-style: italic;
+  padding: 6px 0;
+}
+</style>
+</head>
+<body>
+<div class="mp">
+
+  <div class="mp-band">
+    <div>
+      <h1>ROSS BUILT · PRE-CONSTRUCTION</h1>
+    </div>
+    <div class="right">
+      <div class="when" id="when"></div>
+      <div>FOR ANDREW</div>
+    </div>
+  </div>
+
+  <section class="mp-sec">
+    <h2>Jobs Entering Field — next 60 days <span class="badge" id="upcoming-badge"></span></h2>
+    <div id="upcoming"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Sub Commitments — gaps <span class="badge" id="gaps-badge"></span></h2>
+    <div id="gaps"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Schedule Realism Check</h2>
+    <div class="deferred-card">
+      <div class="key">Deferred to milestone m03-schedule-generation</div>
+      <p style="margin: 6px 0 0;">Detecting current-pace-vs-schedule slip requires per-phase scheduled dates, which BT placeholder data doesn't yet support. Generator 7 (schedule reality) will land with m03 once plan data is reliable.</p>
+    </div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Open Proposals / Estimating Actions <span class="badge" id="props-badge"></span></h2>
+    <div id="props"></div>
+  </section>
+
+  <!-- Phase 12 Part B alignment — forward-looking coordination + procurement -->
+  <section class="mp-sec">
+    <h2>§3 4-Week Coordination <span class="badge" id="aligned-coord-badge"></span></h2>
+    <div id="aligned-coord"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§4 8-Week Procurement Gate <span class="badge" id="aligned-proc-badge"></span></h2>
+    <div id="aligned-proc"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§4 Open Selections (gating) <span class="badge" id="aligned-sel-badge"></span></h2>
+    <div id="aligned-sel"></div>
+  </section>
+
+</div>
+
+<script type="application/json" id="mp-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const SI = window.SI;
+  const DATA = JSON.parse(document.getElementById('mp-data').textContent);
+  const escape = SI.escapeHtml;
+
+  /* Header */
+  const t = DATA.today;
+  const d = t ? new Date(t + 'T00:00:00') : null;
+  const md = d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric' }).toUpperCase() : '';
+  document.getElementById('when').textContent = md ? ('WEEK OF ' + md) : (t || '');
+
+  /* Upcoming jobs */
+  const upcoming = DATA.upcoming_jobs || [];
+  document.getElementById('upcoming-badge').textContent = `${upcoming.length} job${upcoming.length === 1 ? '' : 's'}`;
+  if (upcoming.length === 0) {
+    document.getElementById('upcoming').innerHTML = '<div class="empty-line">No upcoming jobs in next 60 days.</div>';
+  } else {
+    const rows = upcoming.map(j => {
+      const r = j.subs_locked, t = j.subs_total;
+      const cls = (t === 0) ? 'partial' : (r >= t * 0.8) ? 'ready' : (r >= t * 0.4 ? 'partial' : 'gap');
+      const slug = (j.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      return `<tr id="job-${escape(slug)}">
+        <td class="job">${escape(j.name)}</td>
+        <td>${escape(j.next_stage_name || '—')}</td>
+        <td>${escape(j.address || '—')}</td>
+        <td><span class="${cls}">${r}/${t} subs logged</span></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('upcoming').innerHTML =
+      `<table class="upcoming">
+        <thead><tr><th>Job</th><th>Next stage</th><th>Address</th><th>Sub readiness</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  /* Sub commitment gaps */
+  const gaps = DATA.sub_gaps || [];
+  document.getElementById('gaps-badge').textContent = `${gaps.length} gap${gaps.length === 1 ? '' : 's'}`;
+  if (gaps.length === 0) {
+    document.getElementById('gaps').innerHTML = '<div class="empty-line">All known typical subs have logged on upcoming jobs.</div>';
+  } else {
+    document.getElementById('gaps').innerHTML = gaps.slice(0, 16).map(g => `
+      <div class="gap-row">
+        <span class="job">${escape(g.job)}</span>
+        <span class="phase">${escape(g.phase_code + ' ' + g.phase_name)}</span>
+        <span class="needed-subs">${escape((g.needed_subs || []).join(', '))}</span>
+        <span class="days-out">stage ${g.stage}</span>
+      </div>`).join('');
+  }
+
+  /* Open proposals / estimating actions */
+  const props = DATA.estimating_actions || [];
+  document.getElementById('props-badge').textContent = `${props.length} item${props.length === 1 ? '' : 's'}`;
+  if (props.length === 0) {
+    document.getElementById('props').innerHTML = '<div class="empty-line">No proposal/estimating action items found.</div>';
+  } else {
+    document.getElementById('props').innerHTML = props.slice(0, 14).map(it => `
+      <div class="act-row">
+        <span class="check">☐</span>
+        <span class="id">${escape(it.id)}</span>
+        <span class="desc"><strong>${escape((it.job || '').toUpperCase())}</strong> · ${escape(it.action_short || '')}</span>
+        <span class="pri ${escape(it.priority || 'NORMAL')}">${escape(it.priority || 'NORMAL')}</span>
+        <span class="age">${escape(it.days_open != null ? it.days_open + 'd' : '—')}</span>
+      </div>`).join('');
+  }
+
+  /* Phase 12 Part B aligned data */
+  const aligned = DATA.aligned || {};
+
+  const coord = aligned.coordination || [];
+  document.getElementById('aligned-coord-badge').textContent = `${coord.length} dependenc${coord.length === 1 ? 'y' : 'ies'}`;
+  if (!coord.length) {
+    document.getElementById('aligned-coord').innerHTML =
+      '<div class="empty-line">No 4-week coordination items derived from current ongoing phases.</div>';
+  } else {
+    document.getElementById('aligned-coord').innerHTML = coord.map(c => `
+      <div class="gap-row">
+        <span class="job">${escape(c.pm)} · ${escape(c.job)}</span>
+        <span class="phase">${escape(c.phase)}</span>
+        <span class="needed-subs">sub: ${escape(c.sub)}</span>
+        <span class="days-out">${escape(c.needs)}</span>
+      </div>`).join('');
+  }
+
+  const proc = aligned.procurement || [];
+  document.getElementById('aligned-proc-badge').textContent = `${proc.length} item${proc.length === 1 ? '' : 's'}`;
+  if (!proc.length) {
+    document.getElementById('aligned-proc').innerHTML =
+      '<div class="empty-line">No long-lead procurement items in the 5-8 week window.</div>';
+  } else {
+    document.getElementById('aligned-proc').innerHTML = proc.map(p => `
+      <div class="act-row">
+        <span class="check">☐</span>
+        <span class="id">${escape(p.id || '')}</span>
+        <span class="desc"><strong>${escape(p.pm)} · ${escape((p.job||'').toUpperCase())}</strong> · ${escape(p.action || '')}</span>
+        <span class="pri ${escape(p.priority || 'NORMAL')}">${escape(p.priority || 'NORMAL')}</span>
+        <span class="age">${escape(p.due || '—')}</span>
+      </div>`).join('');
+  }
+
+  const sel = aligned.selections || [];
+  document.getElementById('aligned-sel-badge').textContent = `${sel.length} open`;
+  if (!sel.length) {
+    document.getElementById('aligned-sel').innerHTML =
+      '<div class="empty-line">No open gating selections.</div>';
+  } else {
+    document.getElementById('aligned-sel').innerHTML = sel.map(s => `
+      <div class="act-row">
+        <span class="check">☐</span>
+        <span class="id">${escape(s.id || '')}</span>
+        <span class="desc"><strong>${escape(s.pm)} · ${escape((s.job||'').toUpperCase())}</strong> · ${escape(s.action || '')}</span>
+        <span class="pri ${escape(s.priority || 'NORMAL')}">${escape(s.priority || 'NORMAL')}</span>
+        <span class="age">${escape(s.due || '—')}</span>
+      </div>`).join('');
+  }
+
+})();
+</script>
+</body>
+</html>

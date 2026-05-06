@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Master Production · Ross Built</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+<link rel="stylesheet" href="../assets/nightwork-tokens.css">
+<script src="../assets/components.js"></script>
+<style>
+@page { size: letter landscape; margin: 0.4in 0.5in; }
+
+.mp { max-width: 10.5in; margin: 0 auto; padding: 12px 0 18px; font-size: 11.5px; line-height: 1.35; }
+
+.mp-band {
+  border: 1.5px solid var(--ink);
+  padding: 10px 16px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+}
+.mp-band h1 {
+  font-family: var(--font-head);
+  font-size: 18px; font-weight: 700; letter-spacing: 0.5px;
+  margin: 0; color: var(--ink);
+}
+.mp-band .subtitle {
+  font-family: var(--font-head);
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--ink-2); margin-top: 4px;
+}
+.mp-band .right { text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.mp-band .right .when { font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+
+.mp-counts {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink-2);
+  text-align: center;
+  padding: 4px 0 12px;
+}
+.mp-counts strong { color: var(--ink); font-weight: 600; }
+
+.mp-sec { margin-top: 14px; }
+.mp-sec h2 {
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink); margin: 0; padding: 6px 0;
+  border-top: 1.2px solid var(--ink);
+  border-bottom: 1.2px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline;
+  break-after: avoid; page-break-after: avoid;
+}
+.mp-sec h2 .badge {
+  font-family: var(--font-mono);
+  font-size: 10px; text-transform: none; letter-spacing: 0.4px;
+  color: var(--ink-3); font-weight: 500;
+}
+
+/* Red-flags list */
+.flag-card {
+  display: grid;
+  grid-template-columns: 22px 1fr 110px;
+  column-gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 11.5px;
+  break-inside: avoid;
+}
+.flag-card:last-child { border-bottom: none; }
+.flag-card .check { color: var(--ink-2); user-select: none; }
+.flag-card.critical .check { color: var(--nw-danger); }
+.flag-card .body .title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+  letter-spacing: 0.2px;
+}
+.flag-card .body .title .job {
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-right: 4px;
+}
+.flag-card .body .summary {
+  font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--ink-2);
+  margin-top: 1px;
+}
+.flag-card .owner {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.flag-card .owner .pm-name { color: var(--ink); font-weight: 600; }
+.flag-card .owner .age { display:block; font-size: 9.5px; margin-top: 2px; }
+
+/* Accountability rollup */
+.acc-rollup {
+  background: var(--bg-soft);
+  border-left: 3px solid var(--accent);
+  padding: 10px 16px;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.acc-rollup .col { display: flex; flex-direction: column; gap: 3px; }
+.acc-rollup .key { color: var(--ink-3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
+.acc-rollup .val { color: var(--ink); font-size: 13px; font-weight: 600; }
+.acc-rollup .val.alert { color: var(--nw-danger); }
+.acc-rollup .val.ok { color: var(--success); }
+
+/* PM summary table */
+.pm-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  break-inside: avoid; page-break-inside: avoid;
+}
+.pm-table tr { break-inside: avoid; page-break-inside: avoid; }
+.pm-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-weight: 500;
+}
+.pm-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--ink);
+  vertical-align: top;
+}
+.pm-table .pm-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+}
+.pm-table .num { font-family: var(--font-mono); text-align: right; width: 60px; }
+.pm-table .num.alert { color: var(--nw-danger); font-weight: 600; }
+.pm-table .jobs { color: var(--ink-2); font-size: 11px; }
+.pm-table .flag-cell { font-family: var(--font-mono); font-size: 11.5px; color: var(--nw-danger); text-align: center; width: 30px; }
+
+.empty-line {
+  font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--ink-muted); font-style: italic;
+  padding: 6px 0;
+}
+</style>
+</head>
+<body>
+<div class="mp">
+
+  <div class="mp-band">
+    <div>
+      <h1>ROSS BUILT · MASTER PRODUCTION</h1>
+      <div class="subtitle" id="mp-subtitle"></div>
+    </div>
+    <div class="right">
+      <div class="when" id="when"></div>
+      <div id="audience">FOR JAKE</div>
+    </div>
+  </div>
+
+  <div class="mp-counts" id="counts"></div>
+
+  <section class="mp-sec">
+    <h2>This Week's Red Flags <span class="badge" id="flags-badge"></span></h2>
+    <div id="flags-list"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Week-Over-Week Accountability <span class="badge" id="acc-badge"></span></h2>
+    <div class="acc-rollup" id="acc-rollup"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>PM Summary <span class="badge">one line per PM</span></h2>
+    <div id="pm-summary"></div>
+  </section>
+
+  <!-- Phase 12 Part B alignment — cross-PM rollup of office sections -->
+  <section class="mp-sec">
+    <h2>§1 Last Week PPC% <span class="badge">cross-PM</span></h2>
+    <div id="aligned-ppc"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§2 Execution Red Flags <span class="badge">2-week look-ahead</span></h2>
+    <div id="aligned-exec"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§5 Open Action Items by Category <span class="badge">cross-PM totals</span></h2>
+    <div id="aligned-cats"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§7 Financial Top-Line <span class="badge">GP / open BUDGET</span></h2>
+    <div id="aligned-fin"></div>
+  </section>
+
+</div>
+
+<script type="application/json" id="mp-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const SI = window.SI;
+  const DATA = JSON.parse(document.getElementById('mp-data').textContent);
+  const escape = SI.escapeHtml;
+
+  function pct(d) { return (d == null) ? '—' : (Math.round(d * 100) + '%'); }
+  function shortSub(name) {
+    if (!name) return '';
+    return name.split(',')[0].split(' LLC')[0].split(' Inc')[0].split(' Co.')[0].trim();
+  }
+  function phaseLabel(ins) {
+    const code = ins.related_phase || '';
+    const name = ins.related_phase_name || '';
+    if (!code && !name) return '';
+    if (!name) return code;
+    return code ? `${name} (${code})` : name;
+  }
+  function titleFor(ins) {
+    const job = (ins.related_job || '').toUpperCase();
+    const ph = phaseLabel(ins);
+    let head;
+    switch (ins.type) {
+      case 'sequencing_risk':
+        head = ph ? `${ph} dragging` : 'Phase dragging'; break;
+      case 'sub_drift':
+        head = `${shortSub(ins.related_sub)} below their baseline`; break;
+      case 'missed_commitment': {
+        const ev = (ins.evidence || []).find(e => e.kind === 'action_item');
+        const id = ev ? ev.id : (ins.related_action_id || '');
+        head = `${id} closed — no field activity`; break;
+      }
+      case 'sequencing_violation':
+        head = ph ? `${ph} complete · predecessor missing` : 'Predecessor missing'; break;
+      default: head = (ins.message || '').slice(0, 60);
+    }
+    return { job, head };
+  }
+
+  /* Header */
+  const t = DATA.today;
+  const d = t ? new Date(t + 'T00:00:00') : null;
+  const dow = d ? ['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()] : '';
+  const md = d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric' }).toUpperCase() : '';
+  document.getElementById('when').textContent = (dow && md) ? `${dow} · ${md}` : (t || '');
+  const totals = DATA.totals || {};
+  document.getElementById('mp-subtitle').textContent =
+    `${totals.active_jobs || 0} active jobs · ${totals.pms || 0} PMs · ${totals.ongoing_phases || 0} ongoing phases · ${totals.flagged_jobs || 0} flagged`;
+  document.getElementById('counts').innerHTML =
+    `<strong>${(DATA.red_flags || []).length}</strong> red flags · <strong>${totals.must_discuss_total || 0}</strong> must-discuss across PMs · <strong>${totals.open_actions_total || 0}</strong> open actions · <strong>${totals.stale_total || 0}</strong> stale`;
+
+  /* Red flags */
+  const flags = DATA.red_flags || [];
+  document.getElementById('flags-badge').textContent =
+    flags.length ? `top ${flags.length} ranked` : 'no red flags';
+  if (flags.length === 0) {
+    document.getElementById('flags-list').innerHTML = '<div class="empty-line">No red flags this week.</div>';
+  } else {
+    document.getElementById('flags-list').innerHTML = flags.slice(0, 10).map(ins => {
+      const { job, head } = titleFor(ins);
+      const sev = ins.severity || 'warn';
+      const summary = ins.summary_line || ins.message || '';
+      const slug = (ins.related_job || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      return `
+        <div class="flag-card ${sev}" id="job-${escape(slug)}">
+          <div class="check">☐</div>
+          <div class="body">
+            <div class="title"><span class="job">${escape(job)}</span> · ${escape(head)}</div>
+            <div class="summary">${escape(summary)}</div>
+          </div>
+          <div class="owner">
+            <span class="pm-name">${escape(ins.related_pm || '—')}</span>
+            <span class="age">${escape(ins.type)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* Week-over-week accountability rollup */
+  const acc = DATA.accountability_rollup || {};
+  document.getElementById('acc-badge').textContent =
+    acc.last_week ? `last week → ${acc.this_week}` : `first run · this week ${acc.this_week || ''}`;
+  if (acc.last_week_total) {
+    const resolvedPct = acc.last_week_total ? Math.round(100 * acc.resolved_total / acc.last_week_total) : 0;
+    document.getElementById('acc-rollup').innerHTML = `
+      <div class="col">
+        <span class="key">Last week · ${escape(acc.last_week)} · captured</span>
+        <span class="val">${acc.last_week_total} must-discuss</span>
+        <span class="key" style="margin-top:6px">Resolved (signal cleared)</span>
+        <span class="val ok">${acc.resolved_total} · ${resolvedPct}%</span>
+      </div>
+      <div class="col">
+        <span class="key">Carried over</span>
+        <span class="val ${acc.carried_total > 0 ? 'alert' : ''}">${acc.carried_total}</span>
+        <span class="key" style="margin-top:6px">Stuck (3 weeks+)</span>
+        <span class="val ${acc.stuck_total > 0 ? 'alert' : ''}">${acc.stuck_total}</span>
+      </div>`;
+  } else {
+    document.getElementById('acc-rollup').innerHTML = `
+      <div class="col" style="grid-column: 1 / -1;">
+        <span class="key">First run — no last-week data</span>
+        <span class="val">${acc.this_week_total || 0} must-discuss captured this week (snapshot saved)</span>
+        <span class="key" style="margin-top:6px">Next Monday's run will compare against this snapshot.</span>
+      </div>`;
+  }
+
+  /* PM summary */
+  const pms = DATA.pm_summary || [];
+  if (pms.length === 0) {
+    document.getElementById('pm-summary').innerHTML = '<div class="empty-line">No PM data.</div>';
+  } else {
+    const rows = pms.map(p => {
+      const flag = (p.stale > 2) ? '⚠' : '';
+      const flagClass = (p.stale > 2) ? ' alert' : '';
+      return `
+        <tr>
+          <td><div class="pm-name">${escape(p.pm)}</div><div class="jobs">${escape((p.jobs || []).join(' · '))}</div></td>
+          <td class="num">${p.must_discuss}</td>
+          <td class="num">${p.open_actions}</td>
+          <td class="num${flagClass}">${p.stale}</td>
+          <td class="flag-cell">${flag}</td>
+        </tr>`;
+    }).join('');
+    document.getElementById('pm-summary').innerHTML = `
+      <table class="pm-table">
+        <thead><tr>
+          <th>PM · Jobs</th>
+          <th class="num">Must<br>Discuss</th>
+          <th class="num">Open<br>Actions</th>
+          <th class="num">Stale</th>
+          <th class="flag-cell"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  /* Phase 12 Part B — aligned cross-PM rollup */
+  const aligned = DATA.aligned || {};
+
+  /* §1 PPC */
+  const ppcPM = aligned.ppc_per_pm || [];
+  if (ppcPM.length && (aligned.ppc_committed_total || 0) > 0) {
+    let html = `<table class="pm-table"><thead><tr>
+      <th>PM</th><th class="num">Committed</th><th class="num">Resolved</th>
+      <th class="num">Carried</th><th class="num">Stuck</th><th class="num">PPC%</th>
+    </tr></thead><tbody>`;
+    for (const p of ppcPM) {
+      html += `<tr>
+        <td><div class="pm-name">${escape(p.pm)}</div></td>
+        <td class="num">${p.committed}</td>
+        <td class="num">${p.resolved}</td>
+        <td class="num">${p.carried}</td>
+        <td class="num">${p.stuck}</td>
+        <td class="num">${p.ppc_pct == null ? '—' : p.ppc_pct + '%'}</td>
+      </tr>`;
+    }
+    html += `<tr><td><strong>AGGREGATE</strong></td>
+      <td class="num"><strong>${aligned.ppc_committed_total}</strong></td>
+      <td class="num"><strong>${aligned.ppc_resolved_total}</strong></td>
+      <td class="num"></td><td class="num"></td>
+      <td class="num"><strong>${aligned.ppc_aggregate == null ? '—' : aligned.ppc_aggregate + '%'}</strong></td>
+    </tr></tbody></table>`;
+    document.getElementById('aligned-ppc').innerHTML = html;
+  } else {
+    document.getElementById('aligned-ppc').innerHTML =
+      '<div class="empty-line">Baseline week — no prior plan to compare.</div>';
+  }
+
+  /* §2 Execution red flags */
+  const execRed = aligned.execution_red_flags || [];
+  if (execRed.length === 0) {
+    document.getElementById('aligned-exec').innerHTML =
+      '<div class="empty-line">No execution red flags in the 2-week look-ahead.</div>';
+  } else {
+    let html = '<ul style="margin:6px 0;padding-left:18px;font-size:11.5px;">';
+    for (const r of execRed.slice(0, 10)) {
+      html += `<li><strong>${escape(r.pm)}</strong> · ${escape((r.job||'').toUpperCase())} · ${escape(r.phase_name)} (${escape(r.phase_code)}) · sub: ${escape(r.sub || '—')}` +
+              (r.predecessor_complete === 'N' ? ' · <span class="alert">predecessor missing</span>' : '') +
+              (r.blockers ? ` · <span class="alert">blockers: ${escape(r.blockers)}</span>` : '') +
+              '</li>';
+    }
+    html += '</ul>';
+    document.getElementById('aligned-exec').innerHTML = html;
+  }
+
+  /* §5 category totals */
+  const catTotals = aligned.items_by_category_totals || {};
+  const totalAll = Object.values(catTotals).reduce((a,b) => a+b, 0);
+  if (totalAll === 0) {
+    document.getElementById('aligned-cats').innerHTML =
+      '<div class="empty-line">No open action items.</div>';
+  } else {
+    let html = '<table class="pm-table"><thead><tr><th>Category</th><th class="num">Open</th><th class="num">% of total</th></tr></thead><tbody>';
+    const cats = ['SCHEDULE','PROCUREMENT','SUB-TRADE','CLIENT','QUALITY','BUDGET','ADMIN','SELECTION'];
+    for (const c of cats) {
+      const n = catTotals[c] || 0;
+      if (n === 0) continue;
+      html += `<tr><td>${escape(c)}</td><td class="num">${n}</td><td class="num">${Math.round(100*n/totalAll)}%</td></tr>`;
+    }
+    html += `<tr><td><strong>TOTAL</strong></td><td class="num"><strong>${totalAll}</strong></td><td class="num"></td></tr>`;
+    html += '</tbody></table>';
+    document.getElementById('aligned-cats').innerHTML = html;
+  }
+
+  /* §7 financial */
+  const finJobs = aligned.financial_jobs || [];
+  let finHtml = `<div style="font-family: var(--font-mono); font-size: 11px; margin-bottom: 6px;"><strong>${aligned.open_budget_items || 0}</strong> open BUDGET-category items across all PMs.</div>`;
+  if (!finJobs.length) {
+    finHtml += '<div class="empty-line">No jobs with GP populated.</div>';
+  } else {
+    finHtml += '<table class="pm-table"><thead><tr><th>PM</th><th>Job</th><th class="num">GP</th><th class="num">Target CO</th></tr></thead><tbody>';
+    for (const j of finJobs) {
+      finHtml += `<tr><td>${escape(j.pm.split(' ')[0])}</td><td>${escape((j.job||'').toUpperCase())}</td><td class="num">${escape(j.gp)}</td><td class="num">${escape(j.targetCO)}</td></tr>`;
+    }
+    finHtml += '</tbody></table>';
+  }
+  document.getElementById('aligned-fin').innerHTML = finHtml;
+
+  // Bug 3 fix — convert .mp-sec h2 letter-spacing into explicit unicode HAIR SPACE
+  // characters in the rendered text. Edge --print-to-pdf inconsistently encodes
+  // CSS letter-spacing across pages (page 1-2 emits trailing space chars, page 3+
+  // emits per-glyph positioning without spaces, causing extraction tools to
+  // jam letters together). Embedding actual space chars guarantees consistent
+  // extraction regardless of which page the heading lands on.
+  document.querySelectorAll('.mp-sec h2').forEach(h2 => {
+    for (const node of Array.from(h2.childNodes)) {
+      if (node.nodeType === 3 && node.nodeValue) {
+        node.nodeValue = node.nodeValue.toUpperCase().replace(/(\S)(?=\S)/g, '$1 ');
+      }
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

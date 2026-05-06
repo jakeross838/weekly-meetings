@@ -1,0 +1,86 @@
+# =============================================================================
+# Ross Built — weekly-meetings .gitignore
+# =============================================================================
+# Principle: code + config + planning docs go in. Anything containing client,
+# sub, vendor, or financial data stays out. The orchestrator regenerates all
+# data files locally from buildertrend-scraper/data/daily-logs.json + transcripts;
+# nothing in this list is required to reconstruct the codebase.
+
+# ----- Client / sub / financial data --------------------------------------
+data/*.json
+data/*.md
+binders/*.json
+binders/enriched/*.json
+transcripts/inbox/*
+transcripts/processed/*
+transcripts/skipped/*
+api-responses/*
+state/*
+logs/*
+tmp-pdfs/*
+tmp-pdfs/
+exports/*
+print/*
+binders-backup-*/
+binders-backup-*
+
+# ----- Rendered binder artifacts (contain client data) --------------------
+monday-binder/jobs.html
+monday-binder/jobs.pdf
+monday-binder/phase-library.html
+monday-binder/phase-library.pdf
+monday-binder/meeting-prep/
+
+# v1 archive: keep the .py / .bat / .md / .lnk for reference, drop the
+# rendered HTML snapshots (they contain client data).
+monday-binder-v1-archive/*.html
+
+# ----- One-off audit / backfill / dedup log artifacts ---------------------
+# (Reference action item IDs and snippets — same sensitivity class as binders.)
+scripts/backfill-log-*.md
+scripts/category-correction-log-*.md
+scripts/dedup-log-*.md
+
+# ----- Generated debug state files ----------------------------------------
+scripts/_phase3_*state.json
+.planning/**/scripts/_phase3_*state.json
+
+# ----- Rendered mockups (contain real client/PM data) --------------------
+.planning/**/mockups/
+
+# ----- Python build / cache artifacts -------------------------------------
+*.pyc
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ----- Environments / dependency lockfiles by tool -----------------------
+.venv/
+venv/
+env/
+
+# ----- Sensitive config / secrets -----------------------------------------
+.env
+.env.*
+*.env
+*secret*
+*credential*
+*_key.txt
+*.pem
+*.key
+
+# ----- Editor / IDE -------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ----- OS noise -----------------------------------------------------------
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ----- Claude Code / agent state -----------------------------------------
+.claude/

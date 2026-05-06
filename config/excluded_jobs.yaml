@@ -1,0 +1,10 @@
+# Jobs filtered out of Schedule Intelligence insight generation.
+#
+# Listed jobs are skipped by all generators (G1/G2/G3) and never appear
+# in insight output. Use job_short names that match the keys in
+# data/job-stages.json.
+#
+# Reason captured per entry so future maintainers know why.
+excluded:
+  - job: FieldCrew
+    reason: Internal Ross Built crew bucket — not a real construction job. Tracking it in insights creates an "(unmapped)" PM ghost.

@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Job Document</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/styles.css">
+<link rel="stylesheet" href="../../assets/nightwork-tokens.css">
+<script src="../../assets/components.js"></script>
+<style>
+/* Phase 13 — Single-job living document. Same Nightwork visual language
+   as the prior office/site packets; sections filtered to one job. */
+@page { size: letter landscape; margin: 0.4in 0.5in; }
+
+.mp { max-width: 10.5in; margin: 0 auto; padding: 12px 0 18px; font-size: 11.5px; line-height: 1.35; }
+
+/* Header band */
+.mp-band {
+  border: 1.5px solid var(--ink);
+  padding: 10px 16px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+}
+.mp-band h1 {
+  font-family: var(--font-head);
+  font-size: 18px; font-weight: 700; letter-spacing: 0.5px;
+  margin: 0; color: var(--ink);
+}
+.mp-band .mode-tag {
+  font-family: var(--font-head);
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--ink-2); margin-top: 4px;
+}
+.mp-band .right { text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.mp-band .right .when { font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+.mp-band .right a { color: var(--accent); text-decoration: none; }
+
+/* Statline */
+.mp-statline {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink-2);
+  display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between;
+  padding: 6px 16px; border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.mp-statline strong { color: var(--ink); font-weight: 600; }
+
+/* §1 Job Context block */
+.job-context {
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  margin: 8px 0;
+  background: var(--bg-card);
+  break-inside: avoid;
+}
+.job-context .top {
+  display: flex; gap: 18px; align-items: baseline; margin-bottom: 4px;
+  font-family: var(--font-head);
+}
+.job-context .job-name { font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+.job-context .stage-pill {
+  font-family: var(--font-mono); font-size: 10px;
+  background: var(--accent); color: var(--bg-card);
+  padding: 2px 8px; letter-spacing: 0.4px;
+}
+.job-context .pm-line { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); margin-left: auto; }
+.job-context .pm-line a { color: var(--accent); text-decoration: none; }
+.job-context .meta-line {
+  font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--ink-2);
+  display: flex; gap: 18px; flex-wrap: wrap; padding: 4px 0;
+}
+.job-context .meta-line strong { color: var(--ink); }
+.job-context .progress-line {
+  font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--ink-2);
+  padding: 4px 0;
+}
+.job-context .progress-line .ph { color: var(--ink); font-weight: 500; }
+.job-context .progress-line .ph.amber { color: #c89a3a; font-weight: 600; }
+.job-context .progress-line .ph.red { color: var(--nw-danger); font-weight: 700; }
+.job-context .changed-line {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--ink-2);
+  padding: 4px 0 0;
+  border-top: 1px dotted var(--line-2);
+  margin-top: 4px;
+}
+.job-context .changed-line .pill { display: inline-block; padding: 1px 6px; background: var(--bg-soft); margin: 0 4px; }
+
+/* Section headings */
+.mp-sec { margin-top: 14px; }
+.mp-sec h2 {
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink); margin: 0; padding: 6px 0;
+  border-top: 1.2px solid var(--ink);
+  border-bottom: 1.2px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline;
+  break-after: avoid; page-break-after: avoid;
+}
+.mp-sec h2 .meta {
+  font-family: var(--font-mono);
+  font-size: 10px; text-transform: none; letter-spacing: 0.4px;
+  color: var(--ink-3); font-weight: 500;
+}
+.mp-sec-body { padding: 8px 0 4px; }
+.empty-note { color: var(--ink-3); font-style: italic; padding: 4px 6px; font-size: 11px; }
+
+/* Tables (§2 / §3) */
+.flow-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 6px; }
+.flow-table th { font-family: var(--font-head); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--ink); color: var(--ink-2); white-space: nowrap; }
+.flow-table td { padding: 4px 6px; border-bottom: 1px dotted var(--line-2); vertical-align: top; }
+.flow-table tr.flag td { background: rgba(212, 84, 78, 0.08); }
+.flow-table tr.pre-data td { color: var(--ink-3); font-style: italic; background: rgba(0,0,0,0.015); }
+.flow-table tr.pre-data td:first-child { font-style: normal; }
+.flow-table .yn { font-family: var(--font-mono); font-weight: 600; text-align: center; }
+.flow-table .yn.n { color: var(--nw-danger); }
+.flow-table .yn.y { color: var(--nw-good); }
+.flow-table .yn.q { color: var(--ink-3); }
+
+/* Active subs */
+.subs-signals-block {
+  background: var(--bg-soft);
+  padding: 8px 12px;
+  border-left: 2.5px solid var(--accent);
+  margin-top: 12px;
+  break-inside: avoid;
+}
+.subs-signals-block h3 { font-family: var(--font-head); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 4px; color: var(--ink-2); }
+.sub-signal-row { display: grid; grid-template-columns: 6px 1fr auto auto auto; gap: 8px; padding: 2px 0; font-size: 10.5px; align-items: baseline; }
+.sub-signal-row .pip { font-size: 14px; line-height: 1; }
+.sub-signal-row.red .pip { color: var(--nw-danger); }
+.sub-signal-row.yellow .pip { color: #c89a3a; }
+.sub-signal-row.green .pip { color: var(--nw-good); }
+.sub-signal-row .sub-name { color: var(--ink); font-weight: 500; }
+.sub-signal-row.red .sub-name { color: var(--accent); font-weight: 700; }
+.sub-signal-row .stat { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); }
+.sub-signal-row .stat.warn { color: var(--nw-danger); font-weight: 600; }
+
+/* §2c Predicted */
+.predicted-section { border: 1.2px dashed var(--accent); padding: 8px 12px; margin-top: 14px; background: rgba(91,134,153,0.04); break-inside: avoid; }
+.predicted-section h3 { font-family: var(--font-head); font-style: italic; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.predicted-row { display: grid; grid-template-columns: 16px 1fr auto auto; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--line-2); font-size: 11px; align-items: baseline; }
+.predicted-row .icon { font-size: 11px; color: var(--accent); }
+.predicted-row .action { color: var(--ink); font-style: italic; }
+.predicted-row .actions { font-family: var(--font-mono); font-size: 9px; color: var(--ink-3); }
+
+/* Item card layout (§5/§6/§7) */
+.cat-block { margin-bottom: 10px; }
+.cat-head {
+  display: flex; gap: 10px; align-items: baseline;
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.2px;
+  padding: 6px 0 4px; color: var(--ink);
+  border-top: 1px solid var(--ink);
+}
+.cat-head .count { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); font-weight: 500; }
+
+.item-card { padding: 5px 0; border-bottom: 1px dotted var(--line-2); page-break-inside: avoid; break-inside: avoid; }
+.item-card.predicted { background: rgba(91,134,153,0.05); padding-left: 6px; }
+.item-card.predicted .card-headline { font-style: italic; color: var(--ink-2); }
+.card-line-1 { display: grid; grid-template-columns: 56px 1fr auto auto auto; gap: 10px; align-items: baseline; font-size: 11.5px; line-height: 1.35; }
+.card-id { font-family: var(--font-mono); color: var(--ink-3); font-size: 9.5px; }
+.card-headline { font-weight: 500; color: var(--ink); }
+.card-headline .owner { font-weight: 700; color: var(--ink); }
+.card-review-flag { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); cursor: help; }
+.card-due { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); white-space: nowrap; text-align: right; min-width: 80px; }
+.card-due.overdue { color: var(--nw-danger); font-weight: 700; }
+.card-due.today { color: #b87333; font-weight: 700; }
+.card-due.closed { color: var(--nw-good); }
+.card-pri { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-3); text-align: right; min-width: 50px; }
+.card-pri.urgent { color: var(--nw-danger); font-weight: 700; }
+.card-pri.high { color: var(--accent); font-weight: 600; }
+.card-line-2 { margin-top: 2px; margin-left: 66px; margin-right: 8px; font-size: 10.5px; color: var(--ink-2); line-height: 1.4; }
+.card-line-3 { margin-top: 1px; margin-left: 66px; margin-right: 8px; font-size: 9.5px; color: var(--ink-3); font-style: italic; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.phase-cross-ref { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); font-style: italic; padding: 0 0 2px 66px; }
+.phase-cross-ref::before { content: "↳ "; color: var(--accent); }
+
+/* Fix 1 (wmp21) — compact reference row for items canonical elsewhere */
+.compact-ref {
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto;
+  gap: 8px;
+  padding: 2px 0 2px 8px;
+  font-size: 10.5px;
+  border-left: 2px solid var(--line-2);
+  border-bottom: 1px dotted var(--line-2);
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+  align-items: baseline;
+}
+.compact-ref a { color: var(--accent); text-decoration: none; }
+.compact-ref a:hover { text-decoration: underline; }
+.compact-ref .arrow::before { content: "→ "; color: var(--accent); }
+.compact-ref .id { font-size: 9.5px; color: var(--ink-3); }
+.compact-ref .due-mini { font-size: 9.5px; color: var(--ink-2); white-space: nowrap; }
+.compact-ref .due-mini.overdue { color: var(--nw-danger); font-weight: 600; }
+.compact-ref .pri-mini { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-3); }
+.compact-ref .pri-mini.urgent { color: var(--nw-danger); font-weight: 700; }
+.sub-status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 3px; vertical-align: middle; }
+.sub-status-dot.red { background: var(--nw-danger); }
+.sub-status-dot.yellow { background: #c89a3a; }
+.sub-status-dot.green { background: var(--nw-good); }
+
+/* §5b Waiting */
+.waiting-block { margin-top: 14px; padding: 8px 12px; border-left: 2.5px solid var(--ink-3); background: rgba(0,0,0,0.02); break-inside: avoid; }
+.waiting-block h3 { font-family: var(--font-head); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.waiting-block .owner-grp { font-family: var(--font-head); font-size: 11px; font-weight: 600; margin: 6px 0 2px; color: var(--ink); }
+
+/* §9 Client decisions */
+.client-decisions-block { margin-top: 6px; }
+.client-decisions-block h2 { font-family: var(--font-head); font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ink); margin: 0; padding: 6px 0; border-top: 1.2px solid var(--ink); border-bottom: 1.2px solid var(--line); display: flex; justify-content: space-between; break-after: avoid; page-break-after: avoid; }
+.client-decisions-block .person-grp { margin: 6px 0; padding: 6px 0 4px; border-bottom: 1px dotted var(--line-2); }
+.client-decisions-block .person-name { font-family: var(--font-head); font-size: 11px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.client-decisions-block .person-name .count { font-family: var(--font-mono); font-weight: 500; font-size: 10px; color: var(--ink-3); margin-left: 8px; }
+
+/* §7 Financial */
+.fin-row { display: grid; grid-template-columns: 1fr 70px 80px 60px; gap: 8px; padding: 3px 0; border-bottom: 1px dotted var(--line-2); font-size: 10.5px; font-family: var(--font-mono); }
+
+/* §8 Walk notes */
+.walk-area {
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-soft);
+  break-inside: avoid;
+}
+.walk-area h3 { font-family: var(--font-head); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 4px; color: var(--ink); display: flex; justify-content: space-between; align-items: baseline; }
+.walk-area .area-meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); font-weight: 500; }
+.walk-area .subs-line { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); margin: 2px 0 6px; }
+.walk-phase { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 0; color: var(--ink-2); }
+.walk-phase strong { color: var(--ink); }
+
+.hold-row { display: grid; grid-template-columns: 80px 130px 1fr 80px; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--line-2); font-size: 11px; align-items: baseline; }
+.hold-row .kind { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-2); }
+
+.field-capture {
+  margin-top: 12px;
+  border: 1.2px dashed var(--ink-3);
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.015);
+}
+.field-capture h3 { font-family: var(--font-head); font-style: italic; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.field-capture .placeholder { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); font-style: italic; padding: 6px 4px; }
+.capture-row { display: grid; grid-template-columns: 100px 1fr 100px 80px; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 11.5px; font-family: var(--font-mono); min-height: 18px; }
+.capture-row .lbl { color: var(--ink-3); font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+/* Footer */
+.mp-foot { margin-top: 18px; padding-top: 8px; border-top: 1px dashed var(--line); font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); display: flex; justify-content: space-between; }
+
+@media print {
+  body { margin: 0; }
+  .mp-sec, .walk-area, .item-card { break-inside: avoid; }
+  .card-line-3 { -webkit-line-clamp: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .subs-signals-block, .predicted-section, .waiting-block, .field-capture, .walk-area {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}
+</style>
+</head>
+<body>
+<div class="mp">
+
+<header class="mp-band">
+  <div>
+    <h1 id="hdr-job">JOB</h1>
+    <div class="mode-tag">Job Document · Living State</div>
+  </div>
+  <div class="right">
+    <div class="when" id="hdr-today">—</div>
+    <div id="hdr-pm">—</div>
+  </div>
+</header>
+
+<div class="mp-statline" id="statline"></div>
+
+<!-- §1 Job Context block -->
+<div class="job-context" id="job-context"></div>
+
+<!-- §0 Recently Completed (last 7 days) -->
+<section class="mp-sec" id="sec-recent">
+  <h2>Recently Completed <span class="meta">~2 min · review only · last 7 days</span></h2>
+  <div class="mp-sec-body" id="recent-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-2">
+  <h2>§2 Execution (next 14 days) <span class="meta">must be confirmed</span></h2>
+  <div class="mp-sec-body" id="execution-body"></div>
+  <div id="sub-signals-body"></div>
+  <div id="predicted-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-3">
+  <h2>§3 Coordination (15-28 days) <span class="meta">sequencing dependencies</span></h2>
+  <div class="mp-sec-body" id="coord-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-4">
+  <h2>§4 Procurement &amp; Selections Gate <span class="meta">long-lead + active this week</span></h2>
+  <div class="mp-sec-body" id="procurement-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-5">
+  <h2>§5 Open Action Items by Category <span class="meta">priority &gt; aging</span></h2>
+  <div class="mp-sec-body" id="items-body"></div>
+  <div id="waiting-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-6">
+  <h2>§6 Outstanding Selections <span class="meta">client/designer</span></h2>
+  <div class="mp-sec-body" id="selections-body"></div>
+</section>
+
+<section class="mp-sec" id="sec-7">
+  <h2>§7 Escalations + Budget + Financial <span class="meta">on-fire items</span></h2>
+  <div class="mp-sec-body" id="issues-body"></div>
+</section>
+
+<!-- §8 Walk Notes — merged from old site packet -->
+<section class="mp-sec" id="sec-8">
+  <h2>§8 Walk Notes <span class="meta">site-walk content (was site packet §2/§4/§5)</span></h2>
+  <div class="mp-sec-body" id="walk-body"></div>
+  <div id="hold-body"></div>
+  <div id="field-capture-body"></div>
+</section>
+
+<!-- §9 Client Decisions Pending -->
+<section class="mp-sec" id="sec-clients">
+  <div id="client-decisions-wrap"></div>
+</section>
+
+<footer class="mp-foot">
+  <span>Phase 13 · Job-centric · single document per job</span>
+  <span id="foot-pm">—</span>
+</footer>
+
+</div>
+
+<script type="application/json" id="mp-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const SI = window.SI || {};
+  const DATA = JSON.parse(document.getElementById('mp-data').textContent);
+  const escape = (SI.escapeHtml) || function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+    );
+  };
+
+  document.title = `${DATA.job} — Job Document`;
+  document.getElementById('hdr-job').textContent = (DATA.job || '').toUpperCase();
+  document.getElementById('hdr-today').textContent = DATA.today;
+  document.getElementById('hdr-pm').innerHTML = `PM: <a href="/meeting-prep/pm/${escape(DATA.pm_slug)}">${escape(DATA.pm)}</a>`;
+  document.getElementById('foot-pm').textContent = `PM: ${DATA.pm}`;
+
+  // ---- Shared helpers (top of IIFE — TDZ-safe placement per wmp19) ----
+  function renderHeadline(headline) {
+    const idx = (headline || '').indexOf(' · ');
+    if (idx > 0) return `<span class="owner">${escape(headline.slice(0, idx))}</span> · ${escape(headline.slice(idx + 3))}`;
+    return escape(headline || '');
+  }
+  function dueLabel(urgency, item) {
+    const u = urgency || {};
+    const due = item.due || '';
+    const kind = u.kind || 'none';
+    if (kind === 'overdue') return `<span class="card-due overdue">${escape(due)} · ${escape(u.label)}</span>`;
+    if (kind === 'today')   return `<span class="card-due today">${escape(u.label)}</span>`;
+    if (kind === 'future')  return `<span class="card-due">${escape(due)} · ${escape(u.label)}</span>`;
+    return `<span class="card-due">${escape(due || u.label || '—')}</span>`;
+  }
+  const SUB_STATUS = {};
+  for (const s of (DATA.sub_signals || {active: []}).active || []) SUB_STATUS[s.sub] = s.status;
+  function maybeSubStatusDot(item) {
+    const sub = item.related_sub || '';
+    if (!sub) return '';
+    let status = SUB_STATUS[sub];
+    if (!status) {
+      for (const k of Object.keys(SUB_STATUS)) {
+        if (sub.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(sub.toLowerCase())) { status = SUB_STATUS[k]; break; }
+      }
+    }
+    if (!status) return '';
+    return `<span class="sub-status-dot ${status.toLowerCase()}" title="${escape(sub)} ${status}"></span>`;
+  }
+  function renderItemCard(i) {
+    const isPred = i.source === 'system_predicted';
+    const cls = isPred ? ' predicted' : '';
+    const head = i.headline || i.action || '';
+    const detail = i.detail || '';
+    const upd = i.update_excerpt || '';
+    const review = i.category_review ? '<span class="card-review-flag" title="categorization flagged">?</span>' : '';
+    const subDot = maybeSubStatusDot(i);
+    const gates = (i.gates_phase_code && i.gates_phase_name)
+      ? `<div class="phase-cross-ref">Gates: ${escape(i.gates_phase_code)} ${escape(i.gates_phase_name)}</div>` : '';
+    return `<div class="item-card${cls}">
+      <div class="card-line-1">
+        <span class="card-id">${escape(i.id || '')}</span>
+        <span class="card-headline">${renderHeadline(head)}${subDot}</span>
+        ${review}
+        ${dueLabel(i.urgency, i)}
+        <span class="card-pri ${(i.priority||'').toLowerCase()}">${escape(i.priority || '')}</span>
+      </div>
+      ${detail ? `<div class="card-line-2">${escape(detail)}</div>` : ''}
+      ${upd ? `<div class="card-line-3">${escape(upd)}</div>` : ''}
+      ${gates}
+    </div>`;
+  }
+  function renderClosedCard(i) {
+    return `<div class="item-card">
+      <div class="card-line-1">
+        <span class="card-id">${escape(i.id || '')}</span>
+        <span class="card-headline">${renderHeadline(i.headline || i.action || '')}</span>
+        <span class="card-due closed">closed ${escape(i.close_date || '')}</span>
+        <span class="card-pri" style="color:var(--ink-3);">${escape((i.job||'').toUpperCase())}</span>
+      </div>
+    </div>`;
+  }
+  // Fix 1 (wmp21) — compact reference for items rendered fully elsewhere
+  function renderCompactRef(i) {
+    const head = (i.headline || i.action || '');
+    const short = head.length > 70 ? head.slice(0, 67) + '…' : head;
+    const u = i.urgency || {};
+    const dueClass = u.kind === 'overdue' ? 'overdue' : '';
+    const dueText = u.label || (i.due || '');
+    const pri = (i.priority || '').toLowerCase();
+    return `<div class="compact-ref" id="ref-${escape(i.id || '')}">
+      <span class="id">${escape(i.id || '')}</span>
+      <span><a class="arrow" href="#item-${escape(i.id || '')}">${escape(short)}</a></span>
+      <span class="due-mini ${dueClass}">${escape(dueText)}</span>
+      <span class="pri-mini ${pri}">${escape(i.priority || '')}</span>
+    </div>`;
+  }
+  // Wrapped renderItemCard adds the anchor id on canonical homes
+  function renderCanonicalCard(i) {
+    const card = renderItemCard(i);
+    // Inject id="item-{id}" into the wrapping div
+    const id = (i.id || '');
+    return card.replace('<div class="item-card', `<div id="item-${escape(id)}" class="item-card`)
+               .replace('<div class="item-card predicted', `<div id="item-${escape(id)}" class="item-card predicted`);
+  }
+  function renderItemAt(i, sectionName) {
+    // Render a full card at canonical home, compact ref elsewhere.
+    if (i.canonical_section === sectionName) return renderCanonicalCard(i);
+    return renderCompactRef(i);
+  }
+
+  // ---- Statline ----
+  const stats = DATA.stats || {};
+  const overdueChip = (stats.overdue > 0)
+    ? `<span><strong style="color:var(--nw-danger);">${stats.overdue}</strong> overdue</span>`
+    : `<span><strong>0</strong> overdue</span>`;
+  document.getElementById('statline').innerHTML = [
+    `<span><strong>${stats.open}</strong> open actions</span>`,
+    overdueChip,
+    `<span><strong>${stats.stale}</strong> stale (&gt;14d)</span>`,
+    `<span><strong>${stats.selections_open}</strong> selections open</span>`,
+    `<span><strong>${stats.predicted}</strong> system-predicted</span>`,
+    `<span><strong>${stats.waiting}</strong> waiting on others</span>`,
+    `<span><strong>${stats.recently_completed}</strong> closed last 7d</span>`,
+  ].join('');
+
+  // ---- §1 Job Context block ----
+  (function renderJobContext() {
+    const c = DATA.job_header || {};
+    const reg = DATA.registry || {};
+    const wc = DATA.what_changed || {};
+    // Fix 4 (wmp21) — cap days_in_stage display at 365+ when data
+    // attribution flag is set (older log entries misattributed).
+    let days = '';
+    if (c.days_in_stage != null) {
+      days = c.days_in_stage_attribution_flag
+        ? '365+d in stage <span style="color:var(--nw-danger);font-weight:600;" title="data attribution issue">⚠</span>'
+        : `${c.days_in_stage}d in stage`;
+    }
+    const last = c.last_log_date ? `last log ${c.last_log_date}` : '';
+    const lastSub = c.last_sub_on_site ? `last sub: ${escape(c.last_sub_on_site)}` : '';
+    const co = (c.target_co || reg.target_co) ? `CO target ${escape(c.target_co || reg.target_co)}` : '';
+    const gp = (reg.gp && reg.gp !== '—') ? `GP ${escape(reg.gp)}` : '';
+    const status = (reg.status && reg.status !== '—')
+      ? `<span style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.6px;background:var(--bg-soft);padding:1px 6px;color:var(--ink-2);">status ${escape(reg.status)}</span>` : '';
+
+    // Phase progress signal — collect ongoing phases with progress data.
+    // Fix 3 (wmp21) — show "—" for missing median (was "?").
+    // Fix 4 (wmp21) — render pre_data phases as "(pre-data, 365+ days)".
+    // Bug 4 (wmp22) — suppress phases from Active Phases line when their
+    // days_active exceeds the configured threshold (default 90d) AND the
+    // phase is upstream of the job's current_stage. The ⚠ data-attribution
+    // warning footnote still fires below so the data quality issue stays
+    // visible — but stale phases stop polluting "Active phases:" with noise
+    // like "Roof Truss Set 365+ days" on a closeout job.
+    const SUPPRESS_DAYS = (DATA.thresholds && DATA.thresholds.phase_active_suppress_days) || 90;
+    const ongoing = [];
+    for (const jb of (DATA.execution_2wk || [])) {
+      const curStage = jb.current_stage;
+      for (const r of (jb.rows || [])) {
+        if (!r.progress) continue;
+        const days = r.progress.days_active || 0;
+        const stale = (curStage != null && r.stage != null && r.stage < curStage && days > SUPPRESS_DAYS);
+        if (stale) continue;
+        if (r.progress.kind === 'pre_data') {
+          ongoing.push(`<span class="ph red">${escape(r.phase_name)} (pre-data, 365+ days)</span>`);
+          continue;
+        }
+        if (r.progress.kind !== 'ongoing') continue;
+        const fl = r.progress.flag || 'ok';
+        const fcls = fl === 'red' ? 'red' : fl === 'amber' ? 'amber' : '';
+        const med = r.progress.median_days != null ? `${r.progress.median_days}d` : '—';
+        ongoing.push(`<span class="ph ${fcls}">${escape(r.phase_name)} ${days}d / ${escape(med)} typical</span>`);
+      }
+    }
+    const progressLine = ongoing.length
+      ? `<div class="progress-line">Active phases: ${ongoing.join(' · ')}</div>` : '';
+
+    // Items by category bar
+    const cats = DATA.items_by_category || {};
+    const catBar = Object.keys(cats).length
+      ? `<div class="meta-line"><span><strong>Open by category:</strong> ${Object.entries(cats).map(([k,v]) => `${escape(k)} ${v.length}`).join(' · ')}</span></div>` : '';
+
+    // What changed mini-line — Fix 8 (wmp21): informative empty-state phrasing.
+    const totalChanges = (wc.new || 0) + (wc.closed || 0) + (wc.escalated || 0) + (wc.waiting || 0);
+    let changedLine;
+    if (totalChanges === 0) {
+      changedLine = `<div class="changed-line"><span style="text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-3);">last 7d</span> <em>No transcript activity in last 7 days.</em></div>`;
+    } else {
+      const newCat = wc.new_by_cat || {};
+      const newCatLabel = Object.keys(newCat).length
+        ? ' (' + Object.entries(newCat).map(([k,v]) => `${v} ${escape(k)}`).join(', ') + ')' : '';
+      changedLine = `<div class="changed-line">
+        <span style="text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-3);">last 7d</span>
+        <span class="pill">+<strong>${wc.new || 0}</strong> new${newCatLabel}</span>
+        <span class="pill"><strong>${wc.closed || 0}</strong> closed</span>
+        <span class="pill"><strong>${wc.escalated || 0}</strong> escalated</span>
+        <span class="pill"><strong>${wc.waiting || 0}</strong> waiting</span>
+      </div>`;
+    }
+
+    // Fix 4 (wmp21) — explicit data-attribution warning when triggered
+    const attrNote = c.days_in_stage_attribution_flag
+      ? `<div style="background:rgba(212,84,78,0.08);border-left:2.5px solid var(--nw-danger);padding:4px 10px;margin:6px 0 0;font-size:9.5px;font-family:var(--font-mono);color:var(--ink-2);">
+          ⚠ Phase activity dates show 365+ — likely data attribution issue from older log entries. Surfacing honestly until data classifier audit.
+        </div>` : '';
+
+    document.getElementById('job-context').innerHTML = `
+      <div class="top">
+        <span class="job-name">${escape(c.job || DATA.job)}</span>
+        <span class="stage-pill">stage ${c.current_stage} · ${escape(c.current_stage_name || '')}</span>
+        ${status}
+        <span class="pm-line">PM: <a href="/meeting-prep/pm/${escape(DATA.pm_slug)}">${escape(DATA.pm)}</a></span>
+      </div>
+      <div class="meta-line">
+        ${[days, last, lastSub, co, gp].filter(Boolean).map(b => `<span>${b}</span>`).join('')}
+      </div>
+      ${progressLine}
+      ${catBar}
+      ${changedLine}
+      ${attrNote}
+    `;
+  })();
+
+  // ---- §0 Recently Completed ----
+  (function () {
+    const body = document.getElementById('recent-body');
+    const groups = DATA.recently_completed || {};
+    const cats = Object.keys(groups);
+    if (!cats.length) { body.innerHTML = '<div class="empty-note">No items closed this week.</div>'; return; }
+    let html = '';
+    for (const cat of cats) {
+      const items = groups[cat] || [];
+      if (!items.length) continue;
+      html += `<div class="cat-block"><div class="cat-head"><span>${escape(cat)}</span><span class="count">${items.length} closed</span></div>`;
+      for (const i of items) html += renderClosedCard(i);
+      html += '</div>';
+    }
+    body.innerHTML = html;
+  })();
+
+  // ---- §2 Execution ----
+  function renderProgress(p) {
+    if (!p) return '';
+    if (p.kind === 'complete') return '<span style="color:var(--nw-good);font-family:var(--font-mono);font-size:9.5px;">✓ complete</span>';
+    if (p.kind !== 'ongoing') return '';
+    const fl = p.flag || 'ok';
+    const cls = fl === 'red' ? 'n' : fl === 'amber' ? 'q' : 'y';
+    const med = p.median_days != null ? `${p.median_days}d` : '?';
+    return `<span class="yn ${cls}">${p.days_active}d / ${escape(med)} typical</span>`;
+  }
+  (function () {
+    const body = document.getElementById('execution-body');
+    const blocks = DATA.execution_2wk || [];
+    if (!blocks.length) { body.innerHTML = '<div class="empty-note">No active phases for this job in the next 14 days.</div>'; return; }
+    let html = '<div style="font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);margin:4px 0 6px;">Progress = days active vs phase median. Forecasting is Phase 11.</div>';
+    for (const b of blocks) {
+      const actionable = (b.rows || []).filter(r => !r.pre_data);
+      const preData = (b.rows || []).filter(r => r.pre_data);
+      if (b.logging_gap && preData.length > 2) {
+        html += `<details style="margin:4px 0 6px;font-family:var(--font-mono);font-size:10.5px;background:rgba(212,84,78,0.08);border-left:2.5px solid var(--nw-danger);padding:5px 12px;">
+          <summary style="cursor:pointer;color:var(--ink-2);">⚠ ${preData.length} earlier-stage phases (pre-data) — not shown by default. <span style="color:var(--accent);">[expand]</span></summary>
+          <div style="margin-top:6px;color:var(--ink-3);">Pre-data phases: ${preData.map(r => escape(r.phase_code)).join(', ')}.</div>
+        </details>`;
+      }
+      html += `<table class="flow-table"><thead><tr>
+        <th>Phase</th><th>Sub</th><th>Materials</th><th>Predecessor</th><th>Confirmed</th><th>Progress</th><th>Blockers</th>
+      </tr></thead><tbody>`;
+      const rowsToShow = (b.logging_gap && preData.length > 2) ? actionable : (b.rows || []);
+      for (const r of rowsToShow) {
+        const flag = (r.any_red_flag && !r.pre_data) ? ' flag' : '';
+        const preDataCls = r.pre_data ? ' pre-data' : '';
+        const name = (r.phase_name || '') + (r.phase_code ? ` (${r.phase_code})` : '');
+        const predCls = r.predecessor_complete === 'N' ? 'n' : r.predecessor_complete === 'Y' ? 'y' : 'q';
+        html += `<tr class="${flag}${preDataCls}">
+          <td>${escape(name)}${r.pre_data ? ' <span style="color:var(--ink-3);font-size:9.5px;">(pre-data)</span>' : ''}</td>
+          <td>${escape(r.sub || '—')}</td>
+          <td class="yn ${r.materials_on_site === 'N' ? 'n' : (r.materials_on_site && r.materials_on_site.startsWith && r.materials_on_site.startsWith('PENDING') ? 'q' : (r.materials_on_site === 'Y' ? 'y' : 'q'))}">${escape(r.materials_on_site)}${r.materials_detail ? ' <span style="color:var(--ink-3);font-size:9px;">'+escape(r.materials_detail)+'</span>' : ''}</td>
+          <td class="yn ${predCls}">${escape(r.predecessor_complete)}</td>
+          <td class="yn ${r.confirmed === 'N' ? 'n' : (r.confirmed === 'Y' ? 'y' : 'q')}">${escape(r.confirmed)}${r.confirmed_detail ? ' <span style="color:var(--ink-3);font-size:9px;">'+escape(r.confirmed_detail)+'</span>' : ''}</td>
+          <td>${renderProgress(r.progress)}</td>
+          <td>${escape(r.blockers || '—')}</td>
+        </tr>`;
+        if ((r.cross_ref_ids || []).length && !r.pre_data) {
+          html += `<tr><td colspan="7"><div class="phase-cross-ref">See: ${r.cross_ref_ids.map(id => escape(id)).join(' · ')}</div></td></tr>`;
+        }
+      }
+      html += '</tbody></table>';
+    }
+    body.innerHTML = html;
+  })();
+
+  // ---- §2b Active Subs ----
+  (function () {
+    const body = document.getElementById('sub-signals-body');
+    const data = DATA.sub_signals || {active: []};
+    const visible = (data.active || []).filter(s => s.status !== 'GREEN').slice(0, 10);
+    if (!visible.length) { body.innerHTML = ''; return; }
+    let html = `<div class="subs-signals-block"><h3>Active subs · risk signals (this job)</h3>`;
+    for (const s of visible) {
+      const cls = s.status.toLowerCase();
+      const vsB = s.vs_baseline != null ? ((s.vs_baseline >= 0 ? '+' : '') + Math.round(s.vs_baseline*100) + '%') : '—';
+      const dens = s.density != null ? Math.round(s.density*100) + '%' : '—';
+      const warn = s.status === 'RED'
+        ? '<span class="stat warn">⚠ RED — across portfolio</span>'
+        : (s.drift ? `<span class="stat warn">${escape(s.drift)}</span>` : '');
+      html += `<div class="sub-signal-row ${cls}">
+        <span class="pip">●</span>
+        <span class="sub-name">${escape(s.sub)}</span>
+        <span class="stat">${dens} density · vs phase median ${vsB}</span>
+        ${warn}
+        <span class="stat">${s.jobs_touching.join(', ')}</span>
+      </div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  })();
+
+  // ---- §2c Predicted ----
+  (function () {
+    const body = document.getElementById('predicted-body');
+    const items = DATA.execution_predicted || [];
+    if (!items.length) { body.innerHTML = ''; return; }
+    let html = `<div class="predicted-section"><h3>§2c System-suggested items — review and accept/dismiss</h3>`;
+    for (const p of items.slice(0, 12)) {
+      html += `<div class="predicted-row">
+        <span class="icon">⊕</span>
+        <span class="action">${escape(p.action)}</span>
+        <span class="actions">[Accept] [Dismiss]</span>
+      </div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  })();
+
+  // ---- §3 Coordination ----
+  (function () {
+    const body = document.getElementById('coord-body');
+    const blocks = DATA.coordination_4wk || [];
+    if (!blocks.length) { body.innerHTML = '<div class="empty-note">No 4-week coordination items.</div>'; return; }
+    let html = '';
+    for (const b of blocks) {
+      if (b.in_house_only) {
+        const seq = (b.rows || []).map(r => r.phase_name).join(' → ');
+        html += `<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-2);padding:6px 0;line-height:1.5;">
+          Closeout sequence: <strong style="color:var(--ink);">${escape(seq)}</strong>. Ross Built Crew. Confirm timing this meeting.
+        </div>`;
+        continue;
+      }
+      html += `<table class="flow-table"><thead><tr>
+        <th>Phase</th><th>Sub</th><th>Predecessors</th><th>Needs Confirmation</th>
+      </tr></thead><tbody>`;
+      for (const r of b.rows) {
+        const name = (r.phase_name || '') + (r.phase_code ? ` (${r.phase_code})` : '');
+        const preds = (r.predecessors || []).join(' · ') || '—';
+        html += `<tr>
+          <td>${escape(name)}</td><td>${escape(r.sub || '—')}</td>
+          <td>${escape(preds)}</td><td>${escape(r.needs_confirmation || '')}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+    }
+    body.innerHTML = html;
+  })();
+
+  // ---- §4 Procurement ----
+  (function () {
+    const body = document.getElementById('procurement-body');
+    const ps = DATA.procurement_8wk || {};
+    const active = ps.active_this_week || [];
+    const proc = ps.long_lead_procurement || [];
+    const sel = ps.long_lead_selections || [];
+    if (!active.length && !proc.length && !sel.length) {
+      body.innerHTML = '<div class="empty-note">No open procurement or selection items.</div>'; return;
+    }
+    let html = '';
+    if (active.length) {
+      html += `<div class="cat-block"><div class="cat-head"><span>§4a Active this week</span><span class="count">${active.length} due ≤7d or URGENT</span></div>`;
+      for (const i of active) html += renderItemAt(i, 'active_this_week');
+      html += '</div>';
+    }
+    if (proc.length || sel.length) {
+      html += `<div class="cat-block"><div class="cat-head"><span>§4b 8-week gate</span><span class="count">${proc.length + sel.length} items</span></div>`;
+      if (proc.length) {
+        html += `<div style="font-family:var(--font-head);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-2);padding:6px 0 2px;">Procurement</div>`;
+        // §4b items are by definition NOT due-this-week, so canonical for procurement is here.
+        for (const i of proc) html += renderCanonicalCard(i);
+      }
+      if (sel.length) {
+        html += `<div style="font-family:var(--font-head);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-2);padding:6px 0 2px;">Selections</div>`;
+        // SELECTIONs are canonical at §6 — render as compact refs here
+        for (const i of sel) html += renderCompactRef(i);
+      }
+      html += '</div>';
+    }
+    body.innerHTML = html;
+  })();
+
+  // ---- §5 Items by Category ----
+  (function () {
+    const body = document.getElementById('items-body');
+    const groups = DATA.items_by_category || {};
+    const cats = Object.keys(groups);
+    if (!cats.length) { body.innerHTML = '<div class="empty-note">No open action items.</div>'; return; }
+    let html = '';
+    for (const cat of cats) {
+      const items = groups[cat] || [];
+      html += `<div class="cat-block"><div class="cat-head"><span>${escape(cat)}</span><span class="count">${items.length} open</span></div>`;
+      // Items canonical-to "by_category" render full; others compact
+      for (const i of items) html += renderItemAt(i, 'by_category');
+      html += '</div>';
+    }
+    body.innerHTML = html;
+  })();
+
+  // ---- §5b Waiting on others (ALL compact refs — items canonical elsewhere) ----
+  (function () {
+    const body = document.getElementById('waiting-body');
+    const groups = DATA.waiting_on_others || {};
+    const owners = Object.keys(groups);
+    if (!owners.length) { body.innerHTML = ''; return; }
+    const total = owners.reduce((acc, k) => acc + groups[k].length, 0);
+    let html = `<div class="waiting-block"><h3>⏸ Waiting on others — ${total}</h3>`;
+    for (const owner of owners) {
+      const its = groups[owner] || [];
+      html += `<div class="owner-grp">${escape(owner)} <span style="font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);font-weight:500;">(${its.length})</span></div>`;
+      for (const i of its) html += renderCompactRef(i);
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  })();
+
+  // ---- §6 Selections (canonical home for SELECTION items) ----
+  (function () {
+    const body = document.getElementById('selections-body');
+    const sel = DATA.selections || [];
+    if (!sel.length) { body.innerHTML = '<div class="empty-note">No outstanding selections.</div>'; return; }
+    // SELECTION canonical home — but if any item is escalated, escalations wins.
+    body.innerHTML = sel.map(i => renderItemAt(i, 'selections')).join('');
+  })();
+
+  // ---- §7 Escalations + Budget + Financial ----
+  (function () {
+    const body = document.getElementById('issues-body');
+    const ifd = DATA.issues_financial || {};
+    const escalations = ifd.escalations || [];
+    const budgetItems = ifd.budget_items || [];
+    const fin = ifd.financial || {};
+    const subRedCount = ifd.sub_red_count || 0;
+
+    let html = `<div class="cat-block"><div class="cat-head"><span>Escalations</span><span class="count">${escalations.length} URGENT &amp; aging &gt;14d</span></div>`;
+    if (!escalations.length) html += '<div class="empty-note">No active escalations.</div>';
+    else for (const i of escalations.slice(0, 10)) html += renderItemAt(i, 'escalations');
+    html += '</div>';
+
+    html += `<div class="cat-block"><div class="cat-head"><span>BUDGET-category items</span><span class="count">${budgetItems.length} open</span></div>`;
+    if (!budgetItems.length) html += '<div class="empty-note">No open BUDGET items.</div>';
+    // BUDGET items canonical at §5 BUDGET (or §7 Escalations if escalated) — show compact refs
+    else for (const i of budgetItems) html += renderCompactRef(i);
+    html += '</div>';
+
+    html += `<div class="cat-block"><div class="cat-head"><span>Financial rollup</span><span class="count">GP / Target CO</span></div>`;
+    if (!fin.has_data) {
+      html += '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);font-style:italic;padding:6px 0;">Financial data pending Phase 13 contract integration.</div>';
+    } else {
+      html += `<div class="fin-row" style="font-weight:600;border-bottom:1.2px solid var(--ink);"><span>Job</span><span>GP</span><span>Target CO</span><span>Status</span></div>`;
+      for (const j of (fin.jobs || [])) {
+        html += `<div class="fin-row"><span>${escape((j.name || '').toUpperCase())}</span><span>${escape(j.gp || '—')}</span><span>${escape(j.targetCO || '—')}</span><span>${escape(j.status || '—')}</span></div>`;
+      }
+    }
+    html += '</div>';
+
+    html += `<div class="cat-block"><div class="cat-head"><span>Sub performance</span><span class="count">RED touching this job</span></div>`;
+    if (subRedCount === 0) {
+      html += '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--ink-2);padding:4px 0;">0 subs in RED status touching this job.</div>';
+    } else {
+      html += `<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--nw-danger);padding:4px 0;font-weight:600;">${subRedCount} sub(s) in RED status</div>`;
+    }
+    html += '</div>';
+
+    body.innerHTML = html;
+  })();
+
+  // ---- §8 Walk Notes (areas + holds + capture template) ----
+  (function () {
+    const body = document.getElementById('walk-body');
+    const areas = DATA.walk_areas || [];
+    if (!areas.length) {
+      body.innerHTML = '<div class="empty-note">No active walk areas for this job (no ongoing phase activity).</div>';
+    } else {
+      let html = '<h3 style="font-family:var(--font-head);font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 4px;color:var(--ink-2);">§8a By Area / Trade</h3>';
+      for (const a of areas) {
+        html += `<div class="walk-area">
+          <h3><span>${escape(a.area)}</span><span class="area-meta">stages ${(a.stages || []).join(',')}</span></h3>`;
+        if ((a.subs_active || []).length) html += `<div class="subs-line">Active subs: ${a.subs_active.map(escape).join(', ')}</div>`;
+        for (const p of (a.active_phases || [])) {
+          const dens = p.primary_density != null ? Math.round(p.primary_density * 100) + '%' : '—';
+          html += `<div class="walk-phase"><strong>${escape(p.phase_name || '')}</strong> (${escape(p.phase_code || '')}) · ${p.active_days || 0}d active · ${dens}</div>`;
+        }
+        for (const i of (a.items || [])) html += renderCompactRef(i);
+        html += '</div>';
+      }
+      body.innerHTML = html;
+    }
+  })();
+  (function () {
+    const body = document.getElementById('hold-body');
+    const holds = DATA.hold_points || [];
+    if (!holds.length) { body.innerHTML = ''; return; }
+    let html = '<h3 style="font-family:var(--font-head);font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;margin:14px 0 4px;color:var(--ink-2);">§8b Quality Hold Points</h3>';
+    for (const h of holds) {
+      html += `<div class="hold-row">
+        <span class="kind">${escape(h.kind === 'phase_taxonomy' ? 'phase gate' : 'item flag')}</span>
+        <span>${escape(h.phase_code || '')}</span>
+        <span>${escape(h.note || h.phase_name || '')}</span>
+        <span>${escape((h.status || '').toLowerCase().replace('_',' '))}</span>
+      </div>`;
+    }
+    body.innerHTML = html;
+  })();
+  (function () {
+    // §8c Field-discovered template (blank rows, captured during walk)
+    const body = document.getElementById('field-capture-body');
+    let html = `<div class="field-capture">
+      <h3>§8c Field-Discovered — capture during site walk</h3>
+      <div class="placeholder">Capture WHO + WHAT + BY WHEN below during the walk. These flow into next week's binder via process.py and surface in §5.</div>
+      <div class="capture-row" style="font-weight:600;border-bottom:1.2px solid var(--ink);">
+        <span class="lbl">Owner</span><span class="lbl">What (specific deliverable)</span><span class="lbl">By when (hard date)</span><span class="lbl">Job</span>
+      </div>`;
+    for (let n = 0; n < 6; n++) {
+      html += `<div class="capture-row"><span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span></div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  })();
+
+  // ---- §9 Client Decisions Pending ----
+  (function () {
+    const body = document.getElementById('client-decisions-wrap');
+    const groups = DATA.client_decisions || {};
+    const names = Object.keys(groups);
+    if (!names.length) { body.innerHTML = ''; return; }
+    let html = `<div class="client-decisions-block">
+      <h2>Client Decisions Pending — by person <span class="meta" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-3);font-weight:500;letter-spacing:0.4px;text-transform:none;">${names.length} ${names.length === 1 ? 'person' : 'people'}</span></h2>`;
+    for (const name of names) {
+      const items = groups[name] || [];
+      html += `<div class="person-grp"><div class="person-name">${escape(name)} <span class="count">· ${items.length} unresolved</span></div>`;
+      // Client decisions are a cross-cutting summary — all compact refs
+      for (const i of items) html += renderCompactRef(i);
+      html += '</div>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  })();
+
+})();
+</script>
+</body>
+</html>

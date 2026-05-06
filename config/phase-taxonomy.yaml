@@ -1,0 +1,1640 @@
+phases:
+- code: '1.1'
+  name: Permits & Plan Review
+  stage: 1
+  stage_name: Pre-Construction & Site
+  category: permit
+  typical_subs: []
+  predecessors: []
+  successors:
+  - '1.4'
+  - '1.5'
+  parallel_with:
+  - '1.2'
+  - '1.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: Root node. Permits + plan review run in parallel with site clearing/demo.
+- code: '1.2'
+  name: Site Clearing / Demo
+  stage: 1
+  stage_name: Pre-Construction & Site
+  category: other
+  typical_subs:
+  - sub: RC Grade Services, LLC
+    log_count: 19
+  predecessors: []
+  successors:
+  - '1.3'
+  - '1.4'
+  parallel_with:
+  - '1.1'
+  requires_inspection: false
+  inspection_name: null
+  notes: Root node. Can run while permits finalize.
+- code: '1.3'
+  name: Temporary Fencing & Erosion Control
+  stage: 1
+  stage_name: Pre-Construction & Site
+  category: other
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 8
+  - sub: RC Grade Services, LLC
+    log_count: 6
+  predecessors:
+  - '1.2'
+  successors:
+  - '1.4'
+  parallel_with:
+  - '1.1'
+  - '1.4'
+  requires_inspection: false
+  inspection_name: null
+- code: '1.4'
+  name: Site Grading & Pad Prep
+  stage: 1
+  stage_name: Pre-Construction & Site
+  category: concrete
+  typical_subs:
+  - sub: RC Grade Services, LLC
+    log_count: 30
+  - sub: ML Concrete, LLC
+    log_count: 4
+  predecessors:
+  - '1.1'
+  - '1.2'
+  - '1.3'
+  successors:
+  - '1.5'
+  - '2.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '1.5'
+  name: Surveying & Layout
+  stage: 1
+  stage_name: Pre-Construction & Site
+  category: other
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 3
+  predecessors:
+  - '1.1'
+  - '1.4'
+  successors:
+  - '2.1'
+  parallel_with:
+  - '1.4'
+  requires_inspection: false
+  inspection_name: null
+- code: '2.1'
+  name: Pilings
+  stage: 2
+  stage_name: Foundation
+  category: concrete
+  typical_subs:
+  - sub: ML Concrete, LLC
+    log_count: 22
+  - sub: West Coast Foundation, Inc.
+    log_count: 7
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 5
+  predecessors:
+  - '1.4'
+  - '1.5'
+  successors:
+  - '2.2'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Piling Inspection
+  notes: Drilled, driven, auger-cast, or helical pile installation.
+- code: '2.2'
+  name: Pile Caps & Grade Beams
+  stage: 2
+  stage_name: Foundation
+  category: concrete
+  typical_subs:
+  - sub: ML Concrete, LLC
+    log_count: 127
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 12
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 5
+  predecessors:
+  - '2.1'
+  successors:
+  - '2.3'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Footing Inspection
+- code: '2.3'
+  name: Stem Walls
+  stage: 2
+  stage_name: Foundation
+  category: concrete
+  typical_subs:
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 8
+  - sub: RC Grade Services, LLC
+    log_count: 6
+  - sub: ML Concrete, LLC
+    log_count: 5
+  predecessors:
+  - '2.2'
+  successors:
+  - '2.4'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '2.4'
+  name: Stem Wall Waterproofing
+  stage: 2
+  stage_name: Foundation
+  category: waterproofing
+  typical_subs:
+  - sub: CoatRite LLC
+    log_count: 45
+  - sub: Avery Roof Services, LLC
+    log_count: 5
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 4
+  - sub: Gonzalez Construction Services FL LLC
+    log_count: 3
+  - sub: ML Concrete, LLC
+    log_count: 3
+  - sub: Tom Sanger Pool and Spa LLC
+    log_count: 3
+  predecessors:
+  - '2.3'
+  successors:
+  - '2.5'
+  - '2.6'
+  - '2.7'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: CoatRite LLC's primary scope. Waterproofs stem walls before backfill / under-slab plumbing.
+- code: '2.5'
+  name: Under-Slab Plumbing Rough
+  stage: 2
+  stage_name: Foundation
+  category: plumbing
+  typical_subs: []
+  predecessors:
+  - '2.4'
+  successors:
+  - '2.7'
+  parallel_with:
+  - '2.6'
+  requires_inspection: true
+  inspection_name: Under-Slab Plumbing Inspection
+- code: '2.6'
+  name: Under-Slab Electrical
+  stage: 2
+  stage_name: Foundation
+  category: electrical
+  typical_subs: []
+  predecessors:
+  - '2.4'
+  successors:
+  - '2.7'
+  parallel_with:
+  - '2.5'
+  requires_inspection: true
+  inspection_name: Under-Slab Electrical Inspection
+  notes: Optional — many jobs skip if no slab-embedded conduits.
+- code: '2.7'
+  name: Slab Prep
+  stage: 2
+  stage_name: Foundation
+  category: concrete
+  typical_subs:
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 4
+  predecessors:
+  - '2.4'
+  - '2.5'
+  - '2.6'
+  successors:
+  - '2.8'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Pre-Pour / Slab Inspection
+  notes: Vapor barrier, rebar, pre-pour inspection.
+- code: '2.8'
+  name: Slab Pour
+  stage: 2
+  stage_name: Foundation
+  category: concrete
+  typical_subs:
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 7
+  - sub: ML Concrete, LLC
+    log_count: 7
+  predecessors:
+  - '2.7'
+  successors:
+  - '3.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '3.1'
+  name: Masonry Walls (CMU)
+  stage: 3
+  stage_name: Structural Shell
+  category: concrete
+  typical_subs:
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 33
+  - sub: ML Concrete, LLC
+    log_count: 14
+  predecessors:
+  - '2.8'
+  successors:
+  - '3.2'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: CMU block work, per level. Stage 3 cycles 3.1–3.5 per floor.
+- code: '3.2'
+  name: Wall Reinforcement & Cell Fill
+  stage: 3
+  stage_name: Structural Shell
+  category: concrete
+  typical_subs: []
+  predecessors:
+  - '3.1'
+  successors:
+  - '3.3'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Cell Fill / Rebar Inspection
+- code: '3.3'
+  name: Tie Beams (CIP)
+  stage: 3
+  stage_name: Structural Shell
+  category: concrete
+  typical_subs:
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 95
+  - sub: ML Concrete, LLC
+    log_count: 55
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 15
+  - sub: ALL VALENCIA CONSTRUCTION LLC
+    log_count: 5
+  predecessors:
+  - '3.2'
+  successors:
+  - '3.4'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Cast-in-place tie/bond beams complete each level before floor system.
+- code: '3.4'
+  name: Floor Truss / Floor System Set
+  stage: 3
+  stage_name: Structural Shell
+  category: framing
+  typical_subs:
+  - sub: ALL VALENCIA CONSTRUCTION LLC
+    log_count: 115
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 105
+  - sub: Alejandro Carpentry, Inc
+    log_count: 59
+  - sub: Ross Built Crew
+    log_count: 7
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 5
+  - sub: Blue Vision Roofing Inc.
+    log_count: 3
+  - sub: ML Concrete, LLC
+    log_count: 3
+  predecessors:
+  - '3.3'
+  successors:
+  - '3.5'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Floor trusses / TJI / I-joists set after tie beams. SPEC PART 3 lacks a dedicated wall-framing code; ALL VALENCIA
+    wall framing also maps here as nearest-fit.
+- code: '3.5'
+  name: Floor Sheathing
+  stage: 3
+  stage_name: Structural Shell
+  category: framing
+  typical_subs: []
+  predecessors:
+  - '3.4'
+  successors:
+  - '3.7'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Subfloor / Advantech / OSB. After 3.5, repeat 3.1–3.5 for next level (SPEC 3.6 directive); final pass leads into
+    3.7 roof trusses.
+- code: '3.7'
+  name: Roof Truss Set
+  stage: 3
+  stage_name: Structural Shell
+  category: framing
+  typical_subs:
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 11
+  - sub: ALL VALENCIA CONSTRUCTION LLC
+    log_count: 5
+  - sub: Alejandro Carpentry, Inc
+    log_count: 5
+  - sub: Southwest Concrete & Masonry Systems, LLC
+    log_count: 3
+  predecessors:
+  - '3.5'
+  successors:
+  - '3.8'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '3.8'
+  name: Roof Sheathing
+  stage: 3
+  stage_name: Structural Shell
+  category: framing
+  typical_subs: []
+  predecessors:
+  - '3.7'
+  successors:
+  - '3.9'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '3.9'
+  name: Hurricane Strapping & Tie-Down Inspection
+  stage: 3
+  stage_name: Structural Shell
+  category: framing
+  typical_subs:
+  - sub: Alejandro Carpentry, Inc
+    log_count: 5
+  predecessors:
+  - '3.8'
+  successors:
+  - '4.1'
+  - '4.3'
+  - '4.4'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Tie-Down / Strap Inspection
+- code: '4.1'
+  name: Roofing Underlayment
+  stage: 4
+  stage_name: Dry-In
+  category: roofing
+  typical_subs: []
+  predecessors:
+  - '3.9'
+  successors:
+  - '4.2'
+  parallel_with:
+  - '4.3'
+  - '4.4'
+  requires_inspection: false
+  inspection_name: null
+  notes: Peel-and-stick / felt / ice-and-water. Locks the dry-in.
+- code: '4.2'
+  name: Roofing Final
+  stage: 4
+  stage_name: Dry-In
+  category: roofing
+  typical_subs:
+  - sub: Avery Roof Services, LLC
+    log_count: 25
+  - sub: Blue Vision Roofing Inc.
+    log_count: 24
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 6
+  - sub: TNT Custom Painting
+    log_count: 6
+  predecessors:
+  - '4.1'
+  successors:
+  - '5.1'
+  parallel_with:
+  - '4.3'
+  - '4.4'
+  requires_inspection: false
+  inspection_name: null
+  notes: Tile, metal, shingle, standing seam.
+- code: '4.3'
+  name: Exterior Windows
+  stage: 4
+  stage_name: Dry-In
+  category: framing
+  typical_subs:
+  - sub: Gonzalez Construction Services FL LLC
+    log_count: 34
+  - sub: Universal Window Solutions
+    log_count: 11
+  - sub: All Glass & Windows
+    log_count: 3
+  predecessors:
+  - '3.9'
+  successors:
+  - '5.1'
+  parallel_with:
+  - '4.1'
+  - '4.2'
+  - '4.4'
+  requires_inspection: false
+  inspection_name: null
+- code: '4.4'
+  name: Exterior Doors
+  stage: 4
+  stage_name: Dry-In
+  category: framing
+  typical_subs:
+  - sub: Banko Overhead Doors, Inc
+    log_count: 3
+  - sub: Ross Built Crew
+    log_count: 3
+  predecessors:
+  - '3.9'
+  successors:
+  - '5.1'
+  parallel_with:
+  - '4.1'
+  - '4.2'
+  - '4.3'
+  requires_inspection: false
+  inspection_name: null
+- code: '5.1'
+  name: Exterior Wall Sheathing & Wrap
+  stage: 5
+  stage_name: Exterior Rough
+  category: framing
+  typical_subs: []
+  predecessors:
+  - '4.2'
+  - '4.3'
+  - '4.4'
+  successors:
+  - '5.2'
+  - '5.3'
+  - '6.1'
+  - '6.2'
+  - '6.3'
+  - '6.4'
+  - '6.5'
+  - '6.6'
+  - '7.1'
+  parallel_with:
+  - '5.2'
+  - '5.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: Tyvek/Zip/WRB. Bridge from envelope dry-in into MEP rough and stucco lath. Tom Sanger pool deck framing maps here
+    conditionally per cross-trade allowlist.
+- code: '5.2'
+  name: Exterior Decking Framing
+  stage: 5
+  stage_name: Exterior Rough
+  category: framing
+  typical_subs:
+  - sub: M&J Florida Enterprise LLC
+    log_count: 6
+  - sub: ALL VALENCIA CONSTRUCTION LLC
+    log_count: 3
+  predecessors:
+  - '5.1'
+  successors:
+  - '14.2'
+  parallel_with:
+  - '5.3'
+  requires_inspection: false
+  inspection_name: null
+- code: '5.3'
+  name: Exterior Stair Framing
+  stage: 5
+  stage_name: Exterior Rough
+  category: framing
+  typical_subs: []
+  predecessors:
+  - '5.1'
+  successors:
+  - '14.2'
+  parallel_with:
+  - '5.2'
+  requires_inspection: false
+  inspection_name: null
+- code: '6.1'
+  name: Plumbing Top-Out
+  stage: 6
+  stage_name: MEP Rough-In
+  category: plumbing
+  typical_subs:
+  - sub: Gator Plumbing
+    log_count: 186
+  - sub: Tom Sanger Pool and Spa LLC
+    log_count: 6
+  - sub: J.P. Services of Sarasota, LLC
+    log_count: 3
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.2'
+  - '6.3'
+  - '6.4'
+  - '6.5'
+  - '6.6'
+  requires_inspection: true
+  inspection_name: Plumbing Rough Inspection
+- code: '6.2'
+  name: Gas Rough
+  stage: 6
+  stage_name: MEP Rough-In
+  category: plumbing
+  typical_subs:
+  - sub: Gator Plumbing
+    log_count: 14
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.1'
+  - '6.3'
+  - '6.4'
+  - '6.5'
+  - '6.6'
+  requires_inspection: true
+  inspection_name: Gas Rough Inspection
+- code: '6.3'
+  name: Electrical Rough
+  stage: 6
+  stage_name: MEP Rough-In
+  category: electrical
+  typical_subs:
+  - sub: Metro Electric, LLC
+    log_count: 180
+  - sub: SmartShield Homes LLC
+    log_count: 27
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.1'
+  - '6.2'
+  - '6.4'
+  - '6.5'
+  - '6.6'
+  requires_inspection: true
+  inspection_name: Electrical Rough Inspection
+- code: '6.4'
+  name: HVAC Rough
+  stage: 6
+  stage_name: MEP Rough-In
+  category: hvac
+  typical_subs:
+  - sub: Climatic Conditioning Company Inc
+    log_count: 61
+  - sub: Captain Cool LLC
+    log_count: 23
+  - sub: Ross Built Crew
+    log_count: 4
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.1'
+  - '6.2'
+  - '6.3'
+  - '6.5'
+  - '6.6'
+  requires_inspection: true
+  inspection_name: Mechanical Rough Inspection
+- code: '6.5'
+  name: Low Voltage Rough
+  stage: 6
+  stage_name: MEP Rough-In
+  category: audio_video
+  typical_subs:
+  - sub: SmartShield Homes LLC
+    log_count: 5
+  - sub: Smarthouse Integration
+    log_count: 5
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 4
+  - sub: Arquai, LLC dba Elxai
+    log_count: 4
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.1'
+  - '6.2'
+  - '6.3'
+  - '6.4'
+  - '6.6'
+  requires_inspection: false
+  inspection_name: null
+  notes: Smarthouse / data / security / AV pre-wires.
+- code: '6.6'
+  name: Fire Sprinkler Rough
+  stage: 6
+  stage_name: MEP Rough-In
+  category: plumbing
+  typical_subs: []
+  predecessors:
+  - '5.1'
+  successors:
+  - '6.7'
+  parallel_with:
+  - '6.1'
+  - '6.2'
+  - '6.3'
+  - '6.4'
+  - '6.5'
+  requires_inspection: true
+  inspection_name: Fire Sprinkler Rough Inspection
+  notes: Conditional — many residential jobs skip.
+- code: '6.7'
+  name: MEP Inspections
+  stage: 6
+  stage_name: MEP Rough-In
+  category: inspection
+  typical_subs: []
+  predecessors:
+  - '6.1'
+  - '6.2'
+  - '6.3'
+  - '6.4'
+  - '6.5'
+  - '6.6'
+  successors:
+  - '7.1'
+  - '7.4'
+  - '8.1'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: MEP Rough Combined / Frame Inspection
+  notes: Gate from MEP rough into envelope close-up + insulation.
+- code: '7.1'
+  name: Stucco Lath / Wire
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: stucco_plaster
+  typical_subs: []
+  predecessors:
+  - '5.1'
+  - '6.7'
+  successors:
+  - '7.2'
+  parallel_with:
+  - '7.4'
+  requires_inspection: true
+  inspection_name: Lath Inspection
+- code: '7.2'
+  name: Stucco Scratch Coat
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: stucco_plaster
+  typical_subs:
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 152
+  predecessors:
+  - '7.1'
+  successors:
+  - '7.3'
+  parallel_with:
+  - '7.4'
+  requires_inspection: false
+  inspection_name: null
+  notes: Burst 1 of Watts' 3-burst stucco sequence.
+- code: '7.3'
+  name: Stucco Brown Coat
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: stucco_plaster
+  typical_subs:
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 4
+  predecessors:
+  - '7.2'
+  successors:
+  - '7.6'
+  parallel_with:
+  - '7.4'
+  - '7.5'
+  requires_inspection: false
+  inspection_name: null
+  notes: Burst 2 of stucco. Cure window after scratch.
+- code: '7.4'
+  name: Siding Install
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: siding
+  typical_subs:
+  - sub: M&J Florida Enterprise LLC
+    log_count: 104
+  - sub: TNT Custom Painting
+    log_count: 6
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 3
+  predecessors:
+  - '6.7'
+  successors:
+  - '7.5'
+  - '7.7'
+  parallel_with:
+  - '7.1'
+  - '7.2'
+  - '7.3'
+  - '7.5'
+  requires_inspection: false
+  inspection_name: null
+  notes: M&J siding. Runs alongside stucco on mixed envelopes.
+- code: '7.5'
+  name: Soffit / Exterior Ceilings
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: siding
+  typical_subs:
+  - sub: M&J Florida Enterprise LLC
+    log_count: 14
+  - sub: TNT Custom Painting
+    log_count: 9
+  - sub: Sight to See Construction LLC
+    log_count: 7
+  - sub: DB Improvement Services
+    log_count: 6
+  predecessors:
+  - '7.4'
+  successors:
+  - '7.6'
+  - '7.7'
+  parallel_with:
+  - '7.3'
+  requires_inspection: false
+  inspection_name: null
+- code: '7.6'
+  name: Stucco Finish Coat
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: stucco_plaster
+  typical_subs: []
+  predecessors:
+  - '7.3'
+  - '7.5'
+  successors:
+  - '7.7'
+  - '14.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Burst 3 of stucco. Color/texture coat. Must precede exterior paint.
+- code: '7.7'
+  name: Exterior Trim & Bandings
+  stage: 7
+  stage_name: Envelope Close-Up
+  category: siding
+  typical_subs:
+  - sub: M&J Florida Enterprise LLC
+    log_count: 6
+  predecessors:
+  - '7.4'
+  - '7.5'
+  - '7.6'
+  successors:
+  - '14.1'
+  - '14.3'
+  - '14.5'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '8.1'
+  name: Insulation
+  stage: 8
+  stage_name: Insulation & Drywall
+  category: drywall
+  typical_subs:
+  - sub: Paradise Foam, LLC
+    log_count: 16
+  - sub: Daniel Insulation LLC
+    log_count: 11
+  predecessors:
+  - '6.7'
+  successors:
+  - '8.2'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Insulation Inspection
+- code: '8.2'
+  name: Drywall Hang
+  stage: 8
+  stage_name: Insulation & Drywall
+  category: drywall
+  typical_subs:
+  - sub: HBS Drywall
+    log_count: 22
+  - sub: WG QUALITY INC
+    log_count: 6
+  - sub: Doug Naeher Drywall Inc.
+    log_count: 3
+  predecessors:
+  - '8.1'
+  successors:
+  - '8.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '8.3'
+  name: Drywall Tape & Mud
+  stage: 8
+  stage_name: Insulation & Drywall
+  category: drywall
+  typical_subs:
+  - sub: WG QUALITY INC
+    log_count: 34
+  - sub: HBS Drywall
+    log_count: 3
+  predecessors:
+  - '8.2'
+  successors:
+  - '8.4'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '8.4'
+  name: Drywall Texture / Finish
+  stage: 8
+  stage_name: Insulation & Drywall
+  category: drywall
+  typical_subs:
+  - sub: HBS Drywall
+    log_count: 3
+  predecessors:
+  - '8.3'
+  successors:
+  - '8.5'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '8.5'
+  name: Prime Walls
+  stage: 8
+  stage_name: Insulation & Drywall
+  category: paint
+  typical_subs: []
+  predecessors:
+  - '8.4'
+  successors:
+  - '9.1'
+  - '9.2'
+  - '9.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '9.1'
+  name: Interior Stair Framing & Treads
+  stage: 9
+  stage_name: Interior Rough Finish
+  category: metal_fab
+  typical_subs:
+  - sub: Precision Stairs Florida, Inc
+    log_count: 11
+  - sub: DB Welding Inc.
+    log_count: 8
+  - sub: Ross Built Crew
+    log_count: 7
+  predecessors:
+  - '8.5'
+  successors:
+  - '10.1'
+  - '10.2'
+  parallel_with:
+  - '9.2'
+  - '9.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: DB Welding railings/metal-fab nest here as nearest-fit (SPEC has no dedicated metal code).
+- code: '9.2'
+  name: Interior Trim Carpentry
+  stage: 9
+  stage_name: Interior Rough Finish
+  category: cabinetry
+  typical_subs:
+  - sub: Sight to See Construction LLC
+    log_count: 63
+  - sub: SMS Construction Corp
+    log_count: 37
+  - sub: Sight to See Construction, LLC
+    log_count: 35
+  - sub: M&J Florida Enterprise LLC
+    log_count: 19
+  - sub: Creative CC Inc.
+    log_count: 18
+  - sub: Ross Built Crew
+    log_count: 13
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 3
+  - sub: Metro Electric, LLC
+    log_count: 3
+  predecessors:
+  - '8.5'
+  successors:
+  - '10.2'
+  - '12.1'
+  parallel_with:
+  - '9.1'
+  - '9.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: Base/crown/casing/wainscot. Sight to See / SMS Carpentry primary subs.
+- code: '9.3'
+  name: Interior Doors Hung
+  stage: 9
+  stage_name: Interior Rough Finish
+  category: cabinetry
+  typical_subs:
+  - sub: All Glass & Windows
+    log_count: 3
+  predecessors:
+  - '8.5'
+  successors:
+  - '10.1'
+  - '10.2'
+  - '12.3'
+  parallel_with:
+  - '9.1'
+  - '9.2'
+  requires_inspection: false
+  inspection_name: null
+- code: '10.1'
+  name: Wet Area Waterproofing
+  stage: 10
+  stage_name: Tile & Stone
+  category: waterproofing
+  typical_subs:
+  - sub: Rangel Custom Tile LLC
+    log_count: 5
+  predecessors:
+  - '9.1'
+  - '9.3'
+  successors:
+  - '10.2'
+  - '10.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: CoatRite (or Rangel for shower-pan prep). Schluter/Kerdi/Hydroban/Redgard.
+- code: '10.2'
+  name: Floor Tile / Wood Flooring
+  stage: 10
+  stage_name: Tile & Stone
+  category: tile_floor
+  typical_subs:
+  - sub: Elizabeth Key Rosser
+    log_count: 55
+  - sub: Rangel Custom Tile LLC
+    log_count: 51
+  - sub: Integrity Floors LLC
+    log_count: 43
+  - sub: Tile Solutions LLC
+    log_count: 36
+  - sub: SB Custom Flooring LLC
+    log_count: 4
+  predecessors:
+  - '9.1'
+  - '9.2'
+  - '9.3'
+  - '10.1'
+  successors:
+  - '10.4'
+  - '11.1'
+  parallel_with:
+  - '10.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: Rangel Custom Tile primary; Integrity Floors for wood flooring.
+- code: '10.3'
+  name: Wall Tile
+  stage: 10
+  stage_name: Tile & Stone
+  category: tile_floor
+  typical_subs:
+  - sub: Rangel Custom Tile LLC
+    log_count: 15
+  - sub: Elizabeth Key Rosser
+    log_count: 3
+  predecessors:
+  - '10.1'
+  successors:
+  - '10.4'
+  - '11.4'
+  parallel_with:
+  - '10.2'
+  requires_inspection: false
+  inspection_name: null
+- code: '10.4'
+  name: Stone / Slab Install
+  stage: 10
+  stage_name: Tile & Stone
+  category: stone_counters
+  typical_subs: []
+  predecessors:
+  - '10.2'
+  - '10.3'
+  successors:
+  - '11.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '11.1'
+  name: Cabinet Install
+  stage: 11
+  stage_name: Cabinetry & Stone Tops
+  category: cabinetry
+  typical_subs:
+  - sub: Sarasota Cabinetry
+    log_count: 15
+  - sub: Cucine Ricci
+    log_count: 12
+  - sub: Pear Tree Cabinets & Design, LLC
+    log_count: 10
+  predecessors:
+  - '10.2'
+  - '10.4'
+  successors:
+  - '11.2'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: DB Welding custom hoods nest here as nearest-fit (SPEC has no dedicated hood code).
+- code: '11.2'
+  name: Countertop Template
+  stage: 11
+  stage_name: Cabinetry & Stone Tops
+  category: stone_counters
+  typical_subs: []
+  predecessors:
+  - '11.1'
+  successors:
+  - '11.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '11.3'
+  name: Countertop Install
+  stage: 11
+  stage_name: Cabinetry & Stone Tops
+  category: stone_counters
+  typical_subs: []
+  predecessors:
+  - '11.2'
+  successors:
+  - '11.4'
+  - '12.1'
+  - '13.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '11.4'
+  name: Backsplash Install
+  stage: 11
+  stage_name: Cabinetry & Stone Tops
+  category: tile_floor
+  typical_subs: []
+  predecessors:
+  - '10.3'
+  - '11.3'
+  successors:
+  - '12.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '12.1'
+  name: Caulk & Putty
+  stage: 12
+  stage_name: Interior Paint
+  category: paint
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 4
+  predecessors:
+  - '9.2'
+  - '11.3'
+  - '11.4'
+  successors:
+  - '12.2'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '12.2'
+  name: Paint Walls
+  stage: 12
+  stage_name: Interior Paint
+  category: paint
+  typical_subs:
+  - sub: TNT Custom Painting
+    log_count: 121
+  - sub: Myers Painting, LLC
+    log_count: 21
+  predecessors:
+  - '12.1'
+  successors:
+  - '12.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: TNT Custom / Myers primary painters.
+- code: '12.3'
+  name: Paint Trim & Doors
+  stage: 12
+  stage_name: Interior Paint
+  category: paint
+  typical_subs: []
+  predecessors:
+  - '9.3'
+  - '12.2'
+  successors:
+  - '13.1'
+  - '13.2'
+  - '13.3'
+  - '13.4'
+  - '13.5'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '13.1'
+  name: Plumbing Trim
+  stage: 13
+  stage_name: MEP Trim
+  category: plumbing
+  typical_subs:
+  - sub: Gator Plumbing
+    log_count: 5
+  predecessors:
+  - '11.3'
+  - '12.3'
+  successors:
+  - '13.6'
+  - '15.1'
+  parallel_with:
+  - '13.2'
+  - '13.3'
+  - '13.4'
+  - '13.5'
+  requires_inspection: false
+  inspection_name: null
+- code: '13.2'
+  name: Gas Trim
+  stage: 13
+  stage_name: MEP Trim
+  category: plumbing
+  typical_subs:
+  - sub: Gator Plumbing
+    log_count: 15
+  predecessors:
+  - '12.3'
+  successors:
+  - '13.6'
+  - '15.1'
+  parallel_with:
+  - '13.1'
+  - '13.3'
+  - '13.4'
+  - '13.5'
+  requires_inspection: false
+  inspection_name: null
+- code: '13.3'
+  name: Electrical Trim
+  stage: 13
+  stage_name: MEP Trim
+  category: electrical
+  typical_subs:
+  - sub: Metro Electric, LLC
+    log_count: 31
+  predecessors:
+  - '12.3'
+  successors:
+  - '13.6'
+  - '15.1'
+  parallel_with:
+  - '13.1'
+  - '13.2'
+  - '13.4'
+  - '13.5'
+  requires_inspection: false
+  inspection_name: null
+- code: '13.4'
+  name: HVAC Trim
+  stage: 13
+  stage_name: MEP Trim
+  category: hvac
+  typical_subs: []
+  predecessors:
+  - '12.3'
+  successors:
+  - '13.6'
+  - '15.1'
+  parallel_with:
+  - '13.1'
+  - '13.2'
+  - '13.3'
+  - '13.5'
+  requires_inspection: false
+  inspection_name: null
+- code: '13.5'
+  name: Low Voltage Trim
+  stage: 13
+  stage_name: MEP Trim
+  category: audio_video
+  typical_subs: []
+  predecessors:
+  - '12.3'
+  successors:
+  - '13.6'
+  - '15.1'
+  parallel_with:
+  - '13.1'
+  - '13.2'
+  - '13.3'
+  - '13.4'
+  requires_inspection: false
+  inspection_name: null
+- code: '13.6'
+  name: Appliance Install
+  stage: 13
+  stage_name: MEP Trim
+  category: cabinetry
+  typical_subs:
+  - sub: Fuse Specialty Appliances
+    log_count: 7
+  predecessors:
+  - '13.1'
+  - '13.2'
+  - '13.3'
+  - '13.4'
+  - '13.5'
+  successors:
+  - '15.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Fuse Specialty / Cucine Ricci. DB Welding custom hood final-assembly also lands here.
+- code: '14.1'
+  name: Exterior Paint
+  stage: 14
+  stage_name: Exterior Finish
+  category: paint
+  typical_subs:
+  - sub: TNT Custom Painting
+    log_count: 26
+  - sub: Myers Painting, LLC
+    log_count: 8
+  predecessors:
+  - '7.6'
+  - '7.7'
+  successors:
+  - '14.9'
+  - '14.10'
+  - '14.11'
+  - '15.1'
+  parallel_with:
+  - '14.2'
+  - '14.3'
+  - '14.4'
+  - '14.5'
+  - '14.10'
+  - '14.11'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.2'
+  name: Exterior Decking Finish
+  stage: 14
+  stage_name: Exterior Finish
+  category: siding
+  typical_subs:
+  - sub: M&J Florida Enterprise LLC
+    log_count: 3
+  predecessors:
+  - '5.2'
+  - '5.3'
+  successors:
+  - '15.1'
+  parallel_with:
+  - '14.1'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.3'
+  name: Driveway / Hardscape
+  stage: 14
+  stage_name: Exterior Finish
+  category: concrete
+  typical_subs: []
+  predecessors:
+  - '7.7'
+  successors:
+  - '14.4'
+  - '15.1'
+  parallel_with:
+  - '14.1'
+  - '14.10'
+  - '14.11'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.4'
+  name: Exterior Pavers / Walkways
+  stage: 14
+  stage_name: Exterior Finish
+  category: concrete
+  typical_subs: []
+  predecessors:
+  - '14.3'
+  successors:
+  - '15.1'
+  parallel_with:
+  - '14.1'
+  - '14.10'
+  - '14.11'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.5'
+  name: Pool Shell / Plumbing
+  stage: 14
+  stage_name: Exterior Finish
+  category: pool_spa
+  typical_subs:
+  - sub: Tom Sanger Pool and Spa LLC
+    log_count: 20
+  predecessors:
+  - '7.7'
+  successors:
+  - '14.6'
+  parallel_with:
+  - '14.1'
+  - '14.3'
+  requires_inspection: false
+  inspection_name: null
+  notes: Sanger pool shell / gunite / rebar.
+- code: '14.6'
+  name: Pool Tile & Coping
+  stage: 14
+  stage_name: Exterior Finish
+  category: pool_spa
+  typical_subs: []
+  predecessors:
+  - '14.5'
+  successors:
+  - '14.7'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '14.7'
+  name: Pool Plaster / Pebbletec
+  stage: 14
+  stage_name: Exterior Finish
+  category: pool_spa
+  typical_subs: []
+  predecessors:
+  - '14.6'
+  successors:
+  - '14.8'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: 'Markgraf-lesson trigger: PebbleTec dust ruins polished granite — never schedule polished stone before plaster.'
+- code: '14.8'
+  name: Pool Equipment & Startup
+  stage: 14
+  stage_name: Exterior Finish
+  category: pool_spa
+  typical_subs:
+  - sub: Tom Sanger Pool and Spa LLC
+    log_count: 92
+  - sub: ML Concrete, LLC
+    log_count: 6
+  - sub: Sight to See Construction LLC
+    log_count: 4
+  - sub: Jeff Watts Plastering and Stucco
+    log_count: 3
+  predecessors:
+  - '14.7'
+  successors:
+  - '15.1'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '14.9'
+  name: Final Fencing / Gates
+  stage: 14
+  stage_name: Exterior Finish
+  category: landscape
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 9
+  - sub: RC Grade Services, LLC
+    log_count: 7
+  - sub: USA Fence Company
+    log_count: 5
+  predecessors:
+  - '14.1'
+  successors:
+  - '15.1'
+  parallel_with:
+  - '14.10'
+  - '14.11'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.10'
+  name: Landscaping
+  stage: 14
+  stage_name: Exterior Finish
+  category: landscape
+  typical_subs: []
+  predecessors:
+  - '14.1'
+  successors:
+  - '14.11'
+  - '15.1'
+  parallel_with:
+  - '14.9'
+  - '14.11'
+  requires_inspection: false
+  inspection_name: null
+- code: '14.11'
+  name: Irrigation
+  stage: 14
+  stage_name: Exterior Finish
+  category: landscape
+  typical_subs: []
+  predecessors:
+  - '14.1'
+  - '14.10'
+  successors:
+  - '15.1'
+  parallel_with:
+  - '14.9'
+  - '14.10'
+  requires_inspection: false
+  inspection_name: null
+- code: '15.1'
+  name: Punch Walk & List
+  stage: 15
+  stage_name: Closeout
+  category: internal_crew
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 101
+  - sub: Tom Sanger Pool and Spa LLC
+    log_count: 5
+  - sub: Gator Plumbing
+    log_count: 4
+  - sub: DB Welding Inc.
+    log_count: 3
+  - sub: Florida Sunshine Carpentry LLC
+    log_count: 3
+  predecessors:
+  - '13.1'
+  - '13.2'
+  - '13.3'
+  - '13.4'
+  - '13.5'
+  - '13.6'
+  - '14.1'
+  - '14.2'
+  - '14.3'
+  - '14.4'
+  - '14.8'
+  - '14.9'
+  - '14.10'
+  - '14.11'
+  successors:
+  - '15.2'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Ross Built crew fall-back. Punch walk + list creation. Generic site clean-up logs land here.
+- code: '15.2'
+  name: Punch Repairs
+  stage: 15
+  stage_name: Closeout
+  category: internal_crew
+  typical_subs:
+  - sub: Ross Built Crew
+    log_count: 11
+  - sub: TNT Custom Painting
+    log_count: 7
+  - sub: DB Improvement Services, LLC
+    log_count: 5
+  predecessors:
+  - '15.1'
+  successors:
+  - '15.3'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: TNT/SmartShield/Ross crew touch-ups. Markgraf-lesson trigger phase.
+- code: '15.3'
+  name: Final Cleaning
+  stage: 15
+  stage_name: Closeout
+  category: cleaning
+  typical_subs: []
+  predecessors:
+  - '15.2'
+  successors:
+  - '15.4'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '15.4'
+  name: Final Inspections
+  stage: 15
+  stage_name: Closeout
+  category: inspection
+  typical_subs: []
+  predecessors:
+  - '15.3'
+  successors:
+  - '15.5'
+  parallel_with: []
+  requires_inspection: true
+  inspection_name: Building Final / Fire Final / CO Inspection
+- code: '15.5'
+  name: C.O. Issuance
+  stage: 15
+  stage_name: Closeout
+  category: permit
+  typical_subs: []
+  predecessors:
+  - '15.4'
+  successors:
+  - '15.6'
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+- code: '15.6'
+  name: Owner Walk & Move-In
+  stage: 15
+  stage_name: Closeout
+  category: other
+  typical_subs: []
+  predecessors:
+  - '15.5'
+  successors: []
+  parallel_with: []
+  requires_inspection: false
+  inspection_name: null
+  notes: Terminus node.
+metadata:
+  total_phases: 84
+  stage_count: 15
+  source_spec: .planning/milestones/m02-schedule-intelligence/SPEC.md PART 3 (lines 121-241)
+  source_keywords: config/phase-keywords.yaml
+  generated_at: '2026-04-29'
+  notes:
+  - SPEC PART 3 enumerates 84 distinct phase codes across 15 stages (1.1–15.6, omitting 3.6 'Repeat 3.1-3.5' which is a directive
+    not a phase).
+  - Every phase code in the keyword library resolves to one entry here. No orphans.
+  - typical_subs is populated at runtime from data/derived-phases.json by scripts/build_phase_artifacts.py — high + tag_disambiguated
+    only, ≥3 logs.
+  - 'Roots: 1.1 + 1.2 (no predecessors). Terminus: 15.6 (no successors).'
+  - Stage 3 cycles (3.1–3.5 per level) are flattened to a single linear graph; multi-level repetition is handled by the burst
+    detector in Phase 4, not by graph cycles.
+  - Predecessor / successor lists are auto-symmetrized by the build script. Both directions of every edge are present.
+  category_taxonomy:
+  - waterproofing
+  - plumbing
+  - electrical
+  - concrete
+  - framing
+  - stucco_plaster
+  - siding
+  - drywall
+  - tile_floor
+  - paint
+  - pool_spa
+  - landscape
+  - roofing
+  - cabinetry
+  - stone_counters
+  - metal_fab
+  - hvac
+  - audio_video
+  - interior_design
+  - cleaning
+  - inspection
+  - permit
+  - materials_supplier
+  - solar_energy
+  - elevator
+  - internal_crew
+  - other

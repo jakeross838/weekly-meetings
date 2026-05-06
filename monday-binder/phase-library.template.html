@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Schedule Intelligence — Phase Library</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<script src="assets/components.js"></script>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="app-head">
+    <div>
+      <div class="eyebrow">Schedule Intelligence</div>
+      <h1>Phase Library</h1>
+      <div id="hdr-meta" class="when" style="text-align:left;font-size:11.5px;color:rgba(244,242,236,.85);margin-top:6px;"></div>
+    </div>
+    <div>
+      <div class="when" id="hdr-when"></div>
+      <div class="nav" style="margin-top:8px;justify-content:flex-end;">
+        <a href="phase-library.html" class="active">Phase Library</a>
+        <a href="jobs.html">Jobs</a>
+      </div>
+    </div>
+  </header>
+
+  <div id="filter-bar" class="filter-bar"></div>
+
+  <div class="controls-row">
+    <span><label>Sort</label>
+      <select id="sort-select">
+        <option value="stage">Stage order</option>
+        <option value="sample">Sample size</option>
+        <option value="active">Median active days</option>
+        <option value="density">Primary density</option>
+      </select>
+    </span>
+    <label class="checkbox">
+      <input type="checkbox" id="flagged-only">
+      Has flagged subs only
+    </label>
+    <span style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--ink-3);" id="visible-count"></span>
+  </div>
+
+  <div id="phase-cards"></div>
+
+  <footer class="app-foot">
+    <span>Schedule Intelligence v2 · Phase 4 · Phase Library</span>
+    <span id="foot-when"></span>
+  </footer>
+</div>
+
+<script type="application/json" id="si-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('si-data').textContent);
+  const SI = window.SI;
+
+  /* ---- Index helpers ---- */
+  const today = DATA.today;
+
+  // Group instances by phase_code
+  const instancesByPhase = {};
+  DATA.instances.forEach(i => {
+    (instancesByPhase[i.phase_code] = instancesByPhase[i.phase_code] || []).push(i);
+  });
+
+  // Group rollups by phase_code
+  const rollupsByPhase = {};
+  DATA.rollups.forEach(r => {
+    (rollupsByPhase[r.phase_code] = rollupsByPhase[r.phase_code] || []).push(r);
+  });
+
+  // Medians by phase_code
+  const medianByPhase = {};
+  DATA.medians.forEach(m => { medianByPhase[m.phase_code] = m; });
+
+  // Bursts by (job, phase_code)
+  const burstsByJobPhase = {};
+  DATA.bursts.forEach(b => {
+    const k = b.job_id + '||' + b.phase_code;
+    (burstsByJobPhase[k] = burstsByJobPhase[k] || []).push(b);
+  });
+
+  /* ---- Stage filter bar ---- */
+  // Build the stage list from taxonomy
+  const stageMap = {};
+  DATA.taxonomy.forEach(p => {
+    if (!stageMap[p.stage]) {
+      stageMap[p.stage] = { stage: p.stage, name: p.stage_name, phases: [] };
+    }
+    stageMap[p.stage].phases.push(p);
+  });
+  const stages = Object.values(stageMap).sort((a, b) => a.stage - b.stage);
+
+  // Hdr meta line
+  document.getElementById('hdr-meta').textContent =
+    DATA.taxonomy.length + ' phases across ' + stages.length + ' stages · ' +
+    DATA.medians.length + ' medians · ' + DATA.rollups.length + ' rollups (' +
+    DATA.rollups.filter(r => r.flag_for_pm_binder).length + ' flagged)';
+  document.getElementById('hdr-when').innerHTML = '<b>' + (today || '—') + '</b>';
+  document.getElementById('foot-when').textContent = 'Generated ' + (today || '—');
+
+  // Render filter bar
+  const filterBar = document.getElementById('filter-bar');
+  let html = '<button class="stage-btn active" data-stage="all">All</button>';
+  stages.forEach(s => {
+    html += '<button class="stage-btn" data-stage="' + s.stage + '"><span class="num">' + s.stage + '</span>' + s.name + '</button>';
+  });
+  filterBar.innerHTML = html;
+
+  /* ---- Build a phase card ---- */
+  function rolePctOfBursts(instance, role) {
+    if (!instance.bursts || !instance.bursts.length) return null;
+    const total = instance.bursts.length;
+    const r = instance.bursts.filter(b => b.burst_role === role).length;
+    return r / total;
+  }
+
+  function buildPhaseCard(phase) {
+    const code = phase.code;
+    const median = medianByPhase[code];
+    const insts = instancesByPhase[code] || [];
+    const rolls = rollupsByPhase[code] || [];
+    const slug = SI.slugify(code);
+
+    const sampleSize = (median && median.sample_size) ? median.sample_size : insts.length;
+    const sampleConf = median ? median.confidence : null;
+
+    const ongoing = insts.filter(i => i.status === 'ongoing');
+    const ongoingNames = ongoing.map(o => o.job).slice(0, 3).join(', ');
+
+    const flagged = rolls.some(r => r.flag_for_pm_binder);
+
+    // Median active days + range
+    const medActive = median ? median.median_active_days : null;
+    const p25 = median && median.active_range_p25_p75 ? median.active_range_p25_p75[0] : null;
+    const p75 = median && median.active_range_p25_p75 ? median.active_range_p25_p75[1] : null;
+
+    // Primary density: weighted_median_density from medians (more representative for primary)
+    // The medians.median_density is across all bursts; weighted_median_density is more meaningful
+    const pDensity = median ? median.weighted_median_density : null;
+    // tier from pDensity
+    let pTier = null;
+    if (pDensity !== null && pDensity !== undefined) {
+      if (pDensity >= 0.80) pTier = 'continuous';
+      else if (pDensity >= 0.60) pTier = 'steady';
+      else if (pDensity >= 0.40) pTier = 'scattered';
+      else pTier = 'dragging';
+    }
+
+    const returnRate = median ? median.return_burst_rate : null;
+    const punchRate = median ? median.punch_burst_rate : null;
+
+    // Build header
+    let h =
+      '<article class="phase-card' + (flagged ? ' has-flagged' : '') + '" id="phase-' + slug + '" data-stage="' + phase.stage + '" data-flagged="' + (flagged ? '1' : '0') + '" data-sample="' + sampleSize + '" data-active="' + (medActive || 0) + '" data-density="' + (pDensity || 0) + '" data-stage-order="' + phase.stage + '">';
+    h += '<header class="pc-head">';
+    h += '<div class="pc-head-left">';
+    h += '<span class="pc-code">' + SI.escapeHtml(code) + '</span>';
+    h += '<h2 class="pc-title">' + SI.escapeHtml(phase.name) + '</h2>';
+    h += '<span class="pc-stage">Stage ' + phase.stage + ' · ' + SI.escapeHtml(phase.stage_name) + '</span>';
+    h += '</div>';
+    h += '<div class="pc-jobcount"><b>' + sampleSize + ' ' + SI.pluralize(sampleSize, 'job') + '</b>';
+    if (sampleConf) h += '<span class="conf">' + sampleConf + ' confidence</span>';
+    h += '</div>';
+    h += '</header>';
+
+    // Stats
+    h += '<div class="pc-stats">';
+    h += '<div class="pc-stat">';
+    h +=   '<span class="pc-stat-label">Primary Active</span>';
+    h +=   '<span class="pc-stat-value">' + (medActive !== null && medActive !== undefined ? (Math.round(medActive * 10) / 10 + ' d') : '—') + '</span>';
+    h +=   '<span class="pc-stat-aux">' + (p25 !== null ? SI.fmtRange(p25, p75) : '') + '</span>';
+    h += '</div>';
+
+    h += '<div class="pc-stat">';
+    h +=   '<span class="pc-stat-label">Primary Density</span>';
+    h +=   '<span class="pc-stat-value" style="line-height:1;padding-top:2px;">' + SI.renderDensityChip(pTier, null, pDensity) + '</span>';
+    h +=   '<span class="pc-stat-aux">weighted median</span>';
+    h += '</div>';
+
+    h += '<div class="pc-stat">';
+    h +=   '<span class="pc-stat-label">Return Rate</span>';
+    h +=   '<span class="pc-stat-value">' + (returnRate !== null && returnRate !== undefined ? Math.round(returnRate * 100) + '%' : '—') + '</span>';
+    h +=   '<span class="pc-stat-aux">of jobs</span>';
+    h += '</div>';
+
+    h += '<div class="pc-stat">';
+    h +=   '<span class="pc-stat-label">Punch Rate</span>';
+    h +=   '<span class="pc-stat-value">' + (punchRate !== null && punchRate !== undefined ? Math.round(punchRate * 100) + '%' : '—') + '</span>';
+    h +=   '<span class="pc-stat-aux">of jobs</span>';
+    h += '</div>';
+
+    h += '<div class="pc-stat">';
+    h +=   '<span class="pc-stat-label">Active Now</span>';
+    h +=   '<span class="pc-stat-value">' + ongoing.length + ' ' + SI.pluralize(ongoing.length, 'job') + '</span>';
+    h +=   '<span class="pc-stat-aux">' + (ongoing.length > 0 && ongoing.length <= 3 ? SI.escapeHtml(ongoingNames) : '') + '</span>';
+    h += '</div>';
+    h += '</div>'; // pc-stats
+
+    // Sequence chips
+    h += '<div class="pc-seq">';
+    h += '<span class="pc-seq-label">Preceded by</span>';
+    h += '<span class="pc-seq-list">';
+    if (phase.predecessors && phase.predecessors.length) {
+      phase.predecessors.forEach(pc => {
+        const lookup = DATA.taxonomy.find(t => t.code === pc);
+        h += '<span class="pc-seq-chip"><b>' + SI.escapeHtml(pc) + '</b> ' + SI.escapeHtml(lookup ? lookup.name : '') + '</span>';
+      });
+    } else {
+      h += '<span class="pc-seq-empty">— root node</span>';
+    }
+    h += '</span>';
+    h += '<span class="pc-seq-label">Followed by</span>';
+    h += '<span class="pc-seq-list">';
+    if (phase.successors && phase.successors.length) {
+      phase.successors.forEach(sc => {
+        const lookup = DATA.taxonomy.find(t => t.code === sc);
+        h += '<span class="pc-seq-chip"><b>' + SI.escapeHtml(sc) + '</b> ' + SI.escapeHtml(lookup ? lookup.name : '') + '</span>';
+      });
+    } else {
+      h += '<span class="pc-seq-empty">— terminus</span>';
+    }
+    h += '</span>';
+    h += '</div>'; // pc-seq
+
+    // Subs table
+    if (rolls.length) {
+      h += '<div class="pc-subs">';
+      h += '<div class="pc-section-label">Subs who perform this phase · ' + rolls.length + '</div>';
+      h += '<table class="subs-table"><thead><tr>';
+      h += '<th>Sub</th><th class="right">Primary Active</th><th>Absolute</th><th>vs Peer</th><th class="right">Jobs</th><th>Flag</th>';
+      h += '</tr></thead><tbody>';
+      rolls.sort((a, b) => (b.jobs_performed || 0) - (a.jobs_performed || 0));
+      rolls.forEach(r => {
+        const days = r.primary_active_days_median;
+        const p25_p75 = r.primary_active_days_p25_p75 || [null, null];
+        h += '<tr id="sub-' + SI.slugify(r.sub) + '-' + slug + '">';
+        h += '<td class="sub-name">' + SI.renderSubLink(r.sub) + '</td>';
+        h += '<td class="right num">' + (days !== null && days !== undefined ? Math.round(days) + ' d' : '—') +
+              (p25_p75[0] !== null && p25_p75[0] !== undefined ?
+                ' <span style="color:var(--ink-3);font-size:10px;">(' + Math.round(p25_p75[0]) + '-' + Math.round(p25_p75[1]) + ')</span>' : '') +
+            '</td>';
+        h += '<td>' + SI.renderDensityChip(r.density_label_absolute, null, r.primary_density) + '</td>';
+        h += '<td>' + SI.renderVsChip(r.density_label_vs_phase) + '</td>';
+        h += '<td class="right num">' + r.jobs_performed + '</td>';
+        h += '<td>' + (r.flag_for_pm_binder ? SI.renderFlagBadge(r.flag_score, r.flag_reasons) : '<span style="color:var(--ink-muted);font-family:var(--font-mono);font-size:10px;">—</span>') + '</td>';
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      h += '</div>';
+    }
+
+    // Per-job detail teaser
+    if (insts.length) {
+      h += '<div class="detail-teaser" data-toggle="' + slug + '">';
+      h += '<span class="chev">▸</span> Per-job detail (' + insts.length + ' instances · click to expand)';
+      h += '</div>';
+      h += '<div class="detail-grid" id="grid-' + slug + '">';
+      h += '<table class="detail-table"><thead><tr>';
+      h += '<th>Job</th><th>Sub(s)</th><th>Bursts</th><th class="right">Primary Active</th><th>Density</th><th>Status</th><th class="right">vs median</th>';
+      h += '</tr></thead><tbody>';
+      insts.sort((a, b) => (a.first_log_date || '').localeCompare(b.first_log_date || ''));
+      insts.forEach(i => {
+        const subs = (i.subs_involved || []).map(s => s.sub).slice(0, 3);
+        const subStr = subs.length ? subs.map(s => SI.renderSubLink(s)).join(', ') : '—';
+        const burstCount = (i.bursts || []).length;
+        const roleSummary = SI.renderBurstRoles(i.bursts || []);
+        const vsMed = (medActive !== null && medActive !== undefined && i.primary_active_days !== null && i.primary_active_days !== undefined)
+          ? (i.primary_active_days - medActive)
+          : null;
+        const vsTxt = vsMed === null ? '—' : (vsMed > 0 ? '+' + Math.round(vsMed) : Math.round(vsMed)) + ' d';
+        h += '<tr>';
+        h += '<td>' + SI.renderJobLink(i.job) + '</td>';
+        h += '<td>' + subStr + '</td>';
+        h += '<td><span class="num">' + burstCount + '</span> <span class="burst-roles">· ' + SI.escapeHtml(roleSummary) + '</span></td>';
+        h += '<td class="right num">' + (i.primary_active_days !== null && i.primary_active_days !== undefined ? i.primary_active_days + ' d' : '—') + '</td>';
+        h += '<td>' + SI.renderDensityChip(i.density_label_absolute, i.density_label_vs_phase, i.primary_density) + '</td>';
+        h += '<td>' + SI.renderStatusIcon(i.status) + '</td>';
+        h += '<td class="right num">' + vsTxt + '</td>';
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      h += '</div>';
+    }
+
+    h += '</article>';
+    return h;
+  }
+
+  /* ---- Render all stages with cards ---- */
+  function renderAll() {
+    const container = document.getElementById('phase-cards');
+    let h = '';
+    stages.forEach(s => {
+      h += '<section class="stage-section" data-stage="' + s.stage + '" id="stage-' + s.stage + '">';
+      h += '<div class="stage-heading">';
+      h += '<span class="num">Stage ' + s.stage + '</span>';
+      h += '<h3>' + SI.escapeHtml(s.name) + '</h3>';
+      h += '<span class="count">' + s.phases.length + ' phases</span>';
+      h += '</div>';
+      h += '<div class="cards-grid">';
+      s.phases.forEach(p => { h += buildPhaseCard(p); });
+      h += '</div>';
+      h += '</section>';
+    });
+    container.innerHTML = h;
+    bindEvents();
+    applyFilters();
+  }
+
+  function bindEvents() {
+    // Filter bar
+    document.querySelectorAll('.stage-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyFilters();
+      });
+    });
+    document.getElementById('flagged-only').addEventListener('change', applyFilters);
+    document.getElementById('sort-select').addEventListener('change', applyFilters);
+
+    // Detail teaser toggles
+    document.querySelectorAll('.detail-teaser').forEach(t => {
+      t.addEventListener('click', () => {
+        const slug = t.getAttribute('data-toggle');
+        const grid = document.getElementById('grid-' + slug);
+        t.classList.toggle('expanded');
+        grid.classList.toggle('expanded');
+      });
+    });
+  }
+
+  function applyFilters() {
+    const stageBtn = document.querySelector('.stage-btn.active');
+    const stageVal = stageBtn ? stageBtn.getAttribute('data-stage') : 'all';
+    const flaggedOnly = document.getElementById('flagged-only').checked;
+    const sortBy = document.getElementById('sort-select').value;
+
+    let visible = 0, total = 0;
+
+    document.querySelectorAll('.stage-section').forEach(sec => {
+      const sec_stage = sec.getAttribute('data-stage');
+      let stageHasVisible = false;
+
+      const cards = Array.from(sec.querySelectorAll('.phase-card'));
+      total += cards.length;
+
+      // Sort cards within stage
+      cards.sort((a, b) => {
+        if (sortBy === 'sample') return parseInt(b.dataset.sample) - parseInt(a.dataset.sample);
+        if (sortBy === 'active') return parseFloat(b.dataset.active) - parseFloat(a.dataset.active);
+        if (sortBy === 'density') return parseFloat(b.dataset.density) - parseFloat(a.dataset.density);
+        // stage order — preserve original
+        return 0;
+      });
+      if (sortBy !== 'stage') {
+        cards.forEach(c => sec.appendChild(c));
+      }
+
+      cards.forEach(card => {
+        const cardStage = card.getAttribute('data-stage');
+        const isFlagged = card.getAttribute('data-flagged') === '1';
+        let show = true;
+        if (stageVal !== 'all' && cardStage !== stageVal) show = false;
+        if (flaggedOnly && !isFlagged) show = false;
+        card.style.display = show ? '' : 'none';
+        if (show) { stageHasVisible = true; visible++; }
+      });
+
+      // Hide stage section if no visible cards
+      if (stageVal !== 'all' && sec_stage !== stageVal) {
+        sec.style.display = 'none';
+      } else if (stageHasVisible) {
+        sec.style.display = '';
+      } else {
+        sec.style.display = 'none';
+      }
+    });
+
+    document.getElementById('visible-count').textContent =
+      'Showing ' + visible + ' of ' + total + ' phases';
+  }
+
+  // Initial render
+  renderAll();
+
+  // Hash routing — if URL has #phase-x.y or #sub-..., scroll to it
+  window.addEventListener('hashchange', () => {
+    const h = window.location.hash;
+    if (h) {
+      const el = document.querySelector(h);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+  if (window.location.hash) {
+    setTimeout(() => {
+      const el = document.querySelector(window.location.hash);
+      if (el) el.scrollIntoView({ block: 'start' });
+    }, 100);
+  }
+})();
+</script>
+</body>
+</html>

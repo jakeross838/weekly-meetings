@@ -1,0 +1,1519 @@
+# Phase Keyword Library — covers all 67 phase codes (15 stages)
+#
+# Keywords are case-insensitive regex snippets matched against:
+#   notes_full + notes + activity + parent_group_activities (joined into one searchable string)
+#
+# Specificity wins: longer, multi-token patterns outrank shorter ones during classification.
+# tag_hints fire only when the parent_group_activities tag is present AND no higher-confidence text match outranks it.
+#
+# Schema per phase:
+#   code:       "X.Y" canonical phase code from SPEC PART 3
+#   name:       human-readable phase name
+#   stage:      stage number (1-15) and stage label
+#   keywords:   list of regex snippets (action verb + material/element)
+#   tag_hints:  optional list of parent_group_activities strings that strongly imply this phase
+#   notes:      optional free-text rationale
+
+# ==========================================================================
+# STAGE 1 — PRE-CONSTRUCTION & SITE
+# ==========================================================================
+
+phases:
+
+  - code: "1.1"
+    name: "Permits & Plan Review"
+    stage: 1
+    stage_label: "Pre-Construction & Site"
+    keywords:
+      - 'permit\s+(application|review|issued|pulled|submit)'
+      - 'plan review'
+      - 'plan revision'
+      - 'plan check'
+      - 'building permit'
+      - 'pre.{0,3}construction\s+meeting'
+    tag_hints:
+      - "Plan Review"
+      - "Pre-Construction"
+      - "Estimating"
+      - "Finalize Contract"
+
+  - code: "1.2"
+    name: "Site Clearing / Demo"
+    stage: 1
+    stage_label: "Pre-Construction & Site"
+    keywords:
+      - '\bdemo(lition)?\b'
+      - 'tree\s+(remov|cut|clear)'
+      - 'site\s+(clearing|cleared|clear)'
+      - 'land\s+clear'
+      - 'stumps?\b'
+      - 'haul.{0,4}(off|away|debris)'
+
+  - code: "1.3"
+    name: "Temporary Fencing & Erosion Control"
+    stage: 1
+    stage_label: "Pre-Construction & Site"
+    keywords:
+      - 'silt\s+fenc'
+      - 'erosion\s+control'
+      - 'temporary\s+fenc'
+      - 'construction\s+fenc'
+
+  - code: "1.4"
+    name: "Site Grading & Pad Prep"
+    stage: 1
+    stage_label: "Pre-Construction & Site"
+    keywords:
+      - '\bgrading\b'
+      - 'pad\s+prep'
+      - 'fill\s+dirt'
+      - 'compact(ed|ion)?'
+      - 'rough\s+grade'
+      - 'fine\s+grade'
+      - 'site\s+work\s+(prep|grade)'
+      - 'final\s+grade'
+    tag_hints:
+      - "Site Work"
+
+  - code: "1.5"
+    name: "Surveying & Layout"
+    stage: 1
+    stage_label: "Pre-Construction & Site"
+    keywords:
+      - '\bsurvey(or|ing)?\b'
+      - 'layout\s+(stak|line|building)'
+      - 'form\s+board\s+survey'
+      - 'elevation\s+certificate'
+      - 'staking\b'
+
+  # ==========================================================================
+  # STAGE 2 — FOUNDATION
+  # ==========================================================================
+
+  - code: "2.1"
+    name: "Pilings"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - '\bpiling'
+      - 'driven\s+pile'
+      - 'drilled\s+pile'
+      - 'auger.{0,5}cast'
+      - 'helical\s+pile'
+      - 'pile\s+(cap|driving|drill)'
+    tag_hints:
+      - "Pilings"
+
+  - code: "2.2"
+    name: "Pile Caps & Grade Beams"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'pile\s+cap'
+      - 'grade\s+beam'
+      - 'cap\s+pour'
+      - 'footing\s+(form|pour|rebar)'
+      - '\bfooting'
+      - 'final\s+bracing\s+of\s+(forms|panels)'
+      - 'removal\s+of\s+(all\s+)?(panels|forms)'
+      - 'forms?\s+(and\s+)?panels?'
+      - 'form\s+removal'
+      - 'spreading\s+material'
+      - 'starting\s+vertical\s+block|vertical\s+block\s+at\s+(house\s+)?corners?'
+      - 'workers?\s+spreading'
+      - 'level\s+up.{0,30}breakaway\s+walls?'
+      - 'breakaway\s+walls?'
+      - 'fill\w*\s+(the\s+)?planner?\s+block\s+cells?'
+      - 'planner?\s+block'
+      - 'mortar\s+down|mortar\s+(the\s+)?scupper'
+      - 'scupper\s+(drain|hole)'
+      - 'enlarge\s+the\s+scupper'
+      - 'planter?\s+walls?'
+      - 'removing\s+staging'
+      - 'ml\s+concrete'
+    tag_hints:
+      - "Foundation"
+
+  - code: "2.3"
+    name: "Stem Walls"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'stem\s*wall'
+      - 'foundation\s+wall'
+      - 'CMU\s+stem'
+    tag_hints:
+      - "Stem Wall"
+
+  - code: "2.4"
+    name: "Stem Wall Waterproofing"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'waterproof.{0,40}(stem|foundation)\s*wall'
+      - '(stem|foundation)\s*wall.{0,40}waterproof'
+      - 'below.?grade\s+waterproof'
+      - 'tremco'
+      - 'henry'
+      - 'foundation.{0,15}membrane'
+      - 'damp.?proof'
+      - 'water\s*proof(ing|ed|er)?'   # generic catch-all; stems towards CoatRite as the dominant waterproofing sub. Specificity engine still allows 10.1 (shower/wet area) to win when those qualifiers are present.
+      - 'exterior\s+waterproof'
+    notes: "CoatRite LLC: stem wall waterproofing crew. Often mistagged as Masonry. Generic 'waterproof' fallback here so that bare 'Waterproofing continues' lines route correctly. 10.1 has higher specificity for shower/wet-area context."
+
+  - code: "2.5"
+    name: "Under-Slab Plumbing Rough"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'under.?slab\s+plumbing'
+      - 'underslab\s+(sewer|drain|plumb)'
+      - 'sewer\s+line\s+rough'
+      - 'belly\s+plumbing'
+    tag_hints:
+      - "Under-Slab"
+
+  - code: "2.6"
+    name: "Under-Slab Electrical"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'under.?slab\s+(electrical|elec|conduit)'
+      - 'belly\s+electrical'
+
+  - code: "2.7"
+    name: "Slab Prep"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'vapor\s+barrier'
+      - 'slab\s+prep'
+      - 'rebar.{0,15}slab'
+      - 'slab\s+inspection'
+      - 'pre.?pour\s+inspection'
+      - 'compaction\s+test'
+      - 'prepping\s+(the\s+)?(under\s+)?slab'
+      - 'sand\w*\s+(the\s+)?(slab|floor|areas?\s+of\s+the\s+slab)'
+      - 'grind\w*\s+(the\s+)?(slab|floor)'
+      - 'concrete\s+contractor.{0,30}(prep|grind|sand|level)'
+
+  - code: "2.8"
+    name: "Slab Pour"
+    stage: 2
+    stage_label: "Foundation"
+    keywords:
+      - 'slab\s+(pour|placed|poured)'
+      - 'pour.{0,5}slab'
+      - 'concrete\s+pour'
+      - 'pump\s+truck'
+      - 'finishing\s+slab'
+    tag_hints:
+      - "Slab"
+
+  # ==========================================================================
+  # STAGE 3 — STRUCTURAL SHELL
+  # ==========================================================================
+
+  - code: "3.1"
+    name: "Masonry Walls (CMU)"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'masonry\s+wall'
+      - 'CMU\s+wall'
+      - 'block\s+wall'
+      - 'lay(ing)?\s+block'
+      - 'block\s+lay'
+      - 'CMU\s+(vertical\s+)?(block\s+)?install'
+      - 'exterior\s+(\w+\s+)?CMU'
+      - 'exterior\s+(2nd|3rd|second|third|first|1st)\s+floor\s+wall'
+      - '(vertical\s+)?block\s+(install|progress|laying|delivery|on\s+exterior)'
+      - 'lay\w*\s+block'
+      - 'block\s+for\s+(the\s+)?(grill|floor|exterior|wall|3rd|2nd|second|third|first|upper)'
+      - 'concrete\s+block'
+      - 'southwest\s+(was|is|are|continues|continued|onsite|delivering|had|prepping|grind|grinding|sand|sanding|lad|laying|set|poured|finished|stripped|forming|blocking)'
+      - 'block(ing)?\s+(ground|first|second|third)\s+level'
+      - 'shoring\s+walls?'
+      - 'block\s+being\s+placed'
+    tag_hints:
+      - "Masonry Walls - 1L"
+      - "Masonry Walls - 2L"
+      - "Masonry Walls - 3L"
+
+  - code: "3.2"
+    name: "Wall Reinforcement & Cell Fill"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'cell\s+fill'
+      - 'grout(ed|ing)?\s+cell'
+      - 'rebar\s+(set|wall|vertical)'
+      - 'wall\s+reinforce'
+      - 'pour\s+cells'
+
+  - code: "3.3"
+    name: "Tie Beams (CIP)"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'tie\s+beam'
+      - 'tie.?beams?'
+      - 'CIP\s+beam'
+      - 'cast.in.place\s+beam'
+      - 'bond\s+beam'
+      - 'pour.{0,5}beam'
+      - 'ring\s+beam'
+      - 'cast\s+in\s+place\s+(floor|beam)'
+      - 'forming\s+(beams?|floor|the\s+\w+\s+floor|columns?|ground|tie.?beams?)'
+      - 'pour\w*\s+\w*\s+(living\s+)?level\s+floor'
+      - 'pour\w*\s+\w*\s+(1st|2nd|3rd|first|second|third|ground)\s+(living\s+)?(level|floor|column)'
+      - 'steel\s+and\s+form\s+for'
+      - 'set\s+steel\s+and\s+poured?\s+(footers?|columns?|beams?)'
+      - 'pour\w*\s+(ground|first|second|third|1st|2nd|3rd)\s+level\s+columns?'
+      - 'stripping\s+forms?\s+off|stripped?\s+forms?\s+off'
+      - 'concrete\s+filler'
+      - 'corbel\s+details?'
+      - 'rake\s+beams?'
+      - 'a/c\s+pads?'
+      - 'form\s+and\s+pour'
+      - '1st\s+floor\s+cmu|first\s+floor\s+cmu'
+      - 'cmu\s+and\s+concrete'
+      - 'leveling?\s+out\s+beam'
+      - 'sw\s+concrete'
+      - 'pulling\s+down\s+scaffold'
+      - 'stripping\s+(the\s+)?(remaining\s+)?forms?'
+      - 'dropped\s+(more\s+)?block'
+      - 'organizing\s+their\s+equipment'
+      - 'block\s+delivered|cmu\s+delivered'
+      - 'exterior\s+wall\s+block'
+      - 'horizontal\s+beam'
+      - 'horizontal\s+concrete\s+beam'
+      - 'beam\s+forms?\s+and\s+rebar'
+      - 'beam\s+forms?'
+      - 'finishing\s+up\s+with\s+beam'
+      - 'forming\s+(of\s+)?(the\s+)?horizontal'
+      - 'elevated\s+slab\s+forms?'
+      - '(removing|stripping|strip)\s+(concrete|beam)\s+forms?'
+      - '(remov|strip)\w*\s+(concrete\s+)?forms?'
+      - 'pouring\s+concrete\s+(beams?|monday|tuesday|wednesday|thursday|friday)?'
+      - 'cantilever\s+(form|install)'
+      - 'cantilever'
+      - 'rebar\s+(inspection|complete)'
+      - 'forms?\s+and\s+rebar'
+    tag_hints:
+      - "CIP Beams - 1L"
+      - "CIP Beams - 2L"
+
+  - code: "3.4"
+    name: "Floor Truss / Floor System Set"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'floor\s+truss'
+      - 'floor\s+system'
+      - 'TJI\b'
+      - 'I.?joist'
+      - 'set\s+joists?'
+      - 'floor\s+joist'
+      - 'set\s+truss'
+      - 'truss\s+(set|delivery)'
+      - 'wall\s+frame|wall\s+framing|frame\s+(the\s+)?wall'    # wall framing maps here as nearest-fit per SPEC (no dedicated wall framing code)
+      - 'interior\s+frame|interior\s+framing'
+      - 'exterior\s+frame|exterior\s+framing'
+      - '\b(framers?|frame|framing)\s+(continue|continued|onsite|on\s+site|are|completed|were|was|have|lifted|removing|installing|complet|worked|work|address|countered)'
+      - 'framing\s+(scope|contractor|details?)'
+      - 'all\s+valencia.{0,30}(frame|framing|crew|getting|working)'
+      - 'framing\s+(back|front|main|second|third|down|up|out|the)\s+(porch|floor|level|wall|ceiling|room|rafters?|kitchen)'
+      - 'roof\s+sheeting|sheet\w*\s+roof'
+      - 'final\s+framing|finishing\s+(up\s+)?framing'
+      - 'internal\s+framing|interior\s+framing'
+      - 'ceiling\s+drops?'
+      - 'framing\s+needs?'
+      - 'framing\s+lower\s+level|frame\w*\s+lower\s+level'
+      - 'frame\s+(out\s+)?(a\s+)?wall|frame\w*\s+a?\s*wall'
+      - 'frame\w*\s+the?\s+(rafters?|ceilings?|kitchen|master|barbecue|balcony)'
+      - '(setting|set|lay\w*\s+out)\s+(lvl\s+)?beams?'
+      - '(install\w*\s+)?backing\s+(and\s+)?(dead\s+wood|to\s+ceiling)'
+      - 'dead\s+wood'
+      - 'attaching\s+(all\s+the\s+)?furring|furr(ing|ed)\s+(around|out)'
+      - 'finishing\s+the\s+roof|sheeting\s+the\s+roof'
+      - 'sunshine\s+carpentry|florida\s+sunshine|sunshine\s+framing|fl\s+sunshine'
+      - 'alejandro\s+(carpentry|crew|are|is|was|were|onsite|continues|continued|worked|work)'
+      - 'elliptical\s+ceiling'
+      - 'kitchen\s+window\s+in\s+coming|kitchen\s+windows?'
+      - 'closed?\s+in\s+(the\s+)?(lower|upper|floor)\s+(stair|level)'
+      - 'remove\s+(the\s+)?fur'
+      - 'drying\s+in\s+roof|dry.?in\s+roof'
+      - 'rafters?\s+(on|continued|installed|installing|finishing)'
+      - 'work\s+on\s+(the\s+)?rafters?'
+      - 'ceilings?\s+(framing|in\s+(east|west|north|south)\s+wing)'
+      - 'parapet\s+walls?|flat\s+roof\s+parapet'
+      - 'vaulted\s+ceiling'
+      - 'decorative\s+ceiling'
+      - 'interior\s+walls?\s+and\s+roof|interior\s+walls?\s+and\s+ceil'
+      - 'iteral\s+walls?|internal\s+walls?'
+      - '(t&g|tongue.?and.?groove)\s*,?\s+rafters?'
+      - 'final\s+ledger'
+      - 'knock\w*\s+out'
+    tag_hints:
+      - "Framing"
+    notes: "SPEC PART 3 lacks a dedicated wall framing / interior framing phase; in coastal CMU builds the framing crew is doing floor systems, blocking, and wall framing per level. Mapped to 3.4 as nearest fit. Real ALL VALENCIA framing logs land here."
+
+  - code: "3.5"
+    name: "Floor Sheathing"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'floor\s+sheathing'
+      - 'subfloor'
+      - 'sub.?floor'
+      - 'plywood\s+floor'
+      - 'OSB\s+floor'
+      - 'Advantech'
+
+  - code: "3.7"
+    name: "Roof Truss Set"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'roof\s+truss'
+      - 'set\s+roof\s+truss'
+      - 'roof\s+frame'
+    tag_hints:
+      - "Roof Trusses"
+
+  - code: "3.8"
+    name: "Roof Sheathing"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'roof\s+sheathing'
+      - 'roof\s+deck(ing)?'
+      - 'plywood\s+roof'
+      - 'OSB\s+roof'
+
+  - code: "3.9"
+    name: "Hurricane Strapping & Tie-Down Inspection"
+    stage: 3
+    stage_label: "Structural Shell"
+    keywords:
+      - 'hurricane\s+(strap|clip|tie)'
+      - 'tie.?down\s+inspect'
+      - 'simpson\s+strap'
+      - 'h2\.5'
+      - 'truss\s+strap'
+
+  # ==========================================================================
+  # STAGE 4 — DRY-IN
+  # ==========================================================================
+
+  - code: "4.1"
+    name: "Roofing Underlayment"
+    stage: 4
+    stage_label: "Dry-In"
+    keywords:
+      - 'roof\s+underlay'
+      - 'underlayment'
+      - 'peel.?(and.?)?stick'
+      - 'ice.?(and.?)?water'
+      - 'felt\s+paper'
+      - 'roof\s+dry.?in'
+
+  - code: "4.2"
+    name: "Roofing Final"
+    stage: 4
+    stage_label: "Dry-In"
+    keywords:
+      - 'tile\s+roof'
+      - 'metal\s+roof'
+      - 'shingle'
+      - 'roof\s+install'
+      - 'roof\s+complete'
+      - 'standing\s+seam'
+      - 'install.{0,10}roof'
+      - '\broof(er|ing)?(s)?\s+(continue|continued|onsite|on\s+site|are|were|complete)'
+      - '\b(avery|blue\s+vision)\b'
+    tag_hints:
+      - "Roofing"
+
+  - code: "4.3"
+    name: "Exterior Windows"
+    stage: 4
+    stage_label: "Dry-In"
+    keywords:
+      - 'window\s+install'
+      - 'install.{0,10}windows?'
+      - 'set\s+windows?'
+      - 'set.{0,3}window'
+      - 'fixed\s+windows?'
+      - 'sliding\s+(door|glass)'
+    tag_hints:
+      - "Exterior Windows/Doors"
+
+  - code: "4.4"
+    name: "Exterior Doors"
+    stage: 4
+    stage_label: "Dry-In"
+    keywords:
+      - 'exterior\s+door'
+      - 'install.{0,10}exterior\s+door'
+      - 'overhead\s+door'
+      - 'garage\s+door'
+      - 'french\s+door'
+      - 'patio\s+door'
+      - 'front\s+door\s+install'
+
+  # ==========================================================================
+  # STAGE 5 — EXTERIOR ROUGH
+  # ==========================================================================
+
+  - code: "5.1"
+    name: "Exterior Wall Sheathing & Wrap"
+    stage: 5
+    stage_label: "Exterior Rough"
+    keywords:
+      - 'wall\s+sheathing'
+      - 'house\s+wrap'
+      - 'tyvek'
+      - 'WRB\b'
+      - 'weather\s+barrier'
+      - 'zip.?system'
+      - 'exterior\s+sheathing'
+      - 'OSB'
+      - 'plywood\s+wall'
+      - '\bWRB\b'
+      - '\btyvek\b'
+      - 'flashing\s+tape'
+      - 'column\s+wrap'
+      - 'beam\s+wrap'
+      - 'interior\s+sheathing'
+
+  - code: "5.2"
+    name: "Exterior Decking Framing"
+    stage: 5
+    stage_label: "Exterior Rough"
+    keywords:
+      - 'deck(ing)?\s+frame'
+      - 'frame\s+(the\s+)?deck'
+      - 'deck\s+joist'
+      - 'exterior\s+deck.{0,15}fram'
+      - 'deck\s+ledger'
+      - 'install\w*\s+deck(ing)?'
+      - 'putting\s+decking\s+on'
+      - '\bsleepers?\b'
+      - 'decking\s+(crew|tomorrow|continues|continued|onsite|will\s+be)'
+      - 'deck(ing)?\s+(crew|installing)'
+    tag_hints:
+      - "Exterior Decking"
+
+  - code: "5.3"
+    name: "Exterior Stair Framing"
+    stage: 5
+    stage_label: "Exterior Rough"
+    keywords:
+      - 'exterior\s+stair'
+      - 'outdoor\s+stair'
+      - 'deck\s+stair'
+      - 'stair\s+stringer'
+      - 'frame\s+(the\s+)?stair'
+    tag_hints:
+      - "Exterior Stairs"
+
+  # ==========================================================================
+  # STAGE 6 — MEP ROUGH-IN
+  # ==========================================================================
+
+  - code: "6.1"
+    name: "Plumbing Top-Out"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'plumbing\s+top.?out'
+      - 'top.?out\s+plumb'
+      - 'rough.?in\s+plumb'
+      - 'plumb.{0,10}rough.?in'
+      - 'supply\s+line'
+      - 'drain\s+line'
+      - 'water\s+line\s+rough'
+      - 'plumbers?\s+(rough|onsite\s+rough)'
+      - '\bDWV\b'
+      - 'plumber(s)?\s+(was|were|are|is)\s+(back|onsite|on\s+site)'
+      - 'plumbing\s+(continues|continued|in\s+progress)'
+      - '(install|installing)\s+(remaining\s+)?plumbing'
+      - 'underground\s+plumbing'
+      # Common Gator phrasings — water/drainage/main trunk routing work
+      - 'drainage\s+line'
+      - 'water\s+line'
+      - '\bbackflow'
+      - 'trunk\s+line'
+      - 'main\s+(line|trunk|drain)'
+      - 'gator\s+(was|is|continues|continued|onsite|on\s+site|had|did|plumbing|working|worked|still|finishing|completing|pluming)'
+      - 'gator\s+(plumbing|pluming)'
+      - 'sneaky\s+plumb'
+      - 'rough\s+in\s+for\s+(plumb|the\s+plumb)'
+      - 'rough\s+in.{0,30}plumb'
+      - 'plumb.{0,15}rough\s+in'
+      - 'finish\s+rough\s+in|finishing\s+rough\s+in'
+      - 'striving\s+to\s+finish\s+rough\s+in'
+      - 'plum?ing\s+rough\s+in'
+      - 'rough\s+in\s+almost\s+complete'
+      - 'rough\s+in\s+valves?'
+      - 'installer\s+working\s+on\s+rough\s+in'
+      - 'still\s+working\s+on\s+rough\s+in'
+      - 'work\s+on\s+the?\s+plum?ing\s+rough\s+in'
+    tag_hints:
+      - "Plumbing/Gas Rough In"
+
+  - code: "6.2"
+    name: "Gas Rough"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'gas\s+(rough|line|pipe)'
+      - 'gas\s+rough.?in'
+      - 'natural\s+gas\s+install'
+      - 'propane\s+line'
+      - 'CSST\s+line'
+
+  - code: "6.3"
+    name: "Electrical Rough"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'electrical\s+rough'
+      - 'elec\s+rough'
+      - 'rough.?in\s+elec'
+      - 'wire\s+pull'
+      - 'pulling\s+wire'
+      - 'electric\s+rough'
+      - 'install.{0,10}can\s+lights?'
+      - 'electrician.{0,15}rough'
+      - 'box(es)?\s+(rough|install)'
+      - 'electrician(s)?\s+(continue|continued|onsite|are\s+onsite|are\s+on\s+site)'
+      - '(electrician|electrical)\s+(was|were)\s+onsite'
+      - 'pulling\s+conduit|conduit\s+install'
+      # Common Metro phrasings
+      - 'electrician\s+(is|was|are|were)\s+(setting|installing|pulling|cutting|moving|working|onsite|on\s+site|completing)'
+      - 'metro\s+(was|is|continues|continued|onsite|on\s+site|worked|electric)'
+      - 'light\s+rough'
+      - 'cut\s+in\s+(?!.*panel)'        # "cut in lights" but not a "cut in" panel reference
+      - 'panel\s+(rough|install|set\s+up)'
+      - 'setting\s+up\s+the\s+panels?'
+      - 'electrical\s+contractor\s+(was|is|onsite|continues|continued)'
+    tag_hints:
+      - "Electrical Rough In"
+
+  - code: "6.4"
+    name: "HVAC Rough"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'HVAC\s+rough'
+      - 'duct\s*work'
+      - 'ductwork'
+      - 'install\s+ducts?'
+      - 'AC\s+rough'
+      - 'a/c\s+rough'
+      - 'air\s+handler\s+rough'
+      # Common HVAC phrasings — Captain Cool / Climatic
+      - 'hvac\s+contractor\s+(is|was|has|onsite|continues|continued|also)'
+      - 'a/c\s+units?'
+      - 'AC\s+units?'
+      - 'AC\s+unit\b'
+      - 'AC\s+contractor'
+      - 'condensing\s+unit'
+      - 'condenser\b'
+      - 'register\s+install'
+      - 'registers\b'
+      - 'install\w*\s+(both\s+)?a/c'
+      - 'install\w*\s+(the\s+)?ac\b'
+      - 'commissioning\s+(the\s+)?(ac|hvac|a/c)'
+      - 'climatic\s+(was|is|onsite|continues|continued|conditioning)'
+      - 'captain\s+cool\s+(was|is|onsite|continues|continued|worked|duct|duct\s+install|troubleshooting)'
+      - 'temp\s+ac|temp\s+a/c|temporary\s+ac'
+      - 'hvac\s+(cleanup|punch|clean.?up)'
+      - 'hood\s+blower'
+      - 'rough\s+in\s+for\s+hvac|hvac\s+rough\s+in'
+      - 'moving\s+ducted?\s+work'
+      - 'core\s+(hole|holes)'
+      - 'duct\s+install'
+    tag_hints:
+      - "HVAC Rough In"
+
+  - code: "6.5"
+    name: "Low Voltage Rough"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'low\s+voltage\s+rough'
+      - 'LV\s+rough'
+      - 'low.?volt'
+      - 'smarthouse'
+      - 'smart.?home'
+      - 'data\s+rough'
+      - 'security\s+wire'
+      - 'AV\s+rough'
+      - 'audio.?visual\s+rough'
+    tag_hints:
+      - "Low Voltage Rough In"
+
+  - code: "6.6"
+    name: "Fire Sprinkler Rough"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'fire\s+sprinkler'
+      - 'sprinkler\s+rough'
+
+  - code: "6.7"
+    name: "MEP Inspections"
+    stage: 6
+    stage_label: "MEP Rough-In"
+    keywords:
+      - 'MEP\s+inspection'
+      - 'rough\s+inspection'
+      - 'mech\s+rough\s+pass'
+      - 'plumb\s+rough\s+pass'
+      - 'elec\s+rough\s+pass'
+
+  # ==========================================================================
+  # STAGE 7 — ENVELOPE CLOSE-UP
+  # ==========================================================================
+
+  - code: "7.1"
+    name: "Stucco Lath / Wire"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - '\blath\b'
+      - 'stucco\s+(wire|lath)'
+      - 'wire\s+lath'
+      - 'paper\s+and\s+wire'
+      - 'lathe(d|ing)?'
+      - '\blath'
+      - '\bwire'
+      - '\bpaper'
+      - '\bnetting'
+      - '\bmesh'
+
+  - code: "7.2"
+    name: "Stucco Scratch Coat"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - 'scratch\s+coat'
+      - 'first\s+coat\s+stucco'
+      - 'stucco.{0,5}scratch'
+      - 'base\s+coat\s+stucco'
+      - 'stucco\s+(continues?|continued|onsite|on\s+site|begin|began|crew|scope|complet)'   # generic stucco activity — defaults to scratch (stage 7.2 is the entry point of the Watts trade)
+      - 'stucco\s+(work|install)'
+      - 'stucco\s+contractor\s+(is|was|are|onsite|continues|continued|has|begun|completing|completed)'
+      - 'completing\s+(the\s+)?stucco'
+      - 'jeffs?\s+crew\s+(work|are|is|onsite|continues|continued|making|prepping|killed|hung)'
+      - 'stuccoing'
+      - 'prepping\s+for\s+stucco'
+      - 'stucco\s+beed|stucco\s+bead'
+      - 'watts\s+(crew|guys?|workers?|men|stucco)?\s*(installing|prepping|making|working|continues|continued|getting|ready|are|is|was|onsite|finishing|finish)'
+      - 'watts\s+(guys|workers|men)\s+(getting|ready|onsite|are|is|was)'
+      - 'getting\s+ready\s+for\s+stucco'
+      - 'jeff\s+watts'
+      - 'on\s+stucco|working\s+on\s+stucco'
+      - 'plastering\s+planter|plaster(ing)?\s+(scope|continues?|continued)'
+      - 'dens\s+glass'
+      - 'finishing\s+stucco|finished\s+stucco'
+      - 'stucco\s+has\s+been\s+complet'
+    tag_hints:
+      - "Stucco"
+    notes: "Watts can do scratch + brown + finish. The generic 'stucco continues' / 'stucco crew' phrase defaults to 7.2 since it's the most common burst. 7.3 and 7.6 win when their specific 'brown coat' / 'finish coat' phrases appear."
+
+  - code: "7.3"
+    name: "Stucco Brown Coat"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - 'brown\s+coat'
+      - 'second\s+coat\s+stucco'
+      - 'stucco.{0,5}brown'
+      - '2nd\s+coat\s+stucco'
+      - 'parging'
+
+  - code: "7.4"
+    name: "Siding Install"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - 'install\s+siding|siding\s+install'
+      - '\bsiders?\b\s+(are|were|continue|continued|onsite|on\s+site|completed|have)'
+      - 'hardie\s+(plank|board)'
+      - 'lap\s+siding'
+      - 'shake\s+siding'
+      - 'siding\s+(contractor|crew|continue|continued)'
+      - 'siding\s+(work|complete|prep)'
+      - 'rain\s+screen'
+      - '\bfacia\b|\bfascia\b|\bfaica\b'
+      - 'm&j\s+(was|is|are|onsite|continues|continued|worked|complete|crew|siders|almost|got|working|continuing)'
+      - 'm\s*&\s*j\s+(was|is|are|onsite|crew|got|working)'
+      - 'sider\s+(was|is|are|were|continue|continued|onsite|on\s+site|installing)'
+      - 'siders?\s+(returned|return|installing|completing|completed|worked)'
+      - 'porch\s+beam'
+      - 'collum\b|columns?\s+(install|trim)'
+      - 'siding\s+(scope|continues?|wraping|wrapping|complet)'
+      - 'trim\s+for\s+the\s+windows?'
+      - 'shake\s+(done|install|complete)'
+      - 'continuing\s+on\s+siding|continuing\s+siding'
+      - '\bteris?\s+area\b'
+      - 'continued\s+to\s+work\s+on\s+siding'
+      - 'east\s+side\s+of\s+house|west\s+side\s+of\s+house|south\s+side|north\s+side'
+      - 'new[\s-]?tech\s+siding'
+      - 'new\s+tech\s+siding'
+      - 'siding\s+details?'
+      - 'install\w*\s+(siding\s+and\s+trim|new[\s-]?tech)'
+      - 'entry\s+ceilings?'
+      - 'rained\s+out'
+    tag_hints:
+      - "Siding"
+
+  - code: "7.5"
+    name: "Soffit / Exterior Ceilings"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - '\bsoffit'
+      - 'exterior\s+ceiling'
+      - 't&g\s+ceiling'
+      - 'tongue.?and.?groove\s+ceiling'
+      - 'porch\s+ceiling'
+      - 'lanai\s+ceiling'
+    tag_hints:
+      - "Exterior Ceilings"
+
+  - code: "7.6"
+    name: "Stucco Finish Coat"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - 'finish\s+coat\s+stucco'
+      - 'stucco\s+finish\s+coat'
+      - 'color\s+coat'
+      - 'texture\s+coat'
+      - 'stucco\s+texture'
+      - 'final\s+coat\s+stucco'
+      - 'stucco\s+(patch(es|ing)?|repair)'  # commonly Watts coming back for finish-stage repairs
+
+  - code: "7.7"
+    name: "Exterior Trim & Bandings"
+    stage: 7
+    stage_label: "Envelope Close-Up"
+    keywords:
+      - 'exterior\s+trim'
+      - '\bband(ing|s)?\b'
+      - 'corner\s+board'
+      - 'frieze\s+board'
+      - 'exterior\s+casing'
+
+  # ==========================================================================
+  # STAGE 8 — INSULATION & DRYWALL
+  # ==========================================================================
+
+  - code: "8.1"
+    name: "Insulation"
+    stage: 8
+    stage_label: "Insulation & Drywall"
+    keywords:
+      - 'insulat'
+      - 'spray\s+foam'
+      - 'batt\s+insulat'
+      - 'blown.?in\s+insulat'
+      - 'fiberglass\s+insulat'
+      - 'open.?cell\s+foam'
+    tag_hints:
+      - "Insulation"
+
+  - code: "8.2"
+    name: "Drywall Hang"
+    stage: 8
+    stage_label: "Insulation & Drywall"
+    keywords:
+      - 'drywall\s+hang'
+      - 'hang(ing)?\s+drywall'
+      - 'sheetrock\s+hang'
+      - 'hang(ing)?\s+rock'
+      - 'drywall\s+install'
+      - 'drywaller\s+(is|was|are|continue|continued|onsite|installing)'
+      - '\breglet\b'
+      - 'wg\s+quality\s+(was|is|onsite|continues|continued|worked)'
+      - 'hbs\s+drywall\s+(was|is|onsite|continues|continued|worked)'
+      - 'drywall\s+(repair|repairs|patchwork|patch\s+work)'
+      - 'corner\s*bead'
+      - 'mud\s+(door\s+jam|walls)'
+      - 'door\s+jams?\s+(and\s+)?walls?'
+      - 'jams?\s+(and\s+|&\s+)?walls?'
+      - 'patch\s*work'
+
+  - code: "8.3"
+    name: "Drywall Tape & Mud"
+    stage: 8
+    stage_label: "Insulation & Drywall"
+    keywords:
+      - 'tape.{0,5}mud'
+      - 'mud.{0,5}tape'
+      - 'drywall\s+tape'
+      - 'drywall\s+mud'
+      - 'drywall\s+finish'
+      - 'mud\s+and\s+tap'
+      - '\bskim\s+coat'
+      - 'drywaller(s)?\s+(continue|are|were|onsite|on\s+site|completed)'
+    tag_hints:
+      - "Drywall"
+
+  - code: "8.4"
+    name: "Drywall Texture / Finish"
+    stage: 8
+    stage_label: "Insulation & Drywall"
+    keywords:
+      - 'texture'
+      - 'orange\s+peel'
+      - 'knockdown'
+      - 'drywall\s+texture'
+      - 'level\s+5'
+
+  - code: "8.5"
+    name: "Prime Walls"
+    stage: 8
+    stage_label: "Insulation & Drywall"
+    keywords:
+      - 'prime\s+wall'
+      - 'wall\s+primer'
+      - 'priming\s+wall'
+
+  # ==========================================================================
+  # STAGE 9 — INTERIOR ROUGH FINISH
+  # ==========================================================================
+
+  - code: "9.1"
+    name: "Interior Stair Framing & Treads"
+    stage: 9
+    stage_label: "Interior Rough Finish"
+    keywords:
+      - 'interior\s+stair'
+      - 'stair\s+tread'
+      - 'install\s+stair'
+      - 'stair\s+install'
+      - 'staircase\s+(install|frame|build)'
+      - '\brail(ing|ings)?\b'         # Stair/glass/exterior railings — DB Welding's primary scope
+      - 'metal\s+fab'                 # Metal fab contractor work — maps here as nearest-fit (no 9.1.1 metal code in SPEC)
+      - 'guard\s*rail'
+    tag_hints:
+      - "Interior Stairs"
+    notes: "DB Welding's railing/metal-fab work maps here as nearest-fit. SPEC has no dedicated metal-fab code; 9.1 covers stair treads + railings."
+
+  - code: "9.2"
+    name: "Interior Trim Carpentry"
+    stage: 9
+    stage_label: "Interior Rough Finish"
+    keywords:
+      - 'interior\s+trim'
+      - 'trim\s+carpenter'
+      - 'install\s+(base|baseboard|crown)'
+      - 'baseboard'
+      - 'crown\s+(mold|molding)'
+      - 'casing\s+install'
+      - 'pocket\s+door'
+      - 'wainscot'
+      - 'shoe\s+mold'
+      - 'rainscreen|rain\s+screen'
+      - 'walnut\s+shelving|custom\s+shelv'
+      - 'banquette'
+      - 'bedroom\s+ceiling|ceiling\s+install|wall\s+and\s+ceiling'
+      - 'sight\s+to\s+see\s+(carpentry|continue|continued|crew|are|is|was|onsite|finishing|installing|working)'
+      - 'sms\s+(carpentry|continue|continued|crew|are|is|was|onsite|finishing|installing|working)'
+      - 'trim\s+items?\s+(throughout|complet)'
+    tag_hints:
+      - "Interior Trim"
+
+  - code: "9.3"
+    name: "Interior Doors Hung"
+    stage: 9
+    stage_label: "Interior Rough Finish"
+    keywords:
+      - 'interior\s+door'
+      - 'hung\s+door'
+      - 'install\s+interior\s+door'
+      - 'pre.?hung\s+door'
+      - 'door\s+install'
+      - 'hung\s+interior'
+
+  # ==========================================================================
+  # STAGE 10 — TILE & STONE
+  # ==========================================================================
+
+  - code: "10.1"
+    name: "Wet Area Waterproofing"
+    stage: 10
+    stage_label: "Tile & Stone"
+    keywords:
+      - 'schluter'
+      - 'kerdi'
+      - 'hydroban'
+      - 'redgard'
+      - 'shower\s+pan'                              # shower pan in any context (more specific than 2.4 generic waterproof)
+      - 'wet\s+area\s+(membrane|waterproof)'
+      - 'pre.?slope'
+      - 'pan\s+liner'
+      - 'tile\s+waterproof'
+      - 'waterproof.{0,20}shower'
+      - 'shower.{0,20}waterproof'
+      - 'bath.{0,15}waterproof'
+    notes: "CoatRite LLC also does shower pans. 'shower pan' alone wins here over 2.4's generic 'waterproof' due to specificity (longer match)."
+
+  - code: "10.2"
+    name: "Floor Tile / Wood Flooring"
+    stage: 10
+    stage_label: "Tile & Stone"
+    keywords:
+      - 'floor\s+tile'
+      - 'tile\s+(the\s+)?floor'
+      - 'install.{0,10}floor\s+tile'
+      - 'wood\s+floor'
+      - 'hardwood'
+      - 'engineered\s+wood'
+      - 'plank\s+install'
+      - 'floor\s+sand'
+      - 'floor\s+install'
+      - 'floor.{0,5}finish'
+      - 'tile\s+(continues?|onsite|on\s+site|crew|install|complete)'
+      - 'tile\s+contractor'
+      - '(rangel|tile|nemecio|nemesio).{0,30}(install|continue)'
+      - 'tile\s+(in\s+the\s+)?(garage|patio|terrace|deck|kitchen|powder)'
+      - 'patio.{0,15}tile|tile.{0,15}patio'
+      - 'terrace.{0,15}tile|tile.{0,15}terrace'
+      # Integrity Floors / wood flooring patterns
+      - 'flooring\s+contractor\s+(was|is|are|onsite|continues|continued|installing|prepping)'
+      - 'flooring\s+scope\s+(continues|continued|complete)'
+      - 'floor\s+leveling|leveling\s+(the\s+)?floor'
+      - '\bardex\b'
+      - 'self.?leveling'
+      - 'integrity\s+floor'
+      - 'nosing'
+    tag_hints:
+      - "Wood Flooring"
+      - "Interior Tile"
+
+  - code: "10.3"
+    name: "Wall Tile"
+    stage: 10
+    stage_label: "Tile & Stone"
+    keywords:
+      - 'wall\s+tile'
+      - 'shower\s+wall\s+tile'
+      - 'tile\s+(the\s+)?wall'
+      - 'tub\s+surround'
+      - 'shower\s+tile'
+      - 'tile\s+(in\s+the\s+)?shower'
+      - 'shower\s+wall'
+      - 'bathroom\s+(tile|shower)\s+(wall|install)'
+      - 'tile\s+(install|continues?)\s+in\s+(the\s+)?(shower|bath)'
+      - 'tiling\s+(shower|bath|wall)'
+      - 'shower\s+(install|tile)'
+
+  - code: "10.4"
+    name: "Stone / Slab Install"
+    stage: 10
+    stage_label: "Tile & Stone"
+    keywords:
+      - 'stone\s+install'
+      - 'slab\s+install'
+      - 'slab\s+template'
+      - 'cast\s+stone'
+      - 'natural\s+stone'
+
+  # ==========================================================================
+  # STAGE 11 — CABINETRY & STONE TOPS
+  # ==========================================================================
+
+  - code: "11.1"
+    name: "Cabinet Install"
+    stage: 11
+    stage_label: "Cabinetry & Stone Tops"
+    keywords:
+      - 'cabinet\s+install'
+      - 'install\s+cabinet'
+      - 'set\s+cabinet'
+      - 'hang\s+cabinet'
+      - 'cabinet\s+hang'
+      - 'cabinetry\s+install'
+      - 'cabinets?\s+(continue|continued|are\s+being|to\s+be|onsite|on\s+site|complete)'
+      - 'kitchen\s+cabinets?'
+      - 'cabinet\s+(installer|contractor)'
+      - 'cabinetry\s+contractor'
+      - 'vanity\s+install'
+      - 'bath\s+vanity'
+    tag_hints:
+      - "Cabinetry"
+
+  - code: "11.2"
+    name: "Countertop Template"
+    stage: 11
+    stage_label: "Cabinetry & Stone Tops"
+    keywords:
+      - 'counter.?top\s+template'
+      - 'stone\s+template'
+      - 'template.{0,15}counter'
+
+  - code: "11.3"
+    name: "Countertop Install"
+    stage: 11
+    stage_label: "Cabinetry & Stone Tops"
+    keywords:
+      - 'counter.?top\s+install'
+      - 'install\s+counter'
+      - 'set\s+counter'
+      - 'set\s+stone\s+top'
+      - 'install\s+stone\s+top'
+    tag_hints:
+      - "Countertops"
+
+  - code: "11.4"
+    name: "Backsplash Install"
+    stage: 11
+    stage_label: "Cabinetry & Stone Tops"
+    keywords:
+      - 'backsplash'
+      - 'install\s+back\s*splash'
+
+  # ==========================================================================
+  # STAGE 12 — INTERIOR PAINT
+  # ==========================================================================
+
+  - code: "12.1"
+    name: "Caulk & Putty"
+    stage: 12
+    stage_label: "Interior Paint"
+    keywords:
+      - 'fill\s+nail\s+holes?'
+      - 'caulking'
+      - '\bcaulk'
+      - '\bputty'
+      - '\bnail\s+hole'
+      - '\bfill\b.*\bhole'
+      - 'caulking\s+prep'
+      - 'punch\s+putty'
+
+  - code: "12.2"
+    name: "Paint Walls"
+    stage: 12
+    stage_label: "Interior Paint"
+    keywords:
+      - 'paint(ing)?\s+wall'
+      - 'wall\s+paint'
+      - 'interior\s+paint'
+      - 'paint(ed|ing)?\s+(rooms?|interior)'
+      - 'roll(ed|ing)?\s+walls?'
+      - 'painters?\s+(are|were|was|continue|continued|onsite|on\s+site|finishing|stripped|prepping|are\s+priming)'
+      - '(myers|tnt)\s+(paint|painting|are|crew|custom)'
+      - 'paint\s+(crew|continues|continued|punch)'
+      - 'interior\s+priming'
+      - 'priming\s+(and\s+)?sealing'
+      - 'painter\s+is\s+(onsite|finishing|staining|prepping)'
+      - 'painting\s+contractor\s+is\s+(onsite|prepping)'
+      - 'staining\s+(the\s+)?(ground|stairwell|floor|trim)'
+      - 'stripped?\s+floor\s+covering'
+      - 'prepping\s+walls?'
+      - 'tap(e|ing)?\s+off\s+floors?'
+      - 'paint\s+(prep|fill\s+and\s+sand|prep/\s*masking|prep/masking)'
+      - 'paint\s+prep'
+      - 'prime\s+paint\s+day|prime\s+paint'
+      - 'masking\b'
+    tag_hints:
+      - "Interior Painting"
+
+  - code: "12.3"
+    name: "Paint Trim & Doors"
+    stage: 12
+    stage_label: "Interior Paint"
+    keywords:
+      - 'paint\s+trim'
+      - 'trim\s+paint'
+      - 'paint\s+door'
+      - 'door\s+paint'
+      - 'paint\s+base'
+      - 'paint\s+casing'
+      - '\bspraying\s+(doors|trim|cabinets)'
+      - 'baseboard\s+paint'
+      - 'painting\s+(electrical|interior|hvac)\s+trim'
+      - 'painting\s+door'
+      - 'painting\s+door\s+hardware'
+      - 'paint\s+interior\s+door'
+      - 'paint\s+prep\s+trim'
+
+  # ==========================================================================
+  # STAGE 13 — MEP TRIM
+  # ==========================================================================
+
+  - code: "13.1"
+    name: "Plumbing Trim"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'plumbing\s+trim'
+      - 'plumb\s+trim'
+      - 'set\s+(toilet|sink|tub|faucet|fixture)'
+      - 'install\s+(toilet|sink|tub|faucet|fixture)'
+      - 'plumbers?\s+(installing|trimming)'
+      - 'plumb\s+fixture'
+      - '\btoilet\b.*\binstall'
+      - '\bvanity\s+sink'
+      - '\bbathroom\s+fixture'
+      - 'plumbing\s+trim\s+out'
+      - 'set\s+sink'
+      - 'trims?\s+and\s+faucets?'
+      - 'sink\s+faucet'
+    tag_hints:
+      - "Plumbing/Gas Trim Out"
+
+  - code: "13.2"
+    name: "Gas Trim"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'gas\s+trim'
+      - 'gas\s+test'
+      - 'connect\s+gas'
+      - 'gas\s+install\s+complete'
+      - 'gas\s+(line|hookup|stub|test)'
+      - 'propane\s+(connect|test)'
+      - 'plumbing/gas\s+trim'
+      - 'water\s+heater(?!\s+(electric|electrical))'
+      - 'gas\s+contractor\s+(was|is|were)\s+onsite'
+
+  - code: "13.3"
+    name: "Electrical Trim"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'electrical\s+trim'
+      - 'elec\s+trim'
+      - 'install\s+(outlet|switch|receptacle)'
+      - 'set\s+(outlet|switch|panel|fixture)'
+      - 'trim\s+out\s+elec'
+      - 'install\s+light\s+fixture'
+      - 'install\s+(can\s+)?lights?'
+      - 'panel\s+(set|trim)'
+      - 'electrician.{0,15}trim'
+      - 'install\w*\s+(the\s+)?(island\s+)?light(\s+fixtures?|\s+kit)?'
+      - 'island\s+light'
+      - 'electrical\s+contractor.{0,40}trim'
+      - 'troubleshoot\w*\s+(outlets?|switches|electrical|wiring)'
+      - '\boutlet'
+      - '\bswitch'
+      - '\bfixture'
+      - '\breceptacle'
+      - 'electrical\s+trim\s+out'
+      - 'lighting\s+fixtures?'
+      - 'installing\s+(the\s+)?(last\s+of\s+(the\s+)?)?lighting'
+      - 'electricians?\s+(were|are|is|was)\s+onsite\s+installing'
+    tag_hints:
+      - "Electrical Trim Out"
+
+  - code: "13.4"
+    name: "HVAC Trim"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'HVAC\s+trim'
+      - 'AC\s+install'
+      - 'a/c\s+install'
+      - 'AC\s+units?\s+install'
+      - 'hvac\s+install'
+      - 'air\s+handler\s+install'
+      - 'condenser\s+install'
+      - 'install\w*\s+(the\s+)?condens'
+      - 'register\s+(install|set|trim)'
+    tag_hints:
+      - "HVAC Trim Out"
+
+  - code: "13.5"
+    name: "Low Voltage Trim"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'low\s+voltage\s+trim'
+      - 'LV\s+trim'
+      - 'data\s+trim'
+      - 'security\s+trim'
+      - 'AV\s+trim'
+    tag_hints:
+      - "Low Voltage Trim Out"
+
+  - code: "13.6"
+    name: "Appliance Install"
+    stage: 13
+    stage_label: "MEP Trim"
+    keywords:
+      - 'appliance'
+      - 'install\s+(refrigerator|range|dishwasher|oven|hood|microwave)'
+      - 'set\s+(refrigerator|range|dishwasher|oven|hood)'
+      - 'fuse\s+specialty'
+      - 'custom\s+hood'
+    tag_hints:
+      - "Appliances"
+
+  # ==========================================================================
+  # STAGE 14 — EXTERIOR FINISH
+  # ==========================================================================
+
+  - code: "14.1"
+    name: "Exterior Paint"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'exterior\s+paint'
+      - 'paint(ing)?\s+exterior'
+      - 'paint\s+(siding|stucco)'
+      - 'exterior\s+primer'
+      - 'paint\s+the\s+outside'
+    tag_hints:
+      - "Exterior Painting"
+
+  - code: "14.2"
+    name: "Exterior Decking Finish"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'deck\s+(board|surface|stain|finish)'
+      - 'finish\s+deck'
+      - 'install\s+deck\s+board'
+      - 'IPE\s+deck'
+      - 'composite\s+deck'
+
+  - code: "14.3"
+    name: "Driveway / Hardscape"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'driveway'
+      - 'hardscape'
+      - 'concrete\s+drive'
+      - 'install\s+drive'
+    tag_hints:
+      - "Driveway"
+
+  - code: "14.4"
+    name: "Exterior Pavers / Walkways"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - '\bpavers?\b'
+      - 'walkway\s+install'
+      - 'install\s+pavers?'
+      - 'travertine'
+      - 'brick\s+paver'
+    tag_hints:
+      - "Exterior Pavers"
+
+  - code: "14.5"
+    name: "Pool Shell / Plumbing"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'pool\s+shell'
+      - 'pool\s+gunite'
+      - 'pool\s+plumbing'
+      - 'pool\s+excavat'
+      - 'pool\s+steel'
+      - 'pool\s+rebar'
+      - 'pool\s+form'
+      - 'pool\s+contractor.{0,30}(plumbing|shell|gunite|excavat|rebar|form)'
+
+  - code: "14.6"
+    name: "Pool Tile & Coping"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'pool\s+tile'
+      - 'pool\s+coping'
+      - 'tile.{0,15}pool'
+      - 'coping.{0,10}pool'
+
+  - code: "14.7"
+    name: "Pool Plaster / Pebbletec"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'pool\s+plaster'
+      - 'pebble.?tec'
+      - 'pebble.?finish'
+      - 'pool\s+finish'
+
+  - code: "14.8"
+    name: "Pool Equipment & Startup"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'pool\s+equipment'
+      - 'pool\s+pump'
+      - 'pool\s+startup'
+      - 'pool\s+fill'
+      - 'pool\s+heater'
+      - 'pool\s+(contractor|onsite|on\s+site|continues?)'
+      - '(sanger|tom\s+sanger)\s+(pool|continues|onsite|is\s+on|2|crew|worked|poor)'
+      - 'sanger\s+(?!.*deck)'      # Sanger mention without deck — defaults to pool work, conditional 5.1/14.2 handle deck
+      - 'pool\s+from\s+work'
+      - 'leak\s+in\s+the\s+pool'
+      - 'lighting\s+control'
+      - 'sanger\s+pools?'
+    tag_hints:
+      - "Pool"
+
+  - code: "14.9"
+    name: "Final Fencing / Gates"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - '\bfenc(ing|e)\b'
+      - 'gate\s+install'
+      - 'install\s+(gate|fence)'
+      - 'pool\s+fence'
+    tag_hints:
+      - "Fencing"
+
+  - code: "14.10"
+    name: "Landscaping"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'landscap'
+      - 'sod\s+install'
+      - 'plant.{0,10}install'
+      - 'mulch'
+      - 'palm\s+tree\s+install'
+    tag_hints:
+      - "Landscaping"
+
+  - code: "14.11"
+    name: "Irrigation"
+    stage: 14
+    stage_label: "Exterior Finish"
+    keywords:
+      - 'irrigat'
+      - 'sprinkler\s+system'
+      - 'install\s+sprinkler'
+
+  # ==========================================================================
+  # STAGE 15 — CLOSEOUT
+  # ==========================================================================
+
+  - code: "15.1"
+    name: "Punch Walk & List"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'punch\s+(walk|list)'
+      - 'pre.?punch'
+      - 'punch\s+walk.?through'
+      - 'final\s+walk.?through'
+      - 'owner\s+walk.?through'
+      - 'deficien'
+      - 'safety\s+rails?'                  # Ross Built common end-of-build work — temporary safety rails
+      - 'cleaning\s+(the\s+)?(garage|jobsite|exterior|site|elevator|shaft)'
+      - 'general\s+clean.?up|clean.?up\s+x'
+      - 'handrails?\s+(install|installed|building|built|onsite)'
+      - 'install\w*\s+handrails?'
+      - 'temp\s+platform|temporary\s+platform'
+      - 'ross\s+built\s+(was|crew\s+was|crew\s+is|crew\s+onsite|onsite|crew\s+(work|continue|continued)|is\s+onsite|are\s+onsite|added|adding|installing|building|completed)'
+      - 'ross\s+(crew|s\s+crew)\s+(had|worked|continues|continued|onsite|finished|installed|added)'
+      - 'measured\s+and\s+marked'
+      - 'light\s+placement\s+over'
+      - 'no\s+(work|one\s+on\s+site|activity)'
+      - 'hurricane\s+(debby|ian|debris|prep)'
+      - 'backfill\w*\s+(the\s+)?underground'
+      - 'underground\s+(electrical|service|plumbing|prep)'
+      - 'trenching\s+the\s+underground'
+      - 'material\s+take.?offs?'
+      - 'planning\s+day'
+      - 'no\s+apparent\s+damage'
+      - 'inspected\s+site'
+      - 'field\s+measure'
+      - 'front\s+gate\s+screen'
+      - 'review\s+(the\s+)?scope'
+      - 'lighting\s+in\s+the\s+garage|lighting\s+(in\s+the\s+)?(pool\s+storage|garage)'
+      - 'frame\w*\s+in\s+for\s+lighting'
+      - 'stair\s+landing'
+      - 'stair\s+system'
+      - 'shower\s+curbs?\s+for\s+stucco'
+      - 'shower\s+curbs?'
+
+  - code: "15.2"
+    name: "Punch Repairs"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'punch\s+(repair|item|fix)'
+      - 'fix\s+punch'
+      - 'punch\s+work'
+      - 'punching\s+out'
+      - 'final\s+punch'
+      - 'punch\s+complete'
+      - 'touch.?up'
+    tag_hints:
+      - "Final Punch Out"
+
+  - code: "15.3"
+    name: "Final Cleaning"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'final\s+clean'
+      - 'final\s+touch'
+      - 'deep\s+clean'
+      - 'cleaning\s+crew'
+    tag_hints:
+      - "Final Touches"
+
+  - code: "15.4"
+    name: "Final Inspections"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'final\s+inspect'
+      - 'C\.?O\.?\s*inspect'
+      - 'building\s+final'
+      - 'fire\s+final'
+
+  - code: "15.5"
+    name: "C.O. Issuance"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'certificate\s+of\s+occupancy'
+      - 'C\.?O\.?\s+(issued|issuance|target)'
+      - 'CO\s+(issued|received|issuance)'
+      - 'obtain\s+C\.?O\.?'
+    tag_hints:
+      - "Obtain C.O."
+
+  - code: "15.6"
+    name: "Owner Walk & Move-In"
+    stage: 15
+    stage_label: "Closeout"
+    keywords:
+      - 'owner\s+walk'
+      - 'move.?in'
+      - 'turnover'
+      - 'owner\s+orientation'
+      - 'owner\s+walk.?through'
+
+# ==========================================================================
+# Library metadata
+# ==========================================================================
+
+metadata:
+  total_phases: 84
+  total_phases_note: "SPEC PART 3 enumerates 84 distinct codes across 15 stages (orchestrator brief said '67' but the master sequence list itself is 84 phases — 1.1 through 15.6, omitting 3.6 'Repeat 3.1-3.5' which is a directive not a phase). Library covers all of them."
+  stage_count: 15
+  source_spec: ".planning/milestones/m02-schedule-intelligence/SPEC.md PART 3"
+  classification_priority:
+    - "1. Most specific keyword match across notes_full + notes + activity (longer/more-tokens wins)"
+    - "2. tag_hints from parent_group_activities only fire when text is silent on the trade"
+    - "3. Multiple phases can be assigned per log if multiple distinct keyword groups match"
+  org_configurable: true

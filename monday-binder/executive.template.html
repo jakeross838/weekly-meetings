@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Executive Summary · Ross Built</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+<link rel="stylesheet" href="../assets/nightwork-tokens.css">
+<script src="../assets/components.js"></script>
+<style>
+@page { size: letter landscape; margin: 0.5in 0.6in; }
+.mp { max-width: 9.5in; margin: 0 auto; padding: 14px 0; font-size: 12px; line-height: 1.4; }
+
+.mp-band {
+  border: 1.5px solid var(--ink);
+  padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+  background: var(--bg-card);
+}
+.mp-band h1 {
+  font-family: var(--font-head);
+  font-size: 17px; font-weight: 700; letter-spacing: 0.5px;
+  margin: 0; color: var(--ink);
+}
+.mp-band .right { text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.mp-band .right .when { font-size: 13px; color: var(--ink); margin-bottom: 2px; }
+
+.mp-sec { margin-top: 14px; }
+.mp-sec h2 {
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink); margin: 0 0 8px;
+  padding: 6px 0;
+  border-top: 1.2px solid var(--ink);
+  border-bottom: 1.2px solid var(--line);
+  break-after: avoid; page-break-after: avoid;
+}
+
+/* Red items — table-like, dense */
+.red-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+.red-table tr { border-bottom: 1px solid var(--line-2); }
+.red-table tr:last-child { border-bottom: none; }
+.red-table td { padding: 7px 10px; vertical-align: top; }
+.red-table .job {
+  font-family: var(--font-head);
+  font-weight: 700; font-size: 12.5px;
+  color: var(--ink);
+  letter-spacing: 1px; text-transform: uppercase;
+  width: 130px;
+}
+.red-table .label {
+  font-size: 11.5px;
+  color: var(--ink); font-weight: 600;
+  width: 200px;
+}
+.red-table .detail { color: var(--ink-2); font-size: 11.5px; }
+
+/* Trajectory bar */
+.traj { display: grid; grid-template-columns: 200px 1fr 80px; gap: 12px; padding: 4px 0; font-family: var(--font-mono); font-size: 12px; }
+.traj .label { color: var(--ink-2); }
+.traj .bar { background: var(--bg-soft); height: 14px; position: relative; border: 1px solid var(--line); }
+.traj .bar > .fill { height: 100%; background: var(--ink); }
+.traj .bar.ok > .fill { background: var(--success); }
+.traj .bar.flagged > .fill { background: var(--nw-danger); }
+.traj .bar.unknown > .fill { background: var(--nw-stone); }
+.traj .num { text-align: right; color: var(--ink); font-weight: 600; }
+
+/* Recovery list */
+.rec-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 130px;
+  font-family: var(--font-mono); font-size: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dotted var(--line-2);
+}
+.rec-row:last-child { border-bottom: none; }
+.rec-row .job { font-family: var(--font-head); font-weight: 600; text-transform: uppercase; color: var(--ink); letter-spacing: 0.8px; }
+.rec-row .what { color: var(--ink-2); }
+.rec-row .verdict { text-align: right; font-weight: 600; }
+.rec-row .verdict.closed { color: var(--success); }
+.rec-row .verdict.improved { color: var(--accent); }
+.rec-row .verdict.worse { color: var(--nw-danger); }
+.rec-row .verdict.same { color: var(--ink-3); }
+
+/* Decisions block */
+.dec-row {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--line-2);
+}
+.dec-row:last-child { border-bottom: none; }
+.dec-row .check { color: var(--ink-2); font-size: 14px; }
+.dec-row .question {
+  font-family: var(--font-head);
+  color: var(--ink);
+  font-weight: 500;
+}
+.dec-row .context {
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.empty-line {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink-muted); font-style: italic;
+  padding: 6px 0;
+}
+</style>
+</head>
+<body>
+<div class="mp">
+
+  <div class="mp-band">
+    <div>
+      <h1>ROSS BUILT · EXECUTIVE SUMMARY</h1>
+    </div>
+    <div class="right">
+      <div class="when" id="when"></div>
+      <div>FOR LEE</div>
+    </div>
+  </div>
+
+  <section class="mp-sec">
+    <h2>Red This Week</h2>
+    <div id="red-this-week"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Trajectory</h2>
+    <div id="trajectory"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Recovery From Last Week</h2>
+    <div id="recovery"></div>
+  </section>
+
+  <section class="mp-sec">
+    <h2>Decisions Needed From You</h2>
+    <div id="decisions"></div>
+  </section>
+
+  <!-- Phase 12 Part B alignment — exception-only what's-on-fire -->
+  <section class="mp-sec">
+    <h2>§2 Execution Blockers <span class="badge" style="font-size:9px;color:var(--ink-3);font-family:var(--font-mono);">2-week window</span></h2>
+    <div id="aligned-exec-blockers"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§6 Overdue Selections <span class="badge" style="font-size:9px;color:var(--ink-3);font-family:var(--font-mono);">past due</span></h2>
+    <div id="aligned-overdue-sel"></div>
+  </section>
+  <section class="mp-sec">
+    <h2>§7 Financial Exposure <span class="badge" style="font-size:9px;color:var(--ink-3);font-family:var(--font-mono);">flagged jobs / urgent BUDGET</span></h2>
+    <div id="aligned-fin-flags"></div>
+  </section>
+
+</div>
+
+<script type="application/json" id="mp-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const SI = window.SI;
+  const DATA = JSON.parse(document.getElementById('mp-data').textContent);
+  const escape = SI.escapeHtml;
+
+  /* Header */
+  const t = DATA.today;
+  const d = t ? new Date(t + 'T00:00:00') : null;
+  const md = d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric' }).toUpperCase() : '';
+  document.getElementById('when').textContent = md ? ('WEEK OF ' + md) : (t || '');
+
+  /* Red this week */
+  const red = DATA.red_this_week || [];
+  if (red.length === 0) {
+    document.getElementById('red-this-week').innerHTML = '<div class="empty-line">No red signals this week.</div>';
+  } else {
+    document.getElementById('red-this-week').innerHTML =
+      `<table class="red-table">${red.map(r => `
+        <tr>
+          <td class="job">${escape(r.job)}</td>
+          <td class="label">${escape(r.label)}</td>
+          <td class="detail">${escape(r.detail)}</td>
+        </tr>`).join('')}</table>`;
+  }
+
+  /* Trajectory */
+  const traj = DATA.trajectory || {};
+  const total = (traj.on_track || 0) + (traj.flagged || 0) + (traj.unknown || 0);
+  function bar(label, count, cls) {
+    const pct = total ? Math.round(100 * count / total) : 0;
+    return `<div class="traj"><span class="label">${escape(label)}</span><div class="bar ${cls}"><div class="fill" style="width:${pct}%"></div></div><span class="num">${count} of ${total} · ${pct}%</span></div>`;
+  }
+  document.getElementById('trajectory').innerHTML =
+    bar('Jobs on track', traj.on_track || 0, 'ok') +
+    bar('Jobs flagged', traj.flagged || 0, 'flagged');
+
+  /* Recovery */
+  const rec = DATA.recovery || [];
+  if (rec.length === 0) {
+    document.getElementById('recovery').innerHTML =
+      '<div class="empty-line">No prior week reds on record (first run).</div>';
+  } else {
+    document.getElementById('recovery').innerHTML = rec.map(r => `
+      <div class="rec-row">
+        <span class="job">${escape(r.job)}</span>
+        <span class="what">${escape(r.what)}</span>
+        <span class="verdict ${escape(r.verdict_class)}">${escape(r.verdict)}</span>
+      </div>`).join('');
+  }
+
+  /* Decisions */
+  const dec = DATA.decisions || [];
+  if (dec.length === 0) {
+    document.getElementById('decisions').innerHTML =
+      '<div class="empty-line">No Lee-level decisions surfaced this week.</div>';
+  } else {
+    document.getElementById('decisions').innerHTML = dec.map(d => `
+      <div class="dec-row">
+        <span class="check">☐</span>
+        <div>
+          <div class="question">${escape(d.question)}</div>
+          ${d.context ? `<div class="context">${escape(d.context)}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  /* Phase 12 Part B aligned data — exception-only */
+  const aligned = DATA.aligned || {};
+
+  const blockers = aligned.execution_blockers || [];
+  const ebody = document.getElementById('aligned-exec-blockers');
+  if (!blockers.length) {
+    ebody.innerHTML = '<div class="empty-line">No execution blockers in the 2-week window.</div>';
+  } else {
+    ebody.innerHTML = `<table class="red-table">${blockers.map(b => `
+      <tr>
+        <td class="job">${escape(b.pm)} · ${escape((b.job||'').toUpperCase())}</td>
+        <td class="label">${escape(b.phase)}</td>
+        <td class="detail">${escape(b.sub || '—')} · ${escape(b.blockers || '')}</td>
+      </tr>`).join('')}</table>`;
+  }
+
+  const overdue = aligned.overdue_selections || [];
+  const obody = document.getElementById('aligned-overdue-sel');
+  if (!overdue.length) {
+    obody.innerHTML = '<div class="empty-line">No overdue selections.</div>';
+  } else {
+    obody.innerHTML = `<table class="red-table">${overdue.map(o => `
+      <tr>
+        <td class="job">${escape(o.pm)} · ${escape((o.job||'').toUpperCase())}</td>
+        <td class="label">OVERDUE ${-o.days_to_due}d${o.stale ? ' <span style="color:var(--nw-danger);font-weight:700;margin-left:6px;">STALE</span>' : ''}</td>
+        <td class="detail">${escape(o.action || '')}</td>
+      </tr>`).join('')}</table>`;
+  }
+
+  const fbody = document.getElementById('aligned-fin-flags');
+  if (aligned.financial_exposure_disabled) {
+    fbody.innerHTML = '<div class="empty-line">Financial exposure tracking pending Phase 13 contract integration.</div>';
+  } else {
+    const fflags = aligned.financial_flags || [];
+    if (!fflags.length) {
+      fbody.innerHTML = '<div class="empty-line">No financial flags this week.</div>';
+    } else {
+      fbody.innerHTML = `<table class="red-table">${fflags.map(f => `
+        <tr>
+          <td class="job">${escape(f.pm)} · ${escape((f.job||'').toUpperCase())}</td>
+          <td class="label">${escape(f.status || '')}</td>
+          <td class="detail">${escape(f.gp || '—')} ${f.targetCO ? '· CO '+escape(f.targetCO) : ''} ${f.action ? '· '+escape(f.action) : ''}</td>
+        </tr>`).join('')}</table>`;
+    }
+  }
+})();
+</script>
+</body>
+</html>

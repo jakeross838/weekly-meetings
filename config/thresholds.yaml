@@ -1,0 +1,55 @@
+# Org-configurable thresholds for the Monday binder generator.
+# Created for Bug 4 (wmp22) — suppress stale phases from "Active phases:" line.
+
+# When a phase has been "active" longer than this threshold AND the job's
+# current_stage is downstream of the phase's stage, treat the phase as a
+# data-attribution artifact (likely from old log entries on a stage the job
+# has already passed) and suppress it from the per-job "Active phases:" line
+# in PM packets and job documents. The ⚠ attribution warning footnote
+# stays visible so the data quality issue is still surfaced.
+phase_active_suppress_days: 90
+
+# Executive §7 Financial Exposure section is gated until Phase 13 contract
+# integration lands real GP / open BUDGET dollar amounts. While disabled,
+# the section header stays in the executive layout but the body shows a
+# "tracking pending Phase 13 contract integration" placeholder so Lee
+# isn't misled by status colors without dollar figures. Flip to true
+# once contract data is wired up — the existing render path resumes.
+financial_exposure_enabled: false
+
+# §6 Overdue Selections: items overdue this many days or more are flagged
+# STALE in the executive summary. Stale items are unlikely to self-resolve
+# and need escalation rather than another reminder.
+overdue_selection_stale_days: 14
+
+# Decisions Needed From You — scored filter over Lee-owned action items
+# used as the fallback after stuck_items and sub_drift insights have been
+# exhausted. Score >= score_threshold qualifies an item to surface.
+# Weights are additive across the four signals; tune as the section's
+# behavior iterates. Hard-excluded prefixes (schedule|coordinate|confirm
+# timing|follow up on) are filtered before scoring — those are PM-execution
+# items, not decisions, even when Lee is the listed owner.
+decisions_needed:
+  score_threshold: 3
+  weight_co_invoice: 2
+  weight_exec_category: 2
+  weight_decision_verb: 2
+  weight_urgent: 1
+
+# scripts/run_weekly_pipeline.py — orchestrator pre-flight thresholds.
+# Recency limits decide whether a Monday run is "fresh enough" to ship.
+# The orchestrator warns at the soft threshold and aborts at the hard one.
+# required_pms must each have a binders/<PM>.json file on disk before
+# the pipeline runs; missing PMs abort pre-flight.
+weekly_pipeline:
+  daily_logs_recency_hours: 24
+  daily_logs_max_age_hours: 168
+  transcripts_recency_days: 7
+  url_verify_timeout_seconds: 60
+  server_startup_timeout_seconds: 30
+  required_pms:
+    - Bob Mozine
+    - Jason Szykulski
+    - Lee Worthy
+    - Martin Mannix
+    - Nelson Belanger

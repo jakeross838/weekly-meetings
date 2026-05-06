@@ -1,0 +1,107 @@
+# Selection → phase mapping (Phase 12 polish wmp18 Fix 6).
+# Maps common selection / procurement keywords in item action text to
+# the phase they GATE. Used by render_helpers to surface "↳ Gates: X.Y"
+# next to selection/procurement items, and "↳ See: ITEM-ID" cross-refs
+# from §2 phase rows.
+#
+# Multiple keywords per phase; first match wins. Keywords are
+# case-insensitive and matched against item.action + item.update.
+# Order matters — list more specific patterns above broader ones.
+
+mappings:
+  # Stage 7 — Envelope close-up
+  - phase: "7.4"
+    phase_name: "Siding Install"
+    keywords: ["siding", "siding baseboard", "exterior siding"]
+
+  - phase: "7.6"
+    phase_name: "Stucco Finish Coat"
+    keywords: ["stucco finish", "color coat", "stucco color"]
+
+  # Stage 9 — Interior rough finish
+  - phase: "9.1"
+    phase_name: "Interior Stair Framing & Treads"
+    keywords: ["stair railing", "stair handrail", "metal railing", "interior stair"]
+
+  - phase: "9.2"
+    phase_name: "Interior Trim Carpentry"
+    keywords: ["interior trim", "baseboard color", "casing finish", "trim finish"]
+
+  - phase: "9.3"
+    phase_name: "Interior Doors Hung"
+    keywords: ["interior door color", "mahogany interior door", "door color", "door finish",
+               "farrow & ball", "farrow and ball"]
+
+  # Stage 10 — Tile & stone
+  - phase: "10.2"
+    phase_name: "Floor Tile / Wood Flooring"
+    keywords: ["floor tile", "wood floor", "floor pattern", "floor finish"]
+
+  - phase: "10.3"
+    phase_name: "Wall Tile"
+    keywords: ["wall tile", "shower tile", "kitchen backsplash", "backsplash", "bath 102",
+               "square-pattern tile", "square pattern tile"]
+
+  - phase: "10.4"
+    phase_name: "Stone / Slab Install"
+    keywords: ["shower jam", "stone slab", "slab install", "volcano stone"]
+
+  # Stage 11 — Cabinetry & stone tops
+  - phase: "11.1"
+    phase_name: "Cabinet Install"
+    keywords: ["cabinet install", "cabinet finish", "cabinet hardware", "cucine ricci",
+               "first choice cabinets", "outdoor kitchen face-frame", "outdoor kitchen face frame",
+               "face-frame finish", "campbell cabinetry"]
+
+  - phase: "11.3"
+    phase_name: "Countertop Install"
+    keywords: ["countertop", "counter top install"]
+
+  - phase: "11.4"
+    phase_name: "Backsplash Install"
+    keywords: ["backsplash install"]
+
+  # Stage 12 — Interior paint
+  - phase: "12.2"
+    phase_name: "Paint Walls"
+    keywords: ["paint walls", "wall paint", "wall color", "interior paint color"]
+
+  - phase: "12.3"
+    phase_name: "Paint Trim & Doors"
+    keywords: ["paint trim", "trim paint", "door paint"]
+
+  # Stage 13 — MEP trim
+  - phase: "13.3"
+    phase_name: "Electrical Trim"
+    keywords: ["electrical fixture", "fixture finish", "lighting fixture", "switch plate",
+               "outlet finish"]
+
+  - phase: "13.5"
+    phase_name: "Low Voltage Trim"
+    keywords: ["lv finish", "low voltage", "smart house finish"]
+
+  - phase: "13.6"
+    phase_name: "Appliance Install"
+    keywords: ["appliance", "fuse appliance", "ac louver", "louver door", "louver detail",
+               "appliance spec", "register cover", "ac register"]
+
+  # Stage 14 — Exterior finish
+  - phase: "14.1"
+    phase_name: "Exterior Paint"
+    keywords: ["exterior paint", "exterior paint color"]
+
+  - phase: "14.5"
+    phase_name: "Pool Shell / Plumbing"
+    keywords: ["pool plumbing", "pool shell"]
+
+  - phase: "14.6"
+    phase_name: "Pool Tile & Coping"
+    keywords: ["pool tile", "pool coping", "coping spec"]
+
+  - phase: "14.7"
+    phase_name: "Pool Plaster / Pebbletec"
+    keywords: ["pebbletec", "pool plaster", "pool plaster spec"]
+
+  - phase: "14.10"
+    phase_name: "Landscaping"
+    keywords: ["landscape package", "haven planter", "cast-in-place planter", "landscape co"]

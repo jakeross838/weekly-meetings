@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Schedule Intelligence — Jobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<script src="assets/components.js"></script>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="app-head">
+    <div>
+      <div class="eyebrow">Schedule Intelligence</div>
+      <h1>Jobs</h1>
+      <div id="hdr-meta" class="when" style="text-align:left;font-size:11.5px;color:rgba(244,242,236,.85);margin-top:6px;"></div>
+    </div>
+    <div>
+      <div class="when" id="hdr-when"></div>
+      <div class="nav" style="margin-top:8px;justify-content:flex-end;">
+        <a href="phase-library.html">Phase Library</a>
+        <a href="jobs.html" class="active">Jobs</a>
+      </div>
+    </div>
+  </header>
+
+  <div id="apt-strip"></div>
+
+  <div id="job-cards"></div>
+
+  <footer class="app-foot">
+    <span>Schedule Intelligence v2 · Phase 5 · Jobs</span>
+    <span id="foot-when"></span>
+  </footer>
+</div>
+
+<script type="application/json" id="si-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('si-data').textContent);
+  const SI = window.SI;
+  const today = DATA.today;
+
+  /* ---- Index helpers ---- */
+
+  // (job, phase_code) -> instance
+  const instanceByJobPhase = {};
+  DATA.instances.forEach(i => {
+    instanceByJobPhase[i.job + '||' + i.phase_code] = i;
+  });
+
+  // job -> [instances]
+  const instancesByJob = {};
+  DATA.instances.forEach(i => {
+    (instancesByJob[i.job] = instancesByJob[i.job] || []).push(i);
+  });
+
+  // (sub, phase_code) -> rollup (for flag lookup)
+  const rollupByKey = {};
+  DATA.rollups.forEach(r => {
+    rollupByKey[r.sub + '||' + r.phase_code] = r;
+  });
+
+  // Phase median by code
+  const medianByPhase = {};
+  DATA.medians.forEach(m => { medianByPhase[m.phase_code] = m; });
+
+  // (job, phase_code) -> bursts
+  const burstsByKey = {};
+  DATA.bursts.forEach(b => {
+    const k = b.job_id + '||' + b.phase_code;
+    (burstsByKey[k] = burstsByKey[k] || []).push(b);
+  });
+
+  // Phases ordered by stage, then by code numeric
+  const orderedPhases = DATA.taxonomy.slice().sort((a, b) => {
+    if (a.stage !== b.stage) return a.stage - b.stage;
+    // numeric compare for codes like 1.4 vs 1.10
+    const an = a.code.split('.').map(Number);
+    const bn = b.code.split('.').map(Number);
+    if (an[0] !== bn[0]) return an[0] - bn[0];
+    return (an[1] || 0) - (bn[1] || 0);
+  });
+
+  // Group taxonomy by stage for read-down
+  const phasesByStage = {};
+  orderedPhases.forEach(p => {
+    (phasesByStage[p.stage] = phasesByStage[p.stage] || []).push(p);
+  });
+
+  /* ---- Per-instance flag check: any sub on rollup with flag_for_pm_binder=true ---- */
+  function instanceIsFlagged(instance) {
+    if (!instance) return false;
+    if (instance.status !== 'ongoing') return false;
+    const subs = instance.subs_involved || [];
+    for (const s of subs) {
+      const r = rollupByKey[s.sub + '||' + instance.phase_code];
+      if (r && r.flag_for_pm_binder) return true;
+    }
+    return false;
+  }
+
+  /* ---- Active phases today strip ---- */
+  function buildActiveStrip() {
+    const ongoing = DATA.instances.filter(i => i.status === 'ongoing');
+    const jobsWithOngoing = new Set(ongoing.map(i => i.job));
+    const flaggedOngoing = ongoing.filter(instanceIsFlagged);
+
+    let h = '<section class="apt-strip">';
+    h += '<div class="apt-headline">';
+    h += '<span class="num">' + jobsWithOngoing.size + '</span> ' + SI.pluralize(jobsWithOngoing.size, 'job') + ' · ';
+    h += '<span class="num">' + ongoing.length + '</span> phases ongoing · ';
+    h += '<span class="num flagged">' + flaggedOngoing.length + '</span> flagged ⚠';
+    h += '</div>';
+    h += '<div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin:6px 0 4px;">Active phases today · sample of 10</div>';
+    h += '<table class="apt-table"><thead><tr>';
+    h += '<th>Job</th><th>Phase</th><th>Primary Sub</th><th class="right">Active</th><th>Density</th><th>Flag</th>';
+    h += '</tr></thead><tbody>';
+    // Sort: flagged first, then by primary_active_days desc
+    const sorted = ongoing.slice().sort((a, b) => {
+      const af = instanceIsFlagged(a) ? 1 : 0;
+      const bf = instanceIsFlagged(b) ? 1 : 0;
+      if (bf !== af) return bf - af;
+      return (b.primary_active_days || 0) - (a.primary_active_days || 0);
+    }).slice(0, 10);
+    sorted.forEach(i => {
+      const subs = (i.subs_involved || []).map(s => s.sub);
+      const primarySub = subs[0] || '—';
+      const flagged = instanceIsFlagged(i);
+      h += '<tr' + (flagged ? ' class="is-flagged"' : '') + '>';
+      h += '<td>' + SI.renderJobLink(i.job) + '</td>';
+      h += '<td>' + SI.renderPhaseLink(i.phase_code, i.phase_name) + '</td>';
+      h += '<td>' + (primarySub === '—' ? '<span style="color:var(--ink-muted);">—</span>' : SI.renderSubLink(primarySub)) + '</td>';
+      h += '<td class="right num">' + (i.primary_active_days !== null && i.primary_active_days !== undefined ? i.primary_active_days + ' d' : '—') + '</td>';
+      h += '<td>' + SI.renderDensityChip(i.density_label_absolute, i.density_label_vs_phase, i.primary_density) + '</td>';
+      h += '<td>' + (flagged ? '<span class="row-flag" style="color:var(--warn);font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;">⚠ flagged</span>' : '') + '</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    h += '</section>';
+    document.getElementById('apt-strip').innerHTML = h;
+  }
+
+  /* ---- Build a job card ---- */
+  function buildJobCard(jobShort, jobInfo) {
+    const slug = SI.slugify(jobShort);
+    const insts = instancesByJob[jobShort] || [];
+
+    // Stub insight: count ongoing flagged
+    const ongoing = insts.filter(i => i.status === 'ongoing');
+    const flaggedOngoing = ongoing.filter(instanceIsFlagged);
+
+    let h = '<article class="job-card" id="job-' + slug + '">';
+
+    // Header
+    h += '<header class="jc-head">';
+    h += '<h2 class="jc-name">' + SI.escapeHtml(jobShort) + '</h2>';
+    h += '<span class="jc-address">— address pending data wiring</span>';
+    h += '<span class="jc-pm">PM —</span>';
+    h += '<span class="jc-stage">Stage ' + jobInfo.current_stage + ' · ' + SI.escapeHtml(jobInfo.current_stage_name) + '</span>';
+    h += '<span class="jc-co"><span class="label">CO target</span>' + (jobInfo.co_target ? SI.escapeHtml(jobInfo.co_target) : '—') + '</span>';
+    h += '</header>';
+
+    // Insight stub
+    h += '<div class="jc-insight' + (flaggedOngoing.length > 0 ? ' has-flag' : '') + '">';
+    h += '<span class="label">Insights</span>';
+    if (flaggedOngoing.length > 0) {
+      h += flaggedOngoing.length + ' ongoing ' + SI.pluralize(flaggedOngoing.length, 'phase') +
+           ' with flagged subs · <span class="nm">' +
+           flaggedOngoing.map(i => i.phase_code + ' ' + i.phase_name).join(', ') +
+           '</span>';
+    } else {
+      h += 'No ongoing phases with flagged subs · ' + ongoing.length + ' ongoing total';
+    }
+    h += '</div>';
+
+    // Phase read-down — every phase from taxonomy in order
+    h += '<table class="phase-rows"><thead><tr>';
+    h += '<th>Stage</th><th>Code</th><th>Phase</th><th>Sub(s)</th><th>Status</th><th class="right">Active</th><th>Density</th><th>Flag</th>';
+    h += '</tr></thead><tbody>';
+
+    let lastStage = null;
+    orderedPhases.forEach(p => {
+      const inst = instanceByJobPhase[jobShort + '||' + p.code];
+      const isOngoing = inst && inst.status === 'ongoing';
+      const isFlagged = inst && instanceIsFlagged(inst);
+
+      const stageLabel = (lastStage !== p.stage)
+        ? (p.stage + ' ' + (p.stage_name || ''))
+        : '';
+      const stageCellClass = stageLabel ? '' : 'repeated';
+      lastStage = p.stage;
+
+      const rowClass = isFlagged ? 'is-flagged expandable' : (isOngoing ? 'is-ongoing expandable' : (inst ? 'expandable' : ''));
+      const detailId = 'detail-' + slug + '-' + SI.slugify(p.code);
+
+      h += '<tr class="' + rowClass + '" data-detail="' + detailId + '">';
+      h += '<td class="stage-cell ' + stageCellClass + '">' + SI.escapeHtml(stageLabel || (p.stage)) + '</td>';
+      h += '<td class="code-cell">' + SI.escapeHtml(p.code) + '</td>';
+      h += '<td class="name-cell ' + (inst ? '' : 'empty') + '">' + SI.escapeHtml(p.name) + '</td>';
+
+      if (inst) {
+        const subs = (inst.subs_involved || []).map(s => s.sub).slice(0, 3);
+        h += '<td>' + (subs.length ? subs.map(s => SI.renderSubLink(s)).join(', ') : '<span style="color:var(--ink-muted);">—</span>') + '</td>';
+        h += '<td>' + SI.renderStatusIcon(inst.status) + '</td>';
+        h += '<td class="right num">' + (inst.primary_active_days !== null && inst.primary_active_days !== undefined ? inst.primary_active_days + ' d' : '—') + '</td>';
+        h += '<td>' + SI.renderDensityChip(inst.density_label_absolute, inst.density_label_vs_phase, inst.primary_density) + '</td>';
+        h += '<td>' + (isFlagged ? '<span class="row-flag">⚠</span>' : '') + '</td>';
+      } else {
+        h += '<td class="empty-cell">—</td>';
+        h += '<td>' + SI.renderStatusIcon('not_started') + '</td>';
+        h += '<td class="right empty-cell">—</td>';
+        h += '<td class="empty-cell">—</td>';
+        h += '<td></td>';
+      }
+      h += '</tr>';
+
+      // Detail row
+      if (inst) {
+        h += '<tr class="detail-row" id="' + detailId + '"><td colspan="8">';
+        h += '<div class="detail-grid-inner">';
+
+        // Subs detail
+        h += '<div class="detail-block"><span class="label">Subs · primary numbers</span><ul>';
+        (inst.subs_involved || []).forEach(s => {
+          const r = rollupByKey[s.sub + '||' + p.code];
+          h += '<li>' + SI.renderSubLink(s.sub) + ' · ' + s.active_days + ' d · ' +
+            SI.renderDensityChip(s.density_tier, null, s.density) +
+            (r && r.flag_for_pm_binder ? ' · ' + SI.renderFlagBadge(r.flag_score, r.flag_reasons) : '') +
+            '</li>';
+        });
+        h += '</ul></div>';
+
+        // Bursts detail
+        const burstsList = inst.bursts || burstsByKey[jobShort + '||' + p.code] || [];
+        h += '<div class="detail-block"><span class="label">Bursts (' + burstsList.length + ') · ' + SI.escapeHtml(SI.renderBurstRoles(burstsList)) + '</span><ul>';
+        burstsList.slice(0, 8).forEach(b => {
+          h += '<li><span style="color:var(--ink-3);">[' + (b.burst_role || '?') + ']</span> ' +
+                SI.escapeHtml(b.sub || '') + ' · ' +
+                SI.escapeHtml(b.first_log || b.first || '?') + ' → ' +
+                SI.escapeHtml(b.last_log || b.last || '?') + ' · ' +
+                (b.active_days !== undefined ? b.active_days : (b.active || '?')) + 'd active · ' +
+                SI.renderDensityChip(b.density_tier, null, b.density) +
+                '</li>';
+        });
+        if (burstsList.length > 8) h += '<li>… and ' + (burstsList.length - 8) + ' more</li>';
+        h += '</ul></div>';
+
+        h += '</div>';
+        h += '</td></tr>';
+      }
+    });
+
+    h += '</tbody></table>';
+
+    h += '</article>';
+    return h;
+  }
+
+  /* ---- Render all jobs ---- */
+  function renderAllJobs() {
+    const container = document.getElementById('job-cards');
+    // Sort jobs by current_stage asc, then by job_short
+    const jobNames = Object.keys(DATA.jobs).sort((a, b) => {
+      const ja = DATA.jobs[a], jb = DATA.jobs[b];
+      if (ja.current_stage !== jb.current_stage) return ja.current_stage - jb.current_stage;
+      return a.localeCompare(b);
+    });
+    let h = '';
+    jobNames.forEach(name => {
+      h += buildJobCard(name, DATA.jobs[name]);
+    });
+    container.innerHTML = h;
+
+    // Bind row expanders
+    document.querySelectorAll('.phase-rows tr.expandable').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const id = tr.getAttribute('data-detail');
+        const det = document.getElementById(id);
+        if (det) det.classList.toggle('open');
+      });
+    });
+  }
+
+  // Header meta
+  const totalJobs = Object.keys(DATA.jobs).length;
+  document.getElementById('hdr-meta').textContent =
+    totalJobs + ' jobs · current stages 1–15 · ' + DATA.instances.length + ' phase instances';
+  document.getElementById('hdr-when').innerHTML = '<b>' + (today || '—') + '</b>';
+  document.getElementById('foot-when').textContent = 'Generated ' + (today || '—');
+
+  buildActiveStrip();
+  renderAllJobs();
+
+  // Hash routing
+  if (window.location.hash) {
+    setTimeout(() => {
+      const el = document.querySelector(window.location.hash);
+      if (el) el.scrollIntoView({ block: 'start' });
+    }, 100);
+  }
+})();
+</script>
+</body>
+</html>

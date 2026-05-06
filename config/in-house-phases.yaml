@@ -1,0 +1,29 @@
+# Phases Ross Built handles internally — surfaced in §2/§3 of the office
+# packet as "Ross Built Crew" + "Confirm timing" instead of "Identify sub for X".
+# Phase 12 polish (wmp17) — eliminates the noise of asking PMs to "identify
+# a sub" for phases that aren't subbed out.
+#
+# Each entry: phase_code -> { sub: <display name>, note: <suggested ask> }
+
+phases:
+  "1.5":
+    sub: "Ross Built Crew"
+    note: "Confirm survey timing"
+  "15.1":
+    sub: "Ross Built Crew"
+    note: "Confirm punch-walk schedule"
+  "15.2":
+    sub: "Ross Built Crew"
+    note: "Confirm punch-repair sub mix + duration"
+  "15.3":
+    sub: "Ross Built Crew"
+    note: "Confirm cleaning timing"
+  "15.4":
+    sub: "Ross Built Crew + Jake/PM"
+    note: "Confirm inspection schedule"
+  "15.5":
+    sub: "Ross Built Crew + Andrew"
+    note: "Confirm CO submission timeline"
+  "15.6":
+    sub: "Ross Built Crew + PM"
+    note: "Confirm owner walk + move-in date"

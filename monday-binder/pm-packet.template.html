@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PM Packet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/styles.css">
+<link rel="stylesheet" href="../../assets/nightwork-tokens.css">
+<script src="../../assets/components.js"></script>
+<style>
+@page { size: letter landscape; margin: 0.4in 0.5in; }
+.mp { max-width: 10.5in; margin: 0 auto; padding: 12px 0 18px; font-size: 11.5px; line-height: 1.35; }
+
+/* PM-level header */
+.pm-band {
+  border: 1.5px solid var(--ink);
+  padding: 12px 18px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+}
+.pm-band h1 {
+  font-family: var(--font-head);
+  font-size: 22px; font-weight: 700; letter-spacing: 0.5px;
+  margin: 0; color: var(--ink);
+}
+.pm-band .mode-tag {
+  font-family: var(--font-head);
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--ink-2); margin-top: 4px;
+}
+.pm-band .right { text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.pm-band .right .when { font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+.pm-band .right .jobs-line { font-size: 10.5px; color: var(--ink-3); }
+.pm-band .right .jobs-line a { color: var(--accent); text-decoration: none; }
+
+.pm-statline {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink-2);
+  display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between;
+  padding: 8px 18px; border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.pm-statline strong { color: var(--ink); font-weight: 600; }
+.pm-changed-banner {
+  background: var(--bg-soft);
+  border-left: 3px solid var(--accent);
+  padding: 6px 14px;
+  margin: 8px 0 14px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.pm-changed-banner .lbl { color: var(--ink-2); text-transform: uppercase; font-size: 9px; letter-spacing: 0.8px; margin-right: 8px; }
+.pm-changed-banner .pill { display: inline-block; padding: 1px 6px; background: var(--bg-card); margin: 0 4px; }
+
+/* Job separator */
+.job-separator {
+  font-family: var(--font-head);
+  font-size: 26px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2.5px;
+  color: var(--ink);
+  padding: 14px 4px 6px;
+  margin: 22px 0 10px;
+  border-top: 3px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  display: flex; justify-content: space-between; align-items: baseline;
+  page-break-before: always;
+  break-before: page;
+}
+.job-separator:first-child { page-break-before: avoid; break-before: avoid; }
+.job-separator .stage-pill {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--accent); color: var(--bg-card);
+  padding: 3px 10px; letter-spacing: 0.6px;
+  align-self: center;
+}
+.job-separator .anchor {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--accent); text-decoration: none; align-self: center;
+  letter-spacing: 0.6px;
+}
+
+/* Job context block (same as standalone job document) */
+.job-context {
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  margin: 0 0 10px;
+  background: var(--bg-card);
+  break-inside: avoid;
+}
+.job-context .meta-line { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); display: flex; gap: 18px; flex-wrap: wrap; padding: 4px 0; }
+.job-context .meta-line strong { color: var(--ink); }
+.job-context .progress-line { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); padding: 4px 0; }
+.job-context .progress-line .ph.amber { color: #c89a3a; font-weight: 600; }
+.job-context .progress-line .ph.red { color: var(--nw-danger); font-weight: 700; }
+.job-context .changed-line { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); padding: 4px 0 0; border-top: 1px dotted var(--line-2); margin-top: 4px; }
+.job-context .changed-line .pill { display: inline-block; padding: 1px 6px; background: var(--bg-soft); margin: 0 4px; }
+
+/* Section structure (matches job-document) */
+.mp-sec { margin-top: 12px; }
+.mp-sec h2 {
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink); margin: 0; padding: 6px 0;
+  border-top: 1.2px solid var(--ink);
+  border-bottom: 1.2px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline;
+  break-after: avoid; page-break-after: avoid;
+}
+.mp-sec h2 .meta { font-family: var(--font-mono); font-size: 10px; text-transform: none; letter-spacing: 0.4px; color: var(--ink-3); font-weight: 500; }
+.mp-sec-body { padding: 8px 0 4px; }
+.empty-note { color: var(--ink-3); font-style: italic; padding: 4px 6px; font-size: 11px; }
+
+/* All shared section CSS — copied from job-document for visual consistency */
+.flow-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 6px; }
+.flow-table th { font-family: var(--font-head); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--ink); color: var(--ink-2); white-space: nowrap; }
+.flow-table td { padding: 4px 6px; border-bottom: 1px dotted var(--line-2); vertical-align: top; }
+.flow-table tr.flag td { background: rgba(212, 84, 78, 0.08); }
+.flow-table tr.pre-data td { color: var(--ink-3); font-style: italic; background: rgba(0,0,0,0.015); }
+.flow-table .yn { font-family: var(--font-mono); font-weight: 600; text-align: center; }
+.flow-table .yn.n { color: var(--nw-danger); }
+.flow-table .yn.y { color: var(--nw-good); }
+.flow-table .yn.q { color: var(--ink-3); }
+.subs-signals-block { background: var(--bg-soft); padding: 8px 12px; border-left: 2.5px solid var(--accent); margin-top: 12px; break-inside: avoid; }
+.subs-signals-block h3 { font-family: var(--font-head); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 4px; color: var(--ink-2); }
+.sub-signal-row { display: grid; grid-template-columns: 6px 1fr auto auto auto; gap: 8px; padding: 2px 0; font-size: 10.5px; align-items: baseline; }
+.sub-signal-row .pip { font-size: 14px; line-height: 1; }
+.sub-signal-row.red .pip { color: var(--nw-danger); }
+.sub-signal-row.yellow .pip { color: #c89a3a; }
+.sub-signal-row.green .pip { color: var(--nw-good); }
+.sub-signal-row .sub-name { color: var(--ink); font-weight: 500; }
+.sub-signal-row.red .sub-name { color: var(--accent); font-weight: 700; }
+.sub-signal-row .stat { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); }
+.sub-signal-row .stat.warn { color: var(--nw-danger); font-weight: 600; }
+.predicted-section { border: 1.2px dashed var(--accent); padding: 8px 12px; margin-top: 14px; background: rgba(91,134,153,0.04); break-inside: avoid; }
+.predicted-section h3 { font-family: var(--font-head); font-style: italic; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.predicted-row { display: grid; grid-template-columns: 16px 1fr auto auto; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--line-2); font-size: 11px; align-items: baseline; }
+.predicted-row .icon { font-size: 11px; color: var(--accent); }
+.predicted-row .action { color: var(--ink); font-style: italic; }
+.predicted-row .actions { font-family: var(--font-mono); font-size: 9px; color: var(--ink-3); }
+.cat-block { margin-bottom: 10px; }
+.cat-head { display: flex; gap: 10px; align-items: baseline; font-family: var(--font-head); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; padding: 6px 0 4px; color: var(--ink); border-top: 1px solid var(--ink); }
+.cat-head .count { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); font-weight: 500; }
+.item-card { padding: 5px 0; border-bottom: 1px dotted var(--line-2); page-break-inside: avoid; break-inside: avoid; }
+.item-card.predicted { background: rgba(91,134,153,0.05); padding-left: 6px; }
+.item-card.predicted .card-headline { font-style: italic; color: var(--ink-2); }
+.card-line-1 { display: grid; grid-template-columns: 56px 1fr auto auto auto; gap: 10px; align-items: baseline; font-size: 11.5px; line-height: 1.35; }
+.card-id { font-family: var(--font-mono); color: var(--ink-3); font-size: 9.5px; }
+.card-headline { font-weight: 500; color: var(--ink); }
+.card-headline .owner { font-weight: 700; color: var(--ink); }
+.card-review-flag { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); cursor: help; }
+.card-due { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); white-space: nowrap; text-align: right; min-width: 80px; }
+.card-due.overdue { color: var(--nw-danger); font-weight: 700; }
+.card-due.today { color: #b87333; font-weight: 700; }
+.card-due.closed { color: var(--nw-good); }
+.card-pri { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-3); text-align: right; min-width: 50px; }
+.card-pri.urgent { color: var(--nw-danger); font-weight: 700; }
+.card-pri.high { color: var(--accent); font-weight: 600; }
+.card-line-2 { margin-top: 2px; margin-left: 66px; margin-right: 8px; font-size: 10.5px; color: var(--ink-2); line-height: 1.4; }
+.card-line-3 { margin-top: 1px; margin-left: 66px; margin-right: 8px; font-size: 9.5px; color: var(--ink-3); font-style: italic; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.phase-cross-ref { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); font-style: italic; padding: 0 0 2px 66px; }
+.phase-cross-ref::before { content: "↳ "; color: var(--accent); }
+
+/* Compact reference rows (wmp21 Fix 1) */
+.compact-ref { display: grid; grid-template-columns: 56px 1fr auto auto; gap: 8px; padding: 2px 0 2px 8px; font-size: 10.5px; border-left: 2px solid var(--line-2); border-bottom: 1px dotted var(--line-2); font-family: var(--font-mono); color: var(--ink-2); align-items: baseline; }
+.compact-ref a { color: var(--accent); text-decoration: none; }
+.compact-ref a:hover { text-decoration: underline; }
+.compact-ref .arrow::before { content: "→ "; color: var(--accent); }
+.compact-ref .id { font-size: 9.5px; color: var(--ink-3); }
+.compact-ref .due-mini { font-size: 9.5px; color: var(--ink-2); white-space: nowrap; }
+.compact-ref .due-mini.overdue { color: var(--nw-danger); font-weight: 600; }
+.compact-ref .pri-mini { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-3); }
+.compact-ref .pri-mini.urgent { color: var(--nw-danger); font-weight: 700; }
+.sub-status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 3px; vertical-align: middle; }
+.sub-status-dot.red { background: var(--nw-danger); }
+.sub-status-dot.yellow { background: #c89a3a; }
+.sub-status-dot.green { background: var(--nw-good); }
+.waiting-block { margin-top: 14px; padding: 8px 12px; border-left: 2.5px solid var(--ink-3); background: rgba(0,0,0,0.02); break-inside: avoid; }
+.waiting-block h3 { font-family: var(--font-head); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.waiting-block .owner-grp { font-family: var(--font-head); font-size: 11px; font-weight: 600; margin: 6px 0 2px; color: var(--ink); }
+.client-decisions-block { margin-top: 6px; }
+.client-decisions-block h2 { font-family: var(--font-head); font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ink); margin: 0; padding: 6px 0; border-top: 1.2px solid var(--ink); border-bottom: 1.2px solid var(--line); display: flex; justify-content: space-between; break-after: avoid; page-break-after: avoid; }
+.client-decisions-block .person-grp { margin: 6px 0; padding: 6px 0 4px; border-bottom: 1px dotted var(--line-2); }
+.client-decisions-block .person-name { font-family: var(--font-head); font-size: 11px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.client-decisions-block .person-name .count { font-family: var(--font-mono); font-weight: 500; font-size: 10px; color: var(--ink-3); margin-left: 8px; }
+.fin-row { display: grid; grid-template-columns: 1fr 70px 80px 60px; gap: 8px; padding: 3px 0; border-bottom: 1px dotted var(--line-2); font-size: 10.5px; font-family: var(--font-mono); }
+.walk-area { margin-bottom: 14px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--bg-soft); break-inside: avoid; }
+.walk-area h3 { font-family: var(--font-head); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 4px; color: var(--ink); display: flex; justify-content: space-between; align-items: baseline; }
+.walk-area .area-meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); font-weight: 500; }
+.walk-area .subs-line { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); margin: 2px 0 6px; }
+.walk-phase { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 0; color: var(--ink-2); }
+.walk-phase strong { color: var(--ink); }
+.hold-row { display: grid; grid-template-columns: 80px 130px 1fr 80px; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--line-2); font-size: 11px; align-items: baseline; }
+.hold-row .kind { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-2); }
+.field-capture { margin-top: 12px; border: 1.2px dashed var(--ink-3); padding: 8px 12px; background: rgba(0,0,0,0.015); }
+.field-capture h3 { font-family: var(--font-head); font-style: italic; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 6px; color: var(--ink-2); }
+.field-capture .placeholder { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); font-style: italic; padding: 6px 4px; }
+.capture-row { display: grid; grid-template-columns: 100px 1fr 100px 80px; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 11.5px; font-family: var(--font-mono); min-height: 18px; }
+.capture-row .lbl { color: var(--ink-3); font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+.mp-foot { margin-top: 18px; padding-top: 8px; border-top: 1px dashed var(--line); font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); display: flex; justify-content: space-between; }
+
+@media print {
+  body { margin: 0; }
+  .job-separator { page-break-before: always; break-before: page; }
+  .job-separator:first-child, .pm-band + .pm-statline + .pm-changed-banner + #jobs-container > .job-separator:first-child { page-break-before: avoid; break-before: avoid; }
+  .item-card { break-inside: avoid; page-break-inside: avoid; }
+  .card-line-3 { -webkit-line-clamp: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+</style>
+</head>
+<body>
+<div class="mp">
+
+<header class="pm-band">
+  <div>
+    <h1 id="hdr-pm">PM</h1>
+    <div class="mode-tag">PM Packet · all jobs</div>
+  </div>
+  <div class="right">
+    <div class="when" id="hdr-today">—</div>
+    <div class="jobs-line" id="hdr-jobs">—</div>
+  </div>
+</header>
+
+<div class="pm-statline" id="statline"></div>
+<div class="pm-changed-banner" id="changed-banner"></div>
+
+<div id="jobs-container"></div>
+
+<footer class="mp-foot">
+  <span>Phase 13 · Job-centric PM packet</span>
+  <span id="foot-meta">—</span>
+</footer>
+
+</div>
+
+<script type="application/json" id="mp-data">__SI_DATA_BUNDLE__</script>
+
+<script>
+(function () {
+  const SI = window.SI || {};
+  const DATA = JSON.parse(document.getElementById('mp-data').textContent);
+  const escape = (SI.escapeHtml) || function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+    );
+  };
+
+  document.title = `${DATA.pm} — PM Packet`;
+  document.getElementById('hdr-pm').textContent = (DATA.pm || '').toUpperCase();
+  document.getElementById('hdr-today').textContent = DATA.today;
+  const jobLinks = (DATA.jobs || []).map(j =>
+    `<a href="/meeting-prep/job/${escape(j.job_slug)}">${escape(j.job)}</a>`
+  ).join(' · ');
+  document.getElementById('hdr-jobs').innerHTML = `Jobs: ${jobLinks || '—'}`;
+  const summ = DATA.summary || {};
+  document.getElementById('foot-meta').textContent =
+    `${summ.total_jobs} jobs · ${summ.total_open} open · ${summ.total_overdue} overdue`;
+
+  // ---- PM-level statline ----
+  const overdueChip = (summ.total_overdue > 0)
+    ? `<span><strong style="color:var(--nw-danger);">${summ.total_overdue}</strong> overdue</span>`
+    : `<span><strong>0</strong> overdue</span>`;
+  document.getElementById('statline').innerHTML = [
+    `<span><strong>${summ.total_jobs}</strong> jobs</span>`,
+    `<span><strong>${summ.total_open}</strong> open actions</span>`,
+    overdueChip,
+    `<span><strong>${summ.total_stale}</strong> stale (&gt;14d)</span>`,
+    `<span><strong>${summ.total_selections_open}</strong> selections open</span>`,
+    `<span><strong>${summ.total_escalations}</strong> escalations</span>`,
+    `<span><strong style="color:${summ.subs_red_pm > 0 ? 'var(--nw-danger)' : 'var(--ink)'};">${summ.subs_red_pm}</strong> subs RED</span>`,
+  ].join('');
+
+  // ---- PM-level "What changed" banner ----
+  const wc = summ.what_changed || {};
+  const newCat = wc.new_by_cat || {};
+  const newCatLabel = Object.keys(newCat).length
+    ? ' (' + Object.entries(newCat).map(([k,v]) => `${v} ${escape(k)}`).join(', ') + ')'
+    : '';
+  document.getElementById('changed-banner').innerHTML =
+    `<span class="lbl">What changed across portfolio (last 7 days):</span>` +
+    `<span class="pill">+<strong>${wc.new || 0}</strong> new${newCatLabel}</span>` +
+    `<span class="pill"><strong>${wc.closed || 0}</strong> closed</span>` +
+    `<span class="pill"><strong>${wc.escalated || 0}</strong> escalated</span>` +
+    `<span class="pill"><strong>${wc.waiting || 0}</strong> waiting on others</span>`;
+
+  // ---- Shared rendering helpers (used per-job) ----
+  function renderHeadline(headline) {
+    const idx = (headline || '').indexOf(' · ');
+    if (idx > 0) return `<span class="owner">${escape(headline.slice(0, idx))}</span> · ${escape(headline.slice(idx + 3))}`;
+    return escape(headline || '');
+  }
+  function dueLabel(urgency, item) {
+    const u = urgency || {};
+    const due = item.due || '';
+    const kind = u.kind || 'none';
+    if (kind === 'overdue') return `<span class="card-due overdue">${escape(due)} · ${escape(u.label)}</span>`;
+    if (kind === 'today')   return `<span class="card-due today">${escape(u.label)}</span>`;
+    if (kind === 'future')  return `<span class="card-due">${escape(due)} · ${escape(u.label)}</span>`;
+    return `<span class="card-due">${escape(due || u.label || '—')}</span>`;
+  }
+  function renderProgress(p) {
+    if (!p) return '';
+    if (p.kind === 'complete') return '<span style="color:var(--nw-good);font-family:var(--font-mono);font-size:9.5px;">✓ complete</span>';
+    if (p.kind !== 'ongoing') return '';
+    const fl = p.flag || 'ok';
+    const cls = fl === 'red' ? 'n' : fl === 'amber' ? 'q' : 'y';
+    const med = p.median_days != null ? `${p.median_days}d` : '?';
+    return `<span class="yn ${cls}">${p.days_active}d / ${escape(med)} typical</span>`;
+  }
+  function buildSubStatusMap(jobBundle) {
+    const map = {};
+    for (const s of (jobBundle.sub_signals || {active: []}).active || []) map[s.sub] = s.status;
+    return map;
+  }
+  function renderItemCard(i, subMap) {
+    const isPred = i.source === 'system_predicted';
+    const cls = isPred ? ' predicted' : '';
+    const head = i.headline || i.action || '';
+    const detail = i.detail || '';
+    const upd = i.update_excerpt || '';
+    const review = i.category_review ? '<span class="card-review-flag" title="categorization flagged">?</span>' : '';
+    let subDot = '';
+    const sub = i.related_sub || '';
+    if (sub && subMap) {
+      let st = subMap[sub];
+      if (!st) for (const k of Object.keys(subMap)) {
+        if (sub.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(sub.toLowerCase())) { st = subMap[k]; break; }
+      }
+      if (st) subDot = `<span class="sub-status-dot ${st.toLowerCase()}" title="${escape(sub)} ${st}"></span>`;
+    }
+    const gates = (i.gates_phase_code && i.gates_phase_name)
+      ? `<div class="phase-cross-ref">Gates: ${escape(i.gates_phase_code)} ${escape(i.gates_phase_name)}</div>` : '';
+    return `<div class="item-card${cls}">
+      <div class="card-line-1">
+        <span class="card-id">${escape(i.id || '')}</span>
+        <span class="card-headline">${renderHeadline(head)}${subDot}</span>
+        ${review}
+        ${dueLabel(i.urgency, i)}
+        <span class="card-pri ${(i.priority||'').toLowerCase()}">${escape(i.priority || '')}</span>
+      </div>
+      ${detail ? `<div class="card-line-2">${escape(detail)}</div>` : ''}
+      ${upd ? `<div class="card-line-3">${escape(upd)}</div>` : ''}
+      ${gates}
+    </div>`;
+  }
+  function renderClosedCard(i) {
+    return `<div class="item-card">
+      <div class="card-line-1">
+        <span class="card-id">${escape(i.id || '')}</span>
+        <span class="card-headline">${renderHeadline(i.headline || i.action || '')}</span>
+        <span class="card-due closed">closed ${escape(i.close_date || '')}</span>
+        <span class="card-pri" style="color:var(--ink-3);">${escape((i.job||'').toUpperCase())}</span>
+      </div>
+    </div>`;
+  }
+  // Fix 1 (wmp21) — compact reference for items rendered fully elsewhere
+  function renderCompactRef(i) {
+    const head = (i.headline || i.action || '');
+    const short = head.length > 70 ? head.slice(0, 67) + '…' : head;
+    const u = i.urgency || {};
+    const dueClass = u.kind === 'overdue' ? 'overdue' : '';
+    const dueText = u.label || (i.due || '');
+    const pri = (i.priority || '').toLowerCase();
+    return `<div class="compact-ref" id="ref-${escape(i.id || '')}">
+      <span class="id">${escape(i.id || '')}</span>
+      <span><a class="arrow" href="#item-${escape(i.id || '')}">${escape(short)}</a></span>
+      <span class="due-mini ${dueClass}">${escape(dueText)}</span>
+      <span class="pri-mini ${pri}">${escape(i.priority || '')}</span>
+    </div>`;
+  }
+  function renderCanonicalCard(i, subMap) {
+    const card = renderItemCard(i, subMap);
+    const id = (i.id || '');
+    return card.replace('<div class="item-card', `<div id="item-${escape(id)}" class="item-card`)
+               .replace('<div class="item-card predicted', `<div id="item-${escape(id)}" class="item-card predicted`);
+  }
+  function renderItemAt(i, sectionName, subMap) {
+    if (i.canonical_section === sectionName) return renderCanonicalCard(i, subMap);
+    return renderCompactRef(i);
+  }
+
+  // ---- Per-job section render ----
+  function renderJobBlock(job) {
+    const subMap = buildSubStatusMap(job);
+    const c = job.job_header || {};
+    const reg = job.registry || {};
+    const wc = job.what_changed || {};
+    const jstats = job.stats || {};
+
+    // Job context block — Fix 4 (wmp21) cap days_in_stage at 365+
+    let days = '';
+    if (c.days_in_stage != null) {
+      days = c.days_in_stage_attribution_flag
+        ? '365+d in stage <span style="color:var(--nw-danger);font-weight:600;" title="data attribution issue">⚠</span>'
+        : `${c.days_in_stage}d in stage`;
+    }
+    const last = c.last_log_date ? `last log ${c.last_log_date}` : '';
+    const lastSub = c.last_sub_on_site ? `last sub: ${escape(c.last_sub_on_site)}` : '';
+    const co = (c.target_co || reg.target_co) ? `CO target ${escape(c.target_co || reg.target_co)}` : '';
+    const gp = (reg.gp && reg.gp !== '—') ? `GP ${escape(reg.gp)}` : '';
+
+    // Phase progress signal — Fix 3/4 (wmp21)
+    // Bug 4 (wmp22) — suppress phases from Active Phases line when their
+    // days_active exceeds the configured threshold (default 90d) AND the
+    // phase is upstream of the job's current_stage. ⚠ attribution warning
+    // footnote still fires; we just stop listing the polluted phases.
+    const SUPPRESS_DAYS = (DATA.thresholds && DATA.thresholds.phase_active_suppress_days) || 90;
+    const ongoing = [];
+    for (const jb of (job.execution_2wk || [])) {
+      const curStage = jb.current_stage;
+      for (const r of (jb.rows || [])) {
+        if (!r.progress) continue;
+        const days = r.progress.days_active || 0;
+        const stale = (curStage != null && r.stage != null && r.stage < curStage && days > SUPPRESS_DAYS);
+        if (stale) continue;
+        if (r.progress.kind === 'pre_data') {
+          ongoing.push(`<span class="ph red">${escape(r.phase_name)} (pre-data, 365+ days)</span>`);
+          continue;
+        }
+        if (r.progress.kind !== 'ongoing') continue;
+        const fl = r.progress.flag || 'ok';
+        const fcls = fl === 'red' ? 'red' : fl === 'amber' ? 'amber' : '';
+        const med = r.progress.median_days != null ? `${r.progress.median_days}d` : '—';
+        ongoing.push(`<span class="ph ${fcls}">${escape(r.phase_name)} ${days}d / ${escape(med)} typical</span>`);
+      }
+    }
+    const progressLine = ongoing.length ? `<div class="progress-line">Active phases: ${ongoing.join(' · ')}</div>` : '';
+    const cats = job.items_by_category || {};
+    const catBar = Object.keys(cats).length
+      ? `<div class="meta-line"><span><strong>Open by category:</strong> ${Object.entries(cats).map(([k,v]) => `${escape(k)} ${v.length}`).join(' · ')}</span></div>` : '';
+    // Fix 8 (wmp21) — informative empty-state phrasing
+    const totalChanges = (wc.new || 0) + (wc.closed || 0) + (wc.escalated || 0) + (wc.waiting || 0);
+    let changedLine;
+    if (totalChanges === 0) {
+      changedLine = `<div class="changed-line"><span style="text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-3);">last 7d on this job</span> <em>No transcript activity in last 7 days.</em></div>`;
+    } else {
+      const newCat = wc.new_by_cat || {};
+      const newCatLabel = Object.keys(newCat).length
+        ? ' (' + Object.entries(newCat).map(([k,v]) => `${v} ${escape(k)}`).join(', ') + ')' : '';
+      changedLine = `<div class="changed-line">
+        <span style="text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-3);">last 7d on this job</span>
+        <span class="pill">+<strong>${wc.new || 0}</strong> new${newCatLabel}</span>
+        <span class="pill"><strong>${wc.closed || 0}</strong> closed</span>
+        <span class="pill"><strong>${wc.escalated || 0}</strong> escalated</span>
+        <span class="pill"><strong>${wc.waiting || 0}</strong> waiting</span>
+      </div>`;
+    }
+    const attrNote = c.days_in_stage_attribution_flag
+      ? `<div style="background:rgba(212,84,78,0.08);border-left:2.5px solid var(--nw-danger);padding:4px 10px;margin:6px 0 0;font-size:9.5px;font-family:var(--font-mono);color:var(--ink-2);">
+          ⚠ Phase activity dates show 365+ — likely data attribution issue from older log entries.
+        </div>` : '';
+
+    let html = `<div class="job-separator" id="job-${escape(job.job_slug)}">
+      <span>${escape(job.job)}</span>
+      <span class="stage-pill">stage ${c.current_stage} · ${escape(c.current_stage_name || '')}</span>
+      <a class="anchor" href="/meeting-prep/job/${escape(job.job_slug)}">open standalone →</a>
+    </div>`;
+
+    html += `<div class="job-context">
+      <div class="meta-line">
+        ${[days, last, lastSub, co, gp].filter(Boolean).map(b => `<span>${b}</span>`).join('')}
+        <span style="font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);">open=${jstats.open} overdue=${jstats.overdue} stale=${jstats.stale} selections=${jstats.selections_open} predicted=${jstats.predicted}</span>
+      </div>
+      ${progressLine}
+      ${catBar}
+      ${changedLine}
+      ${attrNote}
+    </div>`;
+
+    // §0 Recently Completed
+    {
+      const groups = job.recently_completed || {};
+      const ks = Object.keys(groups);
+      let inner = '';
+      if (!ks.length) inner = '<div class="empty-note">No items closed this week.</div>';
+      else for (const cat of ks) {
+        const items = groups[cat] || [];
+        if (!items.length) continue;
+        inner += `<div class="cat-block"><div class="cat-head"><span>${escape(cat)}</span><span class="count">${items.length} closed</span></div>`;
+        for (const i of items) inner += renderClosedCard(i);
+        inner += '</div>';
+      }
+      html += `<section class="mp-sec"><h2>Recently Completed <span class="meta">last 7 days</span></h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §2 Execution
+    {
+      const blocks = job.execution_2wk || [];
+      let inner = '';
+      if (!blocks.length) inner = '<div class="empty-note">No active phases for this job in next 14 days.</div>';
+      else {
+        inner = '<div style="font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);margin:4px 0 6px;">Progress = days active vs phase median.</div>';
+        for (const b of blocks) {
+          const actionable = (b.rows || []).filter(r => !r.pre_data);
+          const preData = (b.rows || []).filter(r => r.pre_data);
+          if (b.logging_gap && preData.length > 2) {
+            inner += `<details style="margin:4px 0 6px;font-family:var(--font-mono);font-size:10.5px;background:rgba(212,84,78,0.08);border-left:2.5px solid var(--nw-danger);padding:5px 12px;"><summary style="cursor:pointer;color:var(--ink-2);">⚠ ${preData.length} pre-data phases hidden. <span style="color:var(--accent);">[expand]</span></summary><div style="margin-top:6px;color:var(--ink-3);">${preData.map(r => escape(r.phase_code)).join(', ')}</div></details>`;
+          }
+          inner += `<table class="flow-table"><thead><tr><th>Phase</th><th>Sub</th><th>Materials</th><th>Predecessor</th><th>Confirmed</th><th>Progress</th><th>Blockers</th></tr></thead><tbody>`;
+          const rowsToShow = (b.logging_gap && preData.length > 2) ? actionable : (b.rows || []);
+          for (const r of rowsToShow) {
+            const flag = (r.any_red_flag && !r.pre_data) ? ' flag' : '';
+            const preDataCls = r.pre_data ? ' pre-data' : '';
+            const name = (r.phase_name || '') + (r.phase_code ? ` (${r.phase_code})` : '');
+            const predCls = r.predecessor_complete === 'N' ? 'n' : r.predecessor_complete === 'Y' ? 'y' : 'q';
+            inner += `<tr class="${flag}${preDataCls}">
+              <td>${escape(name)}${r.pre_data ? ' <span style="color:var(--ink-3);font-size:9.5px;">(pre-data)</span>' : ''}</td>
+              <td>${escape(r.sub || '—')}</td>
+              <td class="yn ${r.materials_on_site === 'N' ? 'n' : (r.materials_on_site && r.materials_on_site.startsWith && r.materials_on_site.startsWith('PENDING') ? 'q' : (r.materials_on_site === 'Y' ? 'y' : 'q'))}">${escape(r.materials_on_site)}</td>
+              <td class="yn ${predCls}">${escape(r.predecessor_complete)}</td>
+              <td class="yn ${r.confirmed === 'N' ? 'n' : (r.confirmed === 'Y' ? 'y' : 'q')}">${escape(r.confirmed)}</td>
+              <td>${renderProgress(r.progress)}</td>
+              <td>${escape(r.blockers || '—')}</td>
+            </tr>`;
+            if ((r.cross_ref_ids || []).length && !r.pre_data) {
+              inner += `<tr><td colspan="7"><div class="phase-cross-ref">See: ${r.cross_ref_ids.map(id => escape(id)).join(' · ')}</div></td></tr>`;
+            }
+          }
+          inner += '</tbody></table>';
+        }
+      }
+      // §2b active subs
+      const subs = (job.sub_signals || {}).active || [];
+      const visible = subs.filter(s => s.status !== 'GREEN').slice(0, 8);
+      if (visible.length) {
+        inner += `<div class="subs-signals-block"><h3>Active subs · risk signals</h3>`;
+        for (const s of visible) {
+          const cls = s.status.toLowerCase();
+          const vsB = s.vs_baseline != null ? ((s.vs_baseline >= 0 ? '+' : '') + Math.round(s.vs_baseline*100) + '%') : '—';
+          const dens = s.density != null ? Math.round(s.density*100) + '%' : '—';
+          const warn = s.status === 'RED' ? '<span class="stat warn">⚠ RED</span>' : (s.drift ? `<span class="stat warn">${escape(s.drift)}</span>` : '');
+          inner += `<div class="sub-signal-row ${cls}"><span class="pip">●</span><span class="sub-name">${escape(s.sub)}</span><span class="stat">${dens} · vs phase median ${vsB}</span>${warn}<span class="stat">${(s.jobs_touching||[]).join(', ')}</span></div>`;
+        }
+        inner += '</div>';
+      }
+      // §2c predicted
+      const preds = job.execution_predicted || [];
+      if (preds.length) {
+        inner += `<div class="predicted-section"><h3>§2c System-suggested items</h3>`;
+        for (const p of preds.slice(0, 12)) {
+          inner += `<div class="predicted-row"><span class="icon">⊕</span><span class="action">${escape(p.action)}</span><span class="actions">[Accept] [Dismiss]</span></div>`;
+        }
+        inner += '</div>';
+      }
+      html += `<section class="mp-sec"><h2>§2 Execution (next 14 days)</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §3 Coordination
+    {
+      const blocks = job.coordination_4wk || [];
+      let inner = '';
+      if (!blocks.length) inner = '<div class="empty-note">No 4-week coordination items.</div>';
+      else for (const b of blocks) {
+        if (b.in_house_only) {
+          const seq = (b.rows || []).map(r => r.phase_name).join(' → ');
+          inner += `<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-2);padding:6px 0;line-height:1.5;">Closeout sequence: <strong style="color:var(--ink);">${escape(seq)}</strong>. Ross Built Crew. Confirm timing this meeting.</div>`;
+          continue;
+        }
+        inner += `<table class="flow-table"><thead><tr><th>Phase</th><th>Sub</th><th>Predecessors</th><th>Needs Confirmation</th></tr></thead><tbody>`;
+        for (const r of b.rows) {
+          const name = (r.phase_name || '') + (r.phase_code ? ` (${r.phase_code})` : '');
+          const preds = (r.predecessors || []).join(' · ') || '—';
+          inner += `<tr><td>${escape(name)}</td><td>${escape(r.sub || '—')}</td><td>${escape(preds)}</td><td>${escape(r.needs_confirmation || '')}</td></tr>`;
+        }
+        inner += '</tbody></table>';
+      }
+      html += `<section class="mp-sec"><h2>§3 Coordination (15-28 days)</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §4 Procurement
+    {
+      const ps = job.procurement_8wk || {};
+      const active = ps.active_this_week || [];
+      const proc = ps.long_lead_procurement || [];
+      const sel = ps.long_lead_selections || [];
+      let inner = '';
+      if (!active.length && !proc.length && !sel.length) inner = '<div class="empty-note">No open procurement or selection items.</div>';
+      else {
+        if (active.length) {
+          inner += `<div class="cat-block"><div class="cat-head"><span>§4a Active this week</span><span class="count">${active.length} due ≤7d or URGENT</span></div>`;
+          for (const i of active) inner += renderItemAt(i, 'active_this_week', subMap);
+          inner += '</div>';
+        }
+        if (proc.length || sel.length) {
+          inner += `<div class="cat-block"><div class="cat-head"><span>§4b 8-week gate</span><span class="count">${proc.length + sel.length} items</span></div>`;
+          if (proc.length) { inner += `<div style="font-family:var(--font-head);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-2);padding:6px 0 2px;">Procurement</div>`; for (const i of proc) inner += renderCanonicalCard(i, subMap); }
+          if (sel.length) { inner += `<div style="font-family:var(--font-head);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-2);padding:6px 0 2px;">Selections</div>`; for (const i of sel) inner += renderCompactRef(i); }
+          inner += '</div>';
+        }
+      }
+      html += `<section class="mp-sec"><h2>§4 Procurement &amp; Selections Gate</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §5 Items by Category + §5b Waiting
+    {
+      const groups = job.items_by_category || {};
+      let inner = '';
+      const ks = Object.keys(groups);
+      if (!ks.length) inner = '<div class="empty-note">No open action items.</div>';
+      else for (const cat of ks) {
+        const items = groups[cat] || [];
+        inner += `<div class="cat-block"><div class="cat-head"><span>${escape(cat)}</span><span class="count">${items.length} open</span></div>`;
+        for (const i of items) inner += renderItemAt(i, 'by_category', subMap);
+        inner += '</div>';
+      }
+      const waitingGroups = job.waiting_on_others || {};
+      const owners = Object.keys(waitingGroups);
+      if (owners.length) {
+        const total = owners.reduce((acc, k) => acc + waitingGroups[k].length, 0);
+        inner += `<div class="waiting-block"><h3>⏸ Waiting on others — ${total}</h3>`;
+        for (const owner of owners) {
+          const its = waitingGroups[owner] || [];
+          inner += `<div class="owner-grp">${escape(owner)} <span style="font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);font-weight:500;">(${its.length})</span></div>`;
+          for (const i of its) inner += renderCompactRef(i);
+        }
+        inner += '</div>';
+      }
+      html += `<section class="mp-sec"><h2>§5 Open Items by Category + Waiting on Others</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §6 Selections — canonical home for SELECTION items
+    {
+      const sel = job.selections || [];
+      let inner = sel.length ? sel.map(i => renderItemAt(i, 'selections', subMap)).join('') : '<div class="empty-note">No outstanding selections.</div>';
+      html += `<section class="mp-sec"><h2>§6 Outstanding Selections</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §7 Escalations (canonical) + Budget refs + Financial
+    {
+      const ifd = job.issues_financial || {};
+      const escalations = ifd.escalations || [];
+      const budgetItems = ifd.budget_items || [];
+      const fin = ifd.financial || {};
+      let inner = `<div class="cat-block"><div class="cat-head"><span>Escalations</span><span class="count">${escalations.length}</span></div>`;
+      if (!escalations.length) inner += '<div class="empty-note">No active escalations.</div>';
+      else for (const i of escalations) inner += renderItemAt(i, 'escalations', subMap);
+      inner += '</div>';
+      inner += `<div class="cat-block"><div class="cat-head"><span>BUDGET items</span><span class="count">${budgetItems.length}</span></div>`;
+      if (!budgetItems.length) inner += '<div class="empty-note">No open BUDGET items.</div>';
+      else for (const i of budgetItems) inner += renderCompactRef(i);
+      inner += '</div>';
+      inner += `<div class="cat-block"><div class="cat-head"><span>Financial rollup</span></div>`;
+      if (!fin.has_data) inner += '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);font-style:italic;padding:6px 0;">Financial data pending Phase 13 contract integration.</div>';
+      else { inner += `<div class="fin-row" style="font-weight:600;border-bottom:1.2px solid var(--ink);"><span>Job</span><span>GP</span><span>Target CO</span><span>Status</span></div>`; for (const j of (fin.jobs || [])) inner += `<div class="fin-row"><span>${escape((j.name || '').toUpperCase())}</span><span>${escape(j.gp || '—')}</span><span>${escape(j.targetCO || '—')}</span><span>${escape(j.status || '—')}</span></div>`; }
+      inner += '</div>';
+      html += `<section class="mp-sec"><h2>§7 Escalations + Budget + Financial</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §8 Walk Notes
+    {
+      const areas = job.walk_areas || [];
+      let inner = '<h3 style="font-family:var(--font-head);font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 4px;color:var(--ink-2);">§8a By Area / Trade</h3>';
+      if (!areas.length) inner += '<div class="empty-note">No active walk areas.</div>';
+      else for (const a of areas) {
+        inner += `<div class="walk-area"><h3><span>${escape(a.area)}</span><span class="area-meta">stages ${(a.stages || []).join(',')}</span></h3>`;
+        if ((a.subs_active || []).length) inner += `<div class="subs-line">Active subs: ${a.subs_active.map(escape).join(', ')}</div>`;
+        for (const p of (a.active_phases || [])) {
+          const dens = p.primary_density != null ? Math.round(p.primary_density * 100) + '%' : '—';
+          inner += `<div class="walk-phase"><strong>${escape(p.phase_name || '')}</strong> (${escape(p.phase_code || '')}) · ${p.active_days || 0}d active · ${dens}</div>`;
+        }
+        for (const i of (a.items || [])) inner += renderCompactRef(i);
+        inner += '</div>';
+      }
+      const holds = job.hold_points || [];
+      if (holds.length) {
+        inner += '<h3 style="font-family:var(--font-head);font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;margin:14px 0 4px;color:var(--ink-2);">§8b Quality Hold Points</h3>';
+        for (const h of holds) {
+          inner += `<div class="hold-row"><span class="kind">${escape(h.kind === 'phase_taxonomy' ? 'phase gate' : 'item flag')}</span><span>${escape(h.phase_code || '')}</span><span>${escape(h.note || h.phase_name || '')}</span><span>${escape((h.status || '').toLowerCase().replace('_',' '))}</span></div>`;
+        }
+      }
+      // §8c Field-discovered template
+      inner += `<div class="field-capture"><h3>§8c Field-Discovered — capture during site walk</h3><div class="placeholder">Capture WHO + WHAT + BY WHEN below during the walk. Items captured here flow into next week's binder via process.py and surface in §5.</div><div class="capture-row" style="font-weight:600;border-bottom:1.2px solid var(--ink);"><span class="lbl">Owner</span><span class="lbl">What</span><span class="lbl">By when</span><span class="lbl">Job</span></div>`;
+      for (let n = 0; n < 6; n++) inner += `<div class="capture-row"><span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span></div>`;
+      inner += '</div>';
+      html += `<section class="mp-sec"><h2>§8 Walk Notes</h2><div class="mp-sec-body">${inner}</div></section>`;
+    }
+
+    // §9 Client Decisions Pending
+    {
+      const groups = job.client_decisions || {};
+      const names = Object.keys(groups);
+      if (names.length) {
+        let inner = '';
+        for (const name of names) {
+          const items = groups[name] || [];
+          inner += `<div class="person-grp"><div class="person-name">${escape(name)} <span class="count">· ${items.length} unresolved</span></div>`;
+          for (const i of items) inner += renderCompactRef(i);
+          inner += '</div>';
+        }
+        html += `<div class="client-decisions-block"><h2>Client Decisions Pending — by person <span class="meta" style="font-family:var(--font-mono);font-size:10px;color:var(--ink-3);font-weight:500;letter-spacing:0.4px;text-transform:none;">${names.length}</span></h2>${inner}</div>`;
+      }
+    }
+
+    return html;
+  }
+
+  // Render all jobs
+  const container = document.getElementById('jobs-container');
+  let allHtml = '';
+  for (const job of (DATA.jobs || [])) {
+    allHtml += renderJobBlock(job);
+  }
+  container.innerHTML = allHtml;
+})();
+</script>
+</body>
+</html>

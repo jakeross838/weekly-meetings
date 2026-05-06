@@ -1,0 +1,424 @@
+# Cross-Trade Rejection Rules
+# Phase 1 retry — the sub's own line is the only source of truth.
+# These rules override Pass 2 tag_disambiguated attributions when a tag would
+# credit a sub for a phase that's physically impossible given their modal trade.
+#
+# Resolution order in classifier:
+#   1. Compute sub's modal_trade from Pass 1 (high-confidence text matches)
+#   2. For each candidate (sub, log) attribution:
+#      a. If candidate phase is in modal_trade.forbidden  → REJECT (unless allowlist override)
+#      b. If sub appears in multi_trade_allowlist with this phase  → ALLOW
+#      c. Otherwise the candidate is preserved
+#
+# Source: SPEC PART 3 (phase code definitions) + Phase 1 retry kickoff.
+
+# ─────────────────────────────────────────────────────────────────────────
+# Phase code groups — referenced by modal-trade rejection rules below.
+# Defined once here so the YAML stays scannable. Classifier expands
+# `all_*` group names to the concrete phase code list at runtime.
+# ─────────────────────────────────────────────────────────────────────────
+phase_groups:
+  all_plumbing_phases:        [2.5, 6.1, 6.2, 13.1, 13.2]
+  all_electrical_phases:      [2.6, 6.3, 13.3]
+  all_low_voltage_phases:     [6.5, 13.5]
+  all_hvac_phases:            [6.4, 13.4]
+  all_tile_phases:            [10.1, 10.2, 10.3, 10.4]
+  all_interior_tile_phases:   [10.1, 10.2, 10.3]   # excludes 10.4 stone-slab install
+  all_paint_phases:           [12.1, 12.2, 12.3, 14.1]
+  all_drywall_phases:         [8.1, 8.2, 8.3, 8.4, 8.5]
+  all_stucco_phases:          [7.1, 7.2, 7.3, 7.6]
+  all_framing_phases:         [3.4, 3.5, 3.7, 3.8, 5.2, 5.3]   # truss/sheathing/decking framing
+  all_masonry_phases:         [3.1, 3.2, 3.3]                  # CMU + tie beams
+  all_foundation_phases:      [2.1, 2.2, 2.3, 2.7, 2.8]
+  all_concrete_phases:        [2.1, 2.2, 2.3, 2.7, 2.8, 3.1, 3.2, 3.3]   # foundation + masonry combined
+  all_roofing_phases:         [4.1, 4.2]
+  all_interior_trim_phases:   [9.1, 9.2, 9.3, 7.7]   # Edit 1: 12.3 removed (paint phase, painters do it not trim carpenters)
+  all_cabinetry_phases:       [11.1, 11.2, 11.3, 11.4]
+  all_pool_phases:            [14.5, 14.6, 14.7, 14.8]
+  all_landscape_phases:       [14.9, 14.10, 14.11]
+  all_interior_phases:        [8.1, 8.2, 8.3, 8.4, 8.5, 9.1, 9.2, 9.3, 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 11.3, 11.4, 12.1, 12.2, 12.3, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6]
+
+# ─────────────────────────────────────────────────────────────────────────
+# Modal-trade rejection rules.
+# Sub's `modal_trade` is the SUB-LEVEL category derived from their dominant
+# Pass 1 phase. Each rule lists phase-codes/groups the sub will NEVER be
+# credited for unless overridden in `multi_trade_allowlist` below.
+# ─────────────────────────────────────────────────────────────────────────
+modal_trade_rejections:
+
+  plumbing:
+    forbidden:
+      - all_electrical_phases
+      - all_tile_phases
+      - all_paint_phases
+      - all_drywall_phases
+      - all_stucco_phases
+      - all_framing_phases
+
+  electrical:
+    forbidden:
+      - all_plumbing_phases
+      - all_stucco_phases
+      - all_tile_phases
+      - all_concrete_phases
+      - all_paint_phases
+
+  tile_floor:
+    forbidden:
+      - 1.4    # Site Grading
+      - all_framing_phases
+      - all_concrete_phases   # tile-prep mortar/screed is NOT 2.x/3.x; that's their own 10.x prep
+      - all_roofing_phases
+
+  concrete:
+    forbidden:
+      - all_interior_trim_phases
+      - all_paint_phases
+      - all_tile_phases
+      - all_cabinetry_phases
+
+  stucco_plaster:
+    forbidden:
+      - all_electrical_phases
+      - all_plumbing_phases
+      - 8.2   # Drywall Hang — explicitly called out (stucco is exterior, drywall is interior)
+      - all_tile_phases
+      - all_cabinetry_phases
+
+  pool_spa:
+    forbidden:
+      - all_interior_trim_phases
+      - all_interior_tile_phases   # exception: 10.3 wall tile if pool sub also did pool tile (handle via allowlist)
+      - all_drywall_phases
+      - all_framing_phases
+
+  waterproofing:
+    forbidden:
+      - 14.8   # Pool Equipment & Startup
+      - 14.7   # Pool Plaster
+      - all_framing_phases
+      - all_paint_phases
+      - all_cabinetry_phases
+
+  paint:
+    forbidden:
+      - all_concrete_phases
+      - all_framing_phases
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_tile_phases
+
+  roofing:
+    forbidden:
+      - all_interior_phases
+      - all_plumbing_phases
+      - all_electrical_phases
+
+  hvac:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_tile_phases
+      - all_paint_phases
+      - all_drywall_phases
+      - all_framing_phases
+
+  drywall:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_tile_phases
+      - all_concrete_phases
+      - all_framing_phases
+      - all_stucco_phases
+
+  framing:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_tile_phases
+      - all_paint_phases
+      - all_cabinetry_phases
+
+  siding:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_tile_phases
+      - all_concrete_phases
+      - all_cabinetry_phases
+
+  cabinetry:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_concrete_phases
+      - all_roofing_phases
+      - all_framing_phases
+      - 1.4   # Site Grading
+
+  trim_finish:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_concrete_phases
+      - all_roofing_phases
+      - all_framing_phases
+
+  stone_counters:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_concrete_phases       # foundation + masonry — they install, never pour
+      - all_framing_phases
+      - all_paint_phases
+      - all_roofing_phases
+      - all_drywall_phases
+      - all_pool_phases           # pool plaster/tile is Tom Sanger's scope; pool/stone separation is clean
+
+  metal_fab:
+    forbidden:
+      - all_plumbing_phases
+      - all_electrical_phases
+      - all_concrete_phases       # they fab steel, don't pour concrete
+      - all_paint_phases
+      - all_roofing_phases
+      - all_drywall_phases
+      - all_tile_phases
+      - all_stucco_phases
+      - all_pool_phases
+
+# ─────────────────────────────────────────────────────────────────────────
+# Force-modal — explicit modal_trade locks that override Pass 1 auto-derivation.
+# The classifier normally derives `modal_trade` from each sub's dominant
+# Pass 1 phase. For subs where Phase 1 first-run showed the auto-derivation
+# would land on the wrong trade due to multi-phase log noise, force the lock.
+# Use sparingly.
+# ─────────────────────────────────────────────────────────────────────────
+force_modal_trade:
+
+  Architectural Marble Importers, Inc:
+    modal: stone_counters
+    reason: |
+      Old Pool tag (12 logs) is on-site-overlap noise — they install
+      countertops on days Tom Sanger is also on site. Lock to
+      stone_counters so all_pool_phases are forbidden.
+
+  Detweilers Propane Gas Service, LLC:
+    modal: plumbing
+    reason: |
+      Old Electrical Rough In tag (3 logs) and 2 → 6.3 first-run
+      attributions are multi-phase log noise — generator gas hookups
+      logged on the same day as electrician trim work. Lock to
+      plumbing so all_electrical_phases are forbidden.
+
+  DB Welding Inc.:
+    modal: metal_fab
+    reason: |
+      Auto-derived modal landed on `punch` (15.1) because their high-conf
+      Pass 1 hits skewed toward "DB Welding starting on their punch list"
+      lines. But their actual scope is metal fab — railings, glass,
+      stair treads, custom hoods. Force lock to metal_fab so the
+      cross-trade rejection rules properly forbid plumbing/electrical/
+      paint/concrete attribution drift.
+
+# ─────────────────────────────────────────────────────────────────────────
+# Multi-trade allowlist — override modal-trade rejections for specific subs
+# that legitimately work in multiple phases. Phase codes here mean: even if
+# the sub's modal_trade rejection rule would forbid this phase, ALLOW it
+# for this specific sub.
+#
+# REUSABLE MECHANISM — `conditional_codes` with `require_keyword`:
+# Some allowlist entries permit a phase only when the sub's own line text
+# contains specific keywords. Same-day on-site presence is NOT enough
+# evidence — the line text must explicitly mention the trigger word.
+# This pattern is used here for pool deck (Sanger) and is reusable
+# elsewhere. Generator 4 and Schedule Builder will likely want similar
+# discipline ("credit X only if text mentions Y").
+#
+# Schema:
+#   <Sub Name>:
+#     allow: [phase_codes...]                            # plain allow
+#     conditional_codes:                                 # optional gate
+#       - code: <phase_code>
+#         require_keyword: ["pattern1", "pattern2"]      # any-of match
+# ─────────────────────────────────────────────────────────────────────────
+multi_trade_allowlist:
+
+  # Internal crew — never rejected on any phase. Multi-trade by definition.
+  Ross Built Crew:
+    allow_all: true
+    note: "Internal crew. Per-log tagging — never bucketed as one trade."
+
+  # Concrete sub that also does masonry, foundation, slabs, tie beams.
+  ML Concrete, LLC:
+    allow:
+      - 2.1   # Pilings
+      - 2.2   # Pile Caps & Grade Beams
+      - 2.3   # Stem Walls
+      - 2.7   # Slab Prep
+      - 2.8   # Slab Pour
+      - 3.1   # Masonry Walls (CMU)
+      - 3.2   # Wall Reinforcement & Cell Fill
+      - 3.3   # Tie Beams (CIP)
+    note: "Modal=concrete already covers most. Allowlist documented for clarity."
+
+  # Metal sub — stair rails + custom hoods + structural steel
+  DB Welding Inc.:
+    allow:
+      - 3.3    # Tie Beams (some structural steel embed work)
+      - 9.1    # Interior Stair Framing & Treads (railings)
+      - 11.1   # Cabinet Install (custom range hoods land here for now — see SPEC gap)
+      - 13.6   # Appliance Install (hood final assembly)
+      - 15.1   # Punch Walk & List (window flashing, punch metal work)
+      - 5.3    # Exterior Stair Framing
+    note: "Metal trade. SPEC has no dedicated hood code; 11.1 used as nearest-fit."
+
+  # Siding sub that ALSO does framing + exterior ceilings
+  M&J Florida Enterprise LLC:
+    allow:
+      - 7.4   # Siding Install (primary)
+      - 7.5   # Soffit / Exterior Ceilings
+      - 3.4   # Floor Truss / Floor System Set (rare framing scope)
+      - 5.1   # Exterior Wall Sheathing & Wrap
+      - 7.7   # Exterior Trim & Bandings
+    note: "Siding-primary, but framing + ceilings are documented multi-phase scope."
+
+  # Framing sub that ALSO installs windows + siding on some jobs
+  ALL VALENCIA CONSTRUCTION LLC:
+    allow:
+      - 3.4   # Floor Truss / Floor System Set (primary)
+      - 3.5   # Floor Sheathing
+      - 3.7   # Roof Truss Set
+      - 3.8   # Roof Sheathing
+      - 4.3   # Exterior Windows
+      - 4.4   # Exterior Doors
+      - 5.1   # Exterior Wall Sheathing & Wrap
+      - 5.2   # Exterior Decking Framing
+      - 7.4   # Siding Install (when assigned)
+    note: "Framing-primary, multi-phase across the dry-in / exterior-rough range."
+
+  # Tile sub that ALSO does wood flooring on some jobs
+  Rangel Custom Tile LLC:
+    allow:
+      - 10.1  # Wet Area Waterproofing (shower-pan prep)
+      - 10.2  # Floor Tile / Wood Flooring (primary)
+      - 10.3  # Wall Tile
+    note: "Tile + wood flooring confirmed in spec. Both land in 10.2 today."
+
+  # Electrical sub: rough + trim + low-voltage
+  Metro Electric, LLC:
+    allow:
+      - 6.3   # Electrical Rough (primary)
+      - 13.3  # Electrical Trim
+      - 6.5   # Low Voltage Rough (when scoped on this job)
+      - 13.5  # Low Voltage Trim
+    note: "LV is rare — Smarthouse Integration is usually the LV sub."
+
+  # Plumbing sub: top-out + trim + gas rough/trim
+  Gator Plumbing:
+    allow:
+      - 2.5   # Under-Slab Plumbing
+      - 6.1   # Plumbing Top-Out (primary)
+      - 6.2   # Gas Rough
+      - 13.1  # Plumbing Trim
+      - 13.2  # Gas Trim
+    note: "Multi-phase plumbing; gas + top-out + trim all confirmed."
+
+  # HVAC sub that also touches pool heater work occasionally
+  Captain Cool LLC:
+    allow:
+      - 6.4   # HVAC Rough (primary)
+      - 13.4  # HVAC Trim
+      - 14.8  # Pool Equipment & Startup (heater install only — when explicitly logged)
+    note: "Pool heater overlap — 14.8 only allowed if log explicitly mentions heater/HVAC."
+
+  # Low-voltage / AV — different sub from Metro Electric
+  Smarthouse Integration:
+    allow:
+      - 6.5   # Low Voltage Rough (primary)
+      - 13.5  # Low Voltage Trim
+    note: "AV + LV. Distinct from Metro Electric (high-voltage)."
+
+  # CoatRite — waterproofing modal already, but keep allowlist explicit
+  CoatRite LLC:
+    allow:
+      - 2.4   # Stem Wall Waterproofing (primary)
+      - 10.1  # Wet Area Waterproofing (shower pans, when applicable)
+    note: "Waterproofing only. Spec called out 2.4 + 10.1; data shows 2.4 dominant."
+
+  # Stucco / plaster sub
+  Jeff Watts Plastering and Stucco:
+    allow:
+      - 7.1   # Stucco Lath / Wire
+      - 7.2   # Stucco Scratch Coat
+      - 7.3   # Stucco Brown Coat   (rare in text — Phase 3 burst-segmentation will recover)
+      - 7.6   # Stucco Finish Coat  (rare in text — Phase 3 burst-segmentation will recover)
+    note: "Multi-burst pattern. Phase 1 collapses brown/finish into 7.2; Phase 3 splits via dates."
+
+  # Pool/spa sub — primary scope is 14.5–14.8 pool work. Pool deck framing
+  # and decking finish use the conditional_codes mechanism: they fire only
+  # when Sanger's own line text mentions deck/decking. Same-day on-site
+  # presence (e.g., framers cutting deck boards) is NOT enough.
+  Tom Sanger Pool and Spa LLC:
+    allow:
+      - 14.5   # Pool Shell / Plumbing
+      - 14.6   # Pool Tile & Coping
+      - 14.7   # Pool Plaster / Pebbletec
+      - 14.8   # Pool Equipment & Startup
+      - 5.1    # Exterior Wall Sheathing & Wrap (CONDITIONAL — pool deck framing)
+      - 14.2   # Exterior Decking Finish (CONDITIONAL — pool deck boards)
+    conditional_codes:
+      - code: 5.1
+        require_keyword: ["deck", "decking", "pool deck"]
+      - code: 14.2
+        require_keyword: ["deck", "decking", "pool deck"]
+    note: "Conditional 5.1 / 14.2 fire only when Sanger's own line text mentions deck/decking. Same-day on-site presence is NOT enough."
+
+  # Stone / countertop install sub. NOT pool. Modal locked to stone_counters
+  # via force_modal_trade above.
+  Architectural Marble Importers, Inc:
+    allow:
+      - 11.3   # Countertop Install (kitchen, baths) — primary
+      - 11.4   # Backsplash Install
+      - 10.4   # Stone / Slab Install (floors, fireplaces)
+    note: "Stone/countertop only. NOT pool. Pool plaster is Tom Sanger's scope. If poolside outdoor kitchen ever needs countertop install, it's still 11.3, not a pool phase."
+
+  # Gas-only sub. NEVER electrical even when generator/EV-charger gas-side
+  # work coincides with electrician trim. Modal locked to plumbing via
+  # force_modal_trade above.
+  Detweilers Propane Gas Service, LLC:
+    allow:
+      - 6.2    # Gas Rough — primary
+      - 13.2   # Gas Trim
+    note: "Gas-only, period. 6.1 Plumbing Top-Out intentionally NOT in allowlist — water-heater/fixture top-out is the plumber's scope, not the gas company's. Tighter is better here; legitimate ambiguous logs route to manual_review for human eyes."
+
+# ─────────────────────────────────────────────────────────────────────────
+# Edit 5 — `require_text_signal`
+# Phases too easy to false-positive on via tag alone. Logs targeting these
+# codes SKIP Pass 2 tag_disambiguated entirely. They land in low_review
+# without an explicit text-signal match in the sub's own line. Burst-
+# specific stucco coats and shower-pan waterproofing are the canonical
+# offenders.
+# ─────────────────────────────────────────────────────────────────────────
+require_text_signal:
+  - 2.4    # Stem Wall Waterproofing — easily confused with general foundation work
+  - 2.5    # Under-Slab Plumbing Rough — timing-sensitive, needs "pre-slab" signal
+  - 7.2    # Stucco Scratch Coat — burst-specific
+  - 7.3    # Stucco Brown Coat — burst-specific
+  - 7.6    # Stucco Finish Coat — burst-specific
+  - 10.1   # Wet Area Waterproofing — easily confused with general waterproofing
+  - 14.7   # Pool Plaster / Pebbletec — specific phase within pool work
+  - 15.1   # Punch Walk & List — too generic without explicit "punch"
+  - 15.5   # C.O. Issuance — administrative, rarely tagged correctly
+
+# ─────────────────────────────────────────────────────────────────────────
+# Notes & assumptions captured during build
+# ─────────────────────────────────────────────────────────────────────────
+notes:
+  - "SPEC has no dedicated wall-framing or interior-framing phase code (only 3.4 floor truss, 3.7 roof truss, 5.x exterior framing). ALL VALENCIA wall framing maps to 3.4 as nearest-fit."
+  - "SPEC has no dedicated hood-install phase code. DB Welding hood work maps to 11.1 (Cabinet Install) as nearest-fit. Recommend SPEC iteration."
+  - "Stucco brown coat (7.3) and finish coat (7.6) won't be recoverable from text alone. Phase 3 burst segmentation will split based on date proximity to keyword-explicit logs."
+  - "Pool sub (e.g. Tom Sanger Pool and Spa) is intentionally unlisted — pool subs do their phases in 14.5–14.8 with no cross-trade leakage observed in Phase 1 first run."
+  - "Edit 6 (refined low-volume bypass): subs with <3 high-confidence Pass 1 text matches will (a) KEEP their Pass 1 high-confidence text matches normally, and (b) BYPASS Pass 2 tag-disambiguation, routing those records to manual_review instead. No statistical basis for a modal trade with <3 logs, but clean text matches are still credited."
+  - "Edit 1: 12.3 removed from all_interior_trim_phases — painters do paint trim & doors, trim carpenters install the trim itself. Different bursts."

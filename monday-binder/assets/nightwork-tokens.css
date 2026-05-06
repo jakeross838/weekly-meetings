@@ -1,0 +1,186 @@
+/* Nightwork-mirrored visual tokens for the meeting-prep page family.
+   Light theme · slate-tile + stone-blue + white-sand · drafting-stock feel.
+   Square corners, no rounding. Fonts: Space Grotesk / Inter / JetBrains Mono.
+
+   This file overrides the dark-theme custom properties from styles.css and
+   patches a small number of hardcoded colors. Include AFTER styles.css. */
+
+:root {
+  /* ---- Palette ---- */
+  --nw-slate:   #3B5864;   /* primary ink, structural lines, headers */
+  --nw-slate-2: #557382;   /* secondary text */
+  --nw-slate-3: #7C95A1;   /* tertiary, muted labels */
+  --nw-stone:   #5B8699;   /* accent — links, ASK marker */
+  --nw-stone-2: #88A6B5;   /* hover/secondary accent */
+  --nw-sand:    #F7F5EC;   /* page background */
+  --nw-sand-2:  #EFE9D9;   /* card background, soft fills */
+  --nw-paper:   #FFFFFF;   /* high-contrast surfaces */
+  --nw-line:    #C9C0A8;   /* drafting-stock line */
+  --nw-line-2:  #DCD3BC;   /* faint divider */
+
+  /* Semantic — warm ochre / rust / forest range */
+  --nw-success: #2F5E3A;
+  --nw-warn:    #B57F3D;
+  --nw-danger:  #A14F3D;
+  --nw-info:    #4D6F8A;
+
+  /* Density tiers */
+  --nw-dens-cont:  #2F5E3A;
+  --nw-dens-stdy:  #8B6E2D;
+  --nw-dens-scat:  #B57F3D;
+  --nw-dens-drag:  #A14F3D;
+
+  /* ---- Token overrides (override styles.css dark-theme tokens) ---- */
+  --bg:           var(--nw-sand);
+  --bg-soft:      var(--nw-sand-2);
+  --bg-card:      var(--nw-paper);
+
+  --ink:          var(--nw-slate);
+  --ink-2:        var(--nw-slate-2);
+  --ink-3:        var(--nw-slate-3);
+  --ink-muted:    #A8B4BB;
+
+  --accent:       var(--nw-stone);
+  --success:      var(--nw-success);
+  --warn:         var(--nw-warn);
+
+  --dens-cont:    var(--nw-dens-cont);
+  --dens-stdy:    var(--nw-dens-stdy);
+  --dens-scat:    var(--nw-dens-scat);
+  --dens-drag:    var(--nw-dens-drag);
+
+  --line:         var(--nw-line);
+  --line-2:       var(--nw-line-2);
+
+  --radius:       0;          /* square corners */
+  --radius-soft:  0;
+
+  --font-head:    'Space Grotesk', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+}
+
+/* ---- Body / page surface ---- */
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+/* Override existing dark-theme component backgrounds that use hardcoded
+   RGB values referenced from styles.css. */
+.page-wrap { color: var(--ink); }
+
+.app-head {
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 14px;
+}
+.app-head .eyebrow {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+.app-head h1 {
+  font-family: var(--font-head);
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.app-head .when {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+}
+.app-head .nav a {
+  color: var(--ink-2);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+}
+.app-head .nav a.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+/* Drafting-stock divider rules used by section headers */
+.section-head h2 {
+  font-family: var(--font-head);
+  color: var(--ink);
+}
+
+/* Footer */
+.app-foot {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 18px;
+}
+
+/* Density chips — re-skin for light bg */
+.density-chip {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+.density-chip .label { font-family: var(--font-mono); }
+.density-chip.cont { background: rgba(47, 94, 58, 0.10); border-color: var(--nw-dens-cont); }
+.density-chip.stdy { background: rgba(139, 110, 45, 0.10); border-color: var(--nw-dens-stdy); }
+.density-chip.scat { background: rgba(181, 127, 61, 0.10); border-color: var(--nw-dens-scat); }
+.density-chip.drag { background: rgba(161, 79, 61, 0.10); border-color: var(--nw-dens-drag); }
+.density-chip.empty { background: var(--bg-soft); border-color: var(--ink-muted); color: var(--ink-3); }
+
+.vs-chip { font-family: var(--font-mono); }
+.vs-chip.above { color: var(--success); }
+.vs-chip.below { color: var(--danger, var(--nw-danger)); }
+.vs-chip.at    { color: var(--ink-3); }
+
+.flag-badge {
+  background: rgba(161, 79, 61, 0.10);
+  border: 1px solid var(--nw-danger);
+  color: var(--nw-danger);
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+.status-icon { font-family: var(--font-mono); }
+.status-icon.complete { color: var(--success); }
+.status-icon.ongoing  { color: var(--warn); }
+.status-icon.scheduled { color: var(--accent); }
+
+/* Square inputs */
+input, button, select { border-radius: 0; }
+
+/* Cards / boxed content default */
+.card, .nw-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 14px 18px;
+}
+
+/* Text helpers */
+.nw-mono { font-family: var(--font-mono); }
+.nw-head { font-family: var(--font-head); }
+
+@media print {
+  html, body {
+    background: var(--nw-paper);
+    color: var(--nw-slate);
+  }
+  .nw-card, .card {
+    background: var(--nw-paper);
+    border-color: var(--nw-slate);
+  }
+}

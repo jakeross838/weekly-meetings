@@ -1,0 +1,112 @@
+# Sub Filter List — non-sub entries to remove from `crews_clean` arrays
+#
+# Three buckets:
+#   - hard_delete:          scraper artifacts, equipment, finance — drop entirely
+#   - external_entities:    utilities (treat as their own entity later)
+#   - inspection_authorities: building departments (track inspection events, not as a sub)
+#
+# Format per entry:
+#   name:        verbatim string from crews_clean
+#   log_count:   how many logs reference this entry
+#   sample:      first ~120 chars of one notes_full where this entry appeared
+#   reason:      why it is being filtered
+
+hard_delete:
+  - name: "ZZ - Inspection"
+    log_count: 8
+    reason: "Scraper placeholder ('ZZ -' prefix). Not a real crew."
+    sample: "Sight to See Carpentry - Mike's crew onsite framing..."
+  - name: "ZZ - Paver"
+    log_count: 8
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Ross crew worked on punch..."
+  - name: "ZZ - Epoxy Floors"
+    log_count: 4
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "The stucco contractor was onsite..."
+  - name: "ZZ - Framing"
+    log_count: 3
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Daily Manpower Log: 2 crews on site..."
+  - name: "ZZ - Pool"
+    log_count: 2
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Altered State - 2 - Driveway..."
+  - name: "ZZ - Interior Trim"
+    log_count: 1
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Daily Manpower Log: 1 crew on site..."
+  - name: "ZZ - Landscaping"
+    log_count: 1
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Loftin Plumbing - 3 - Plumbing..."
+  - name: "ZZ - Insulation"
+    log_count: 1
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Daily Manpower Log: 2 crews on site..."
+  - name: "ZZ - Painting"
+    log_count: 1
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Daily Manpower Log: 5 crews on site..."
+  - name: "ZZ - Siding"
+    log_count: 1
+    reason: "Scraper placeholder. Not a real crew."
+    sample: "Daily Manpower Log: 3 crews on site..."
+  - name: "American Express Simply Cash Business CC"
+    log_count: 1
+    reason: "Finance/credit card. Not a sub."
+    sample: "L1 soffit, pool tile west..."
+  - name: "Sunbelt Rentals"
+    log_count: 4
+    reason: "Equipment rental vendor, not a trade sub."
+    sample: "Florida Sunshine Carpentry. Sunbelt Rentals..."
+
+external_entities:
+  - name: "FPL"
+    log_count: 7
+    reason: "Utility (Florida Power & Light). Track separately for power-set events."
+    sample: "A meeting was held with..."
+  - name: "TECO Peoples Gas-Shepard"
+    log_count: 2
+    reason: "Utility (gas service). Track separately for gas-set events."
+    sample: "Trim and ceiling t&g -4..."
+
+inspection_authorities:
+  - name: "City Of Sarasota"
+    log_count: 5
+    reason: "Building department. Track inspection events, not as a sub."
+    sample: "Daily Manpower Log: 3 crews on site..."
+  - name: "City of Anna Maria - Building Department"
+    log_count: 3
+    reason: "Building department."
+    sample: "City of Anna Maria, 1 worker..."
+  - name: "Manatee County"
+    log_count: 3
+    reason: "Building department / inspection authority."
+    sample: "Manatee County, 1 worker..."
+  - name: "City of AMI"
+    log_count: 2
+    reason: "Building department (Anna Maria Island)."
+    sample: "All Glass & Windows. Smartshield. City of AMI..."
+  - name: "Town of Longboat Key"
+    log_count: 1
+    reason: "Building department."
+    sample: "Trim and ceiling t&g..."
+  - name: "Manatee County Utilitiy Department"
+    log_count: 1
+    reason: "Building / utility authority. Note: typo 'Utilitiy' is in source data."
+    sample: "Florida Sunshine. Manatee County Utility Dept..."
+
+# Summary
+counts:
+  hard_delete_total: 36
+  external_entities_total: 9
+  inspection_authorities_total: 15
+  grand_total_filtered_log_refs: 60
+  unique_entries_removed: 19
+  estimated_remaining_subs: 162
+
+notes:
+  - "The SPEC.md mentioned PilingsFoundation, Plan Review*, Documents, 1Passed.Inspection for Framing, Yes, and Multi-sub days as filter targets. NONE of those names appear in the current crews_clean arrays — they were artifacts from earlier scrape passes that have since been cleaned. Confirmed by exhaustive scan of all 181 unique crews."
+  - "ZZ - * placeholders are scraper artifacts (alphabetized to bottom of dropdown). They never represent a real trade attribution."
+  - "Spec called out Sight to See Construction LLC + Sight to See Construction, LLC as duplicate variants of the same sub — these are NOT filtered (they are real subs); just need de-duplication downstream."
