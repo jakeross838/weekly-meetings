@@ -155,6 +155,22 @@ def _spawn_one(cmd: list[str], cwd: Path, label: str) -> int:
     return proc.returncode
 
 
+def _load_distribution() -> dict | None:
+    """Load distribution config. Prefer config/distribution.local.json
+    (gitignored, real addresses); fall back to config/distribution.json
+    (committed template with placeholder addresses). Returns the parsed
+    dict, or None if neither file is present and parseable."""
+    for fname in ("distribution.local.json", "distribution.json"):
+        p = PROJECT_ROOT / "config" / fname
+        if not p.exists():
+            continue
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+    return None
+
+
 def _run_process_thread() -> None:
     rc = _spawn_one([sys.executable, str(PROCESS_PY)], PROJECT_ROOT, "process.py")
     _release_job(rc)
@@ -197,21 +213,17 @@ def _run_email_pm_thread(pm_slug: str) -> None:
             return
         pm_name = render_helpers.SLUG_TO_PM[pm_slug]
 
-        # Email config
-        dist_path = PROJECT_ROOT / "config" / "distribution.json"
-        if not dist_path.exists():
-            _push(f"[{_ts()}] ERROR: config/distribution.json missing")
-            rc = 1
-            return
-        try:
-            dist = json.loads(dist_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            _push(f"[{_ts()}] ERROR: distribution.json invalid: {e}")
+        # Email config — prefer distribution.local.json (gitignored, real
+        # addresses); fall back to distribution.json (committed template).
+        dist = _load_distribution()
+        if dist is None:
+            _push(f"[{_ts()}] ERROR: distribution config missing or invalid "
+                  f"(checked config/distribution.local.json and config/distribution.json)")
             rc = 1
             return
         to_addr = (dist.get("pm_emails") or {}).get(pm_name)
         if not to_addr:
-            _push(f"[{_ts()}] ERROR: no email mapped for '{pm_name}' in distribution.json")
+            _push(f"[{_ts()}] ERROR: no email mapped for '{pm_name}' in distribution config")
             rc = 1
             return
         always_cc = dist.get("always_cc") or []
@@ -1232,13 +1244,8 @@ def api_email_pm():
         daemon=True,
     ).start()
     pm_name = render_helpers.SLUG_TO_PM[pm_slug]
-    dist_path = PROJECT_ROOT / "config" / "distribution.json"
-    to_addr = ""
-    if dist_path.exists():
-        try:
-            to_addr = (json.loads(dist_path.read_text(encoding="utf-8")).get("pm_emails") or {}).get(pm_name, "")
-        except Exception:
-            pass
+    dist = _load_distribution() or {}
+    to_addr = (dist.get("pm_emails") or {}).get(pm_name, "")
     return jsonify({
         "started": True,
         "action": f"email:{pm_slug}",
