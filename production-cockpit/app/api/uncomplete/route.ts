@@ -20,35 +20,37 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = supabaseServer();
-  // Capture prior status so /api/uncomplete can revert. Worst-case race
-  // (two concurrent completes) both see the same prior — fine.
-  const prior = await supabase
+  const cur = await supabase
     .from("todos")
-    .select("status")
+    .select("status, previous_status")
     .eq("id", id)
     .maybeSingle();
-  if (prior.error) {
+  if (cur.error) {
     return NextResponse.json(
-      { ok: false, error: prior.error.message },
+      { ok: false, error: cur.error.message },
       { status: 500 }
     );
   }
-  if (!prior.data) {
+  if (!cur.data) {
     return NextResponse.json(
       { ok: false, error: "Todo not found" },
       { status: 404 }
     );
   }
-  if (prior.data.status === "COMPLETE") {
-    return NextResponse.json({ ok: true, alreadyComplete: true });
+  if (cur.data.status !== "COMPLETE") {
+    return NextResponse.json(
+      { ok: false, error: "Not complete" },
+      { status: 400 }
+    );
   }
+  const revertTo = cur.data.previous_status || "IN_PROGRESS";
 
   const { error } = await supabase
     .from("todos")
     .update({
-      status: "COMPLETE",
-      completed_at: new Date().toISOString(),
-      previous_status: prior.data.status,
+      status: revertTo,
+      completed_at: null,
+      previous_status: null,
     })
     .eq("id", id);
   if (error) {
@@ -57,5 +59,5 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, revertedTo: revertTo });
 }
