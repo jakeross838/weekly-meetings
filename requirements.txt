@@ -4,3 +4,5 @@ flask-cors>=4.0
 holidays>=0.50
 websocket-client>=1.7
 pywin32>=305 ; sys_platform == "win32"
+supabase>=2.0
+python-dotenv>=1.0

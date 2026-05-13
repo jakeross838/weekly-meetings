@@ -24,6 +24,15 @@ import time
 from datetime import datetime, date
 from pathlib import Path
 
+# Load environment from .env (Supabase credentials, etc.) before anything
+# else reads os.environ. python-dotenv does NOT override existing env vars,
+# so setx-set ANTHROPIC_API_KEY still wins — .env is a backstop.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # .env loading is optional; existing setx flow keeps working
+
 # Force UTF-8 on stdout/stderr so log messages with em-dashes (U+2014),
 # right arrows (U+2192), and other non-ASCII chars don't blow up under
 # the Windows cp1252 console codec. This MUST run before any print/log
@@ -200,6 +209,154 @@ def parse_filename(filename: str):
 
 def binder_path(pm_name: str) -> Path:
     return BINDERS_DIR / f"{pm_name.replace(' ', '_')}.json"
+
+
+# =============================================================================
+# SUPABASE SINK (additive — binder JSON remains source of truth)
+# =============================================================================
+
+def _pm_slug(pm_name: str) -> str:
+    """First-name lowercase. 'Martin Mannix' -> 'martin'."""
+    return pm_name.split()[0].lower() if pm_name else ""
+
+
+_SUPABASE_CLIENT = None
+
+
+def _supabase_client():
+    """Lazy supabase client. Returns None when env is unset or supabase-py
+    isn't installed so the sink is a no-op in dev environments without
+    Supabase configured."""
+    global _SUPABASE_CLIENT
+    if _SUPABASE_CLIENT is not None:
+        return _SUPABASE_CLIENT
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        return None
+    try:
+        from supabase import create_client
+    except ImportError:
+        return None
+    _SUPABASE_CLIENT = create_client(url, key)
+    return _SUPABASE_CLIENT
+
+
+_SUB_ALIAS_INDEX: list[tuple] | None = None  # cached: list of (compiled_regex, alias_len, sub_id)
+
+
+def _sub_alias_index(client):
+    """Build (and cache) a list of (regex, alias_length, sub_id) tuples from
+    the Supabase `subs` table. Used to extract sub_id from binder item text
+    so each upserted todo gets linked to a sub when a canonical alias matches."""
+    global _SUB_ALIAS_INDEX
+    if _SUB_ALIAS_INDEX is not None:
+        return _SUB_ALIAS_INDEX
+    try:
+        resp = client.table("subs").select("id, aliases").execute()
+    except Exception:
+        _SUB_ALIAS_INDEX = []
+        return _SUB_ALIAS_INDEX
+    idx: list[tuple] = []
+    for s in resp.data or []:
+        for alias in s.get("aliases") or []:
+            pat = re.compile(rf"(?<!\w){re.escape(alias)}(?!\w)", re.IGNORECASE)
+            idx.append((pat, len(alias), s["id"]))
+    _SUB_ALIAS_INDEX = idx
+    return idx
+
+
+def _extract_sub_id(text: str, client) -> str | None:
+    """Scan text for the longest-matching canonical sub alias and return its
+    sub_id. Returns None when nothing matches."""
+    if not text:
+        return None
+    best: tuple[int, str] | None = None
+    for pat, length, sub_id in _sub_alias_index(client):
+        if pat.search(text):
+            if best is None or length > best[0]:
+                best = (length, sub_id)
+    return best[1] if best else None
+
+
+def _item_to_supabase_row(item: dict, pm_name: str, transcript_filename: str, client=None):
+    """Map a binder item dict to a todos-table row. Returns None for items
+    that should be skipped (DISMISSED). When `client` is provided, attempts
+    to extract a sub_id from the item's action + update text."""
+    status = (item.get("status") or "").upper()
+    if status == "DISMISSED":
+        return None
+
+    def _date_or_none(s):
+        if not s:
+            return None
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").date().isoformat()
+        except Exception:
+            return None
+
+    def _datetime_or_none(s):
+        d = _date_or_none(s)
+        return f"{d}T00:00:00Z" if d else None
+
+    completed_at = None
+    if status == "COMPLETE":
+        completed_at = _datetime_or_none(item.get("close_date") or item.get("closed_date"))
+
+    action = item.get("action") or ""
+    update = item.get("update") or ""
+    sub_id = None
+    if client is not None:
+        try:
+            sub_id = _extract_sub_id(f"{action}\n{update}", client)
+        except Exception:
+            sub_id = None  # never let sub extraction break the sink
+
+    return {
+        "id": item.get("id"),
+        "pm_id": _pm_slug(pm_name),
+        "job": item.get("job") or "",
+        "title": action,
+        "due_date": _date_or_none(item.get("due")),
+        "priority": item.get("priority"),
+        "status": status,
+        "type": item.get("type"),
+        "category": item.get("category"),
+        "created_at": _datetime_or_none(item.get("opened")),
+        "completed_at": completed_at,
+        "source_transcript": transcript_filename,
+        "source_excerpt": item.get("update"),
+        "sub_id": sub_id,
+    }
+
+
+def sink_to_supabase(pm_name: str, binder: dict, transcript_filename: str, logger) -> int:
+    """Upsert each binder item into Supabase todos. Failures log but never
+    raise. Returns count of rows attempted (skipped DISMISSED items not
+    counted). binder JSON write must already have completed; this is a
+    secondary, failure-tolerant mirror."""
+    client = _supabase_client()
+    if client is None:
+        logger.info("Supabase: client unavailable (missing env or import). Skipping sink.")
+        return 0
+    rows = []
+    for item in binder.get("items", []) or []:
+        row = _item_to_supabase_row(item, pm_name, transcript_filename, client=client)
+        if row is None:
+            continue
+        if not row.get("id"):
+            continue  # never upsert without a primary key
+        rows.append(row)
+    if not rows:
+        logger.info(f"Supabase: no rows to upsert for {pm_name}.")
+        return 0
+    try:
+        client.table("todos").upsert(rows, on_conflict="id").execute()
+        logger.info(f"Supabase: upserted {len(rows)} rows for {pm_name}.")
+        return len(rows)
+    except Exception as e:
+        logger.error(f"Supabase upsert failed for {pm_name}: {type(e).__name__}: {e}")
+        return 0
 
 
 def migrate_binder_items(binder: dict, logger) -> dict:
@@ -823,6 +980,10 @@ def process_transcript(transcript_file: Path, ledger_index: dict, logger) -> str
         return "failure"
 
     save_binder(pm_name, new_binder, logger)
+
+    # Additive Supabase sink — failure-tolerant, never breaks the run.
+    # binder JSON above remains the source of truth.
+    sink_to_supabase(pm_name, new_binder, transcript_file.name, logger)
 
     archived = archive_transcript(transcript_file)
     logger.info(f"Moved transcript → processed/{archived.name}")

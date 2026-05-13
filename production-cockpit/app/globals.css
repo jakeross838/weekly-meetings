@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-paper: var(--paper);
+  --color-sand: var(--sand);
+  --color-sand-2: var(--sand-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-urgent: var(--urgent);
+  --color-high: var(--high);
+  --color-success: var(--success);
+  --color-info: var(--info);
+
+  --font-head: var(--font-head), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, Menlo, monospace;
+}
+
+/* Ross Built palette — mirrors monday-binder/assets/nightwork-tokens.css
+   so the cockpit and the meeting-prep PDFs share one visual identity.
+   slate-tile + stone-blue + white-sand · drafting-stock feel. */
+:root {
+  --sand:    #F7F5EC;   /* page background */
+  --sand-2:  #EFE9D9;   /* soft fill / muted bg */
+  --paper:   #FFFFFF;   /* high-contrast surfaces */
+
+  --ink:     #3B5864;   /* primary ink — slate */
+  --ink-2:   #557382;   /* secondary text */
+  --ink-3:   #7C95A1;   /* tertiary / muted labels */
+
+  --accent:  #5B8699;   /* stone — links, accents */
+  --rule:    #C9C0A8;   /* drafting-stock line */
+  --rule-soft: #DCD3BC; /* faint divider */
+
+  /* Semantic — warm ochre / rust / forest range */
+  --urgent:  #A14F3D;   /* rust (danger) */
+  --high:    #B57F3D;   /* warm ochre (warn) */
+  --success: #2F5E3A;   /* forest */
+  --info:    #4D6F8A;
+
+  --background: var(--sand);
+  --foreground: var(--ink);
+  --muted: var(--sand-2);
+  --muted-foreground: var(--ink-3);
+}
+
+/* Subtle drafting-paper grid — very faint, large pitch */
+body {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--rule-soft) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--rule-soft) 60%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: 0 0;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--sand);
+}
+
+/* Stagger reveal on mount */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Tap-to-complete slide-out */
+@keyframes strikeOut {
+  0%   { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(8px); }
+}
+.strike-out {
+  animation: strikeOut 220ms ease-in forwards;
+}
+
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Square corners — drafting-stock feel from the binder PDFs */
+button, input, select { border-radius: 0; }
+
+/* Explicit utility rules — pinned outside @layer so Tailwind v4's content
+   scanner can't drop them. These are the brand classes the cockpit relies
+   on; defining them as plain CSS guarantees they ship to production. */
+.bg-paper          { background-color: var(--paper); }
+.bg-paper\/30      { background-color: color-mix(in oklab, var(--paper) 30%, transparent); }
+.bg-sand           { background-color: var(--sand); }
+.bg-sand-2         { background-color: var(--sand-2); }
+.bg-sand-2\/40     { background-color: color-mix(in oklab, var(--sand-2) 40%, transparent); }
+.bg-sand-2\/50     { background-color: color-mix(in oklab, var(--sand-2) 50%, transparent); }
+.bg-muted          { background-color: var(--muted); }
+.bg-muted\/40      { background-color: color-mix(in oklab, var(--muted) 40%, transparent); }
+.bg-muted\/50      { background-color: color-mix(in oklab, var(--muted) 50%, transparent); }
+.bg-muted\/60      { background-color: color-mix(in oklab, var(--muted) 60%, transparent); }
+.active\:bg-muted\/60:active {
+  background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+.border-success\/60 {
+  border-color: color-mix(in oklab, var(--success) 60%, transparent);
+}
+.bg-urgent         { background-color: var(--urgent); }
+.bg-high           { background-color: var(--high); }
+.bg-success        { background-color: var(--success); }
+.bg-ink            { background-color: var(--ink); }
+.text-paper        { color: var(--paper); }
+.text-paper\/70    { color: color-mix(in oklab, var(--paper) 70%, transparent); }
+.text-sand         { color: var(--sand); }
+.text-rule         { color: var(--rule); }
+.border-ink        { border-color: var(--ink); }
