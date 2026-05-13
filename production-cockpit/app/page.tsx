@@ -7,6 +7,7 @@ import { Filters } from "@/components/filters";
 import { PMSection } from "@/components/pm-section";
 import { CompletedSection } from "@/components/completed-section";
 import { RossBuiltMark } from "@/components/logo";
+import { PriorityPanel } from "@/components/priority-panel";
 
 interface SP {
   pm?: string;
@@ -119,7 +120,7 @@ export default async function Page({
   });
 
   return (
-    <main className="max-w-[480px] mx-auto min-h-screen bg-background">
+    <main className="max-w-[480px] lg:max-w-[1200px] mx-auto min-h-screen bg-background">
       <Header />
       <StatsBar
         open={openCountRes.count ?? 0}
@@ -133,51 +134,58 @@ export default async function Page({
         selectedJob={selectedJob}
         view={view}
       />
-      <div>
-        {pms
-          .filter((pm) => (byPm[pm.id] ?? []).length > 0)
-          .map((pm, idx) => (
-            <PMSection
-              key={pm.id}
-              pmFullName={pm.full_name}
-              todos={byPm[pm.id] ?? []}
-              allowComplete={view === "open"}
-              index={idx}
-            />
-          ))}
-        {todos.length === 0 && (
-          <div className="px-5 py-16 text-center">
-            <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">
-              {view === "open" ? "Inbox zero" : "Nothing closed this week"}
-            </p>
-          </div>
-        )}
-        {/* Recently completed — visible on the Open view to give Jake
-            ambient awareness of what's been knocked out lately. */}
-        {view === "open" && (
-          <CompletedSection todos={recentlyCompleted} pmNames={pmNames} />
-        )}
-
-        {/* Footer — brand mark + drafting-stock metadata strip */}
-        <footer className="mt-6 px-5 py-6 border-t border-rule bg-sand-2/40">
-          <div className="flex items-center gap-3 text-ink">
-            <RossBuiltMark size={20} className="opacity-80" />
-            <div className="flex-1 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 leading-tight">
-              <div className="text-ink">Ross Built · PD Cockpit</div>
-              <div>
-                Last sync ·{" "}
-                {new Date().toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </div>
+      {/* Desktop ≥lg becomes a 2-column layout: priority + recently-completed
+          on the left rail, PM sections on the right. Mobile stays single-col. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:divide-x lg:divide-rule">
+        <div>
+          {view === "open" && (
+            <PriorityPanel todos={todos} pmNames={pmNames} />
+          )}
+          {view === "open" && (
+            <CompletedSection todos={recentlyCompleted} pmNames={pmNames} />
+          )}
+        </div>
+        <div>
+          {pms
+            .filter((pm) => (byPm[pm.id] ?? []).length > 0)
+            .map((pm, idx) => (
+              <PMSection
+                key={pm.id}
+                pmFullName={pm.full_name}
+                todos={byPm[pm.id] ?? []}
+                allowComplete={view === "open"}
+                index={idx}
+              />
+            ))}
+          {todos.length === 0 && (
+            <div className="px-5 py-16 text-center">
+              <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">
+                {view === "open" ? "Inbox zero" : "Nothing closed this week"}
+              </p>
             </div>
-            <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
-              v1.0
-            </div>
-          </div>
-        </footer>
+          )}
+        </div>
       </div>
+
+      {/* Footer — brand mark + drafting-stock metadata strip */}
+      <footer className="mt-6 px-5 py-6 border-t border-rule bg-sand-2/40">
+        <div className="flex items-center gap-3 text-ink">
+          <RossBuiltMark size={20} className="opacity-80" />
+          <div className="flex-1 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 leading-tight">
+            <div className="text-ink">Ross Built · PD Cockpit</div>
+            <div>
+              Last sync ·{" "}
+              {new Date().toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </div>
+          </div>
+          <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
+            v2.0
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

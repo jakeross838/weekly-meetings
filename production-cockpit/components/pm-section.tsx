@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Todo } from "@/lib/types";
 import { TodoRow } from "./todo-row";
+import { computeJobStatus } from "@/lib/job-status";
 
 interface PMSectionProps {
   pmFullName: string;
@@ -40,9 +41,6 @@ export function PMSection({
           <span className="font-head text-sm font-semibold uppercase tracking-[0.14em] truncate text-ink">
             {pmFullName}
           </span>
-          <span className="font-mono text-[10px] tracking-[0.12em] text-muted-foreground truncate hidden sm:inline">
-            {jobs.join(" · ")}
-          </span>
         </div>
         <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] tabular-nums">
           {urgentCount > 0 && (
@@ -54,11 +52,39 @@ export function PMSection({
         </div>
       </button>
       {open && (
-        <div className="bg-paper">
-          {todos.map((t) => (
-            <TodoRow key={t.id} todo={t} allowComplete={allowComplete} />
-          ))}
-        </div>
+        <>
+          {/* Per-job traffic-light row: a dot + job name + count */}
+          {allowComplete && jobs.length > 0 && (
+            <div className="border-b border-rule-soft bg-sand-2/30 px-5 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {jobs.map((j) => {
+                const jobTodos = todos.filter((t) => t.job === j);
+                const status = computeJobStatus(jobTodos);
+                const dotClass =
+                  status.status === "red"
+                    ? "bg-urgent"
+                    : status.status === "amber"
+                      ? "bg-high"
+                      : "bg-success";
+                return (
+                  <span
+                    key={j}
+                    className="inline-flex items-center gap-1.5 font-mono text-[11px] text-ink-2 tabular-nums"
+                    title={status.reasons.join(" · ")}
+                  >
+                    <span className={`h-2 w-2 ${dotClass}`} aria-hidden />
+                    <span>{j}</span>
+                    <span className="text-ink-3">{jobTodos.length}</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <div className="bg-paper">
+            {todos.map((t) => (
+              <TodoRow key={t.id} todo={t} allowComplete={allowComplete} />
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

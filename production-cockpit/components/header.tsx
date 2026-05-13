@@ -17,12 +17,18 @@ export function Header() {
         <Link href="/" className="shrink-0">
           <RossBuiltLogo size={22} className="text-paper" />
         </Link>
-        <nav className="flex items-center gap-4 font-mono text-[10px] tracking-[0.22em] uppercase">
+        <nav className="flex items-center gap-3 font-mono text-[10px] tracking-[0.22em] uppercase">
           <Link href="/" className="text-paper hover:text-paper/80">
             Todos
           </Link>
+          <Link href="/selections" className="text-paper/70 hover:text-paper">
+            Selections
+          </Link>
           <Link href="/subs" className="text-paper/70 hover:text-paper">
             Subs
+          </Link>
+          <Link href="/pace" className="text-paper/70 hover:text-paper">
+            Pace
           </Link>
         </nav>
       </div>
