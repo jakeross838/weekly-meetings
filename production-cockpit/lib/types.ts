@@ -7,6 +7,7 @@ export interface SubEmbedded {
   trade: string | null;
   rating: number | null;
   reliability_pct: number | null;
+  avg_days_per_job: number | null;
 }
 
 export interface Sub extends SubEmbedded {
@@ -35,6 +36,9 @@ export interface Todo {
   source_excerpt: string | null;
   sub_id: string | null;
   sub?: SubEmbedded | null;
+  previous_status: Status | null;
+  edited_title: string | null;
+  edited_at: string | null;
 }
 
 export interface PM {
