@@ -39,8 +39,6 @@ export default async function SubPage({
 
   const ratingDisplay =
     sub.rating != null ? sub.rating.toFixed(1) : "—";
-  const reliability =
-    sub.reliability_pct != null ? sub.reliability_pct : null;
 
   return (
     <main className="max-w-[480px] lg:max-w-[960px] mx-auto min-h-screen bg-background">
