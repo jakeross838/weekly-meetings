@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Todo } from "@/lib/types";
 import { shortDate, relativeOffset, daysFromToday } from "@/lib/date";
+import { EditTodo } from "./edit-todo";
+import { UndoButton } from "./undo-button";
 
 const ACCENT_BAR: Record<string, string> = {
   URGENT: "bg-urgent",
@@ -41,7 +43,6 @@ export function TodoRow({
         body: JSON.stringify({ id: todo.id }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // wait for animation to finish before hiding + refresh
       setTimeout(() => {
         setDone(true);
         start(() => router.refresh());
@@ -60,15 +61,19 @@ export function TodoRow({
   const bar = ACCENT_BAR[priority] ?? ACCENT_BAR.NORMAL;
   const daysOut = daysFromToday(todo.due_date);
   const isOverdue = allowComplete && daysOut !== null && daysOut < 0;
+  const displayTitle = todo.edited_title ?? todo.title;
 
   return (
-    <button
+    <div
       onClick={complete}
-      disabled={!allowComplete || pending}
-      type="button"
+      role={allowComplete ? "button" : undefined}
+      tabIndex={allowComplete ? 0 : undefined}
+      aria-disabled={!allowComplete || pending}
       className={
-        "group w-full flex items-stretch text-left active:bg-muted/60 transition-colors border-b border-rule disabled:opacity-70 " +
-        (striking ? "strike-out" : "")
+        "group w-full flex items-stretch text-left transition-colors border-b border-rule " +
+        (allowComplete && !pending ? "cursor-pointer active:bg-muted/60" : "") +
+        (striking ? " strike-out" : "") +
+        (!allowComplete || pending ? " opacity-70" : "")
       }
     >
       {/* Priority bar — 3px, full row height */}
@@ -98,9 +103,9 @@ export function TodoRow({
           )}
         </div>
 
-        {/* Title — the deliverable */}
+        {/* Title — uses edited_title when present */}
         <p className="text-[15px] leading-snug text-foreground line-clamp-3">
-          {todo.title}
+          {displayTitle}
         </p>
 
         {/* Sub chip — tappable when the todo is linked to a known sub */}
@@ -138,7 +143,23 @@ export function TodoRow({
             </span>
           )}
         </div>
+
+        {/* Actions: Edit (always) + Undo (Done view only) + edited tag */}
+        <div
+          className="mt-2 flex items-center gap-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <EditTodo todoId={todo.id} initialTitle={displayTitle} />
+          {!allowComplete && todo.status === "COMPLETE" && (
+            <UndoButton todoId={todo.id} completedAt={todo.completed_at} />
+          )}
+          {todo.edited_at && (
+            <span className="font-mono text-[10px] tracking-[0.12em] text-ink-3 ml-auto">
+              edited
+            </span>
+          )}
+        </div>
       </div>
-    </button>
+    </div>
   );
 }

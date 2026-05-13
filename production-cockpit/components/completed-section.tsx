@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Todo } from "@/lib/types";
+import { UndoButton } from "./undo-button";
 
 interface CompletedSectionProps {
   todos: Todo[];
@@ -70,7 +71,7 @@ export function CompletedSection({ todos, pmNames }: CompletedSectionProps) {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] leading-snug text-ink-3 line-through line-clamp-2">
-                    {t.title}
+                    {t.edited_title ?? t.title}
                   </p>
                   <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-ink-3 tabular-nums">
                     <span>{t.id}</span>
@@ -81,11 +82,12 @@ export function CompletedSection({ todos, pmNames }: CompletedSectionProps) {
                     {completedShort && (
                       <>
                         <span>·</span>
-                        <span className="text-success">
-                          done {completedShort}
-                        </span>
+                        <span className="text-success">done {completedShort}</span>
                       </>
                     )}
+                    <span className="ml-auto">
+                      <UndoButton todoId={t.id} completedAt={t.completed_at} />
+                    </span>
                   </div>
                 </div>
               </li>
