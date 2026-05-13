@@ -15,7 +15,7 @@ interface SP {
 
 const SORT_LABEL: Record<SortKey, string> = {
   rating: "Rating",
-  reliability: "Reliability",
+  reliability: "Avg days",
   open: "Open",
   name: "Name",
 };
@@ -64,7 +64,10 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
       return (openCountBySub[b.id] ?? 0) - (openCountBySub[a.id] ?? 0);
     }
     if (sortKey === "reliability") {
-      return (b.reliability_pct ?? -1) - (a.reliability_pct ?? -1);
+      // Faster (fewer days/job) ranks higher. NULLs to bottom.
+      const av = a.avg_days_per_job ?? 9999;
+      const bv = b.avg_days_per_job ?? 9999;
+      return av - bv;
     }
     // default rating
     return (b.rating ?? -1) - (a.rating ?? -1);
@@ -75,7 +78,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   const flaggedSubs = subs.filter((s) => s.flagged_for_pm_binder).length;
 
   return (
-    <main className="max-w-[480px] mx-auto min-h-screen bg-background">
+    <main className="max-w-[480px] lg:max-w-[1200px] mx-auto min-h-screen bg-background">
       <Header />
 
       <div className="px-5 py-2 border-b border-rule bg-sand-2/40 flex items-center justify-between">
@@ -172,10 +175,10 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
         </details>
       </div>
 
-      {/* Sub list */}
-      <div>
+      {/* Sub list — single col on mobile, 2-col grid on desktop */}
+      <div className="lg:grid lg:grid-cols-2 lg:divide-x lg:divide-rule">
         {rows.length === 0 ? (
-          <div className="px-5 py-16 text-center font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+          <div className="px-5 py-16 text-center font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 lg:col-span-2">
             No subs match
           </div>
         ) : (
@@ -276,16 +279,6 @@ function SubRow({
   index: number;
 }) {
   const hasRating = sub.rating != null;
-  const rel = sub.reliability_pct ?? null;
-  const barWidth = rel != null ? Math.min(rel, 100) : 0;
-  const barColor =
-    rel == null
-      ? "bg-rule"
-      : rel >= 70
-        ? "bg-success"
-        : rel >= 40
-          ? "bg-high"
-          : "bg-urgent";
   return (
     <Link
       href={`/sub/${sub.id}`}
@@ -315,14 +308,16 @@ function SubRow({
                 <span className="text-ink-3">—</span>
               )}
             </div>
-            <div className="font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3">
-              {hasRating ? "rated" : "no data"}
-            </div>
+            {sub.avg_days_per_job != null && (
+              <div className="font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3">
+                {sub.avg_days_per_job.toFixed(1)}d/job
+              </div>
+            )}
           </div>
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3 mb-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3">
           <span>{sub.trade ?? "Trade ?"}</span>
           {sub.jobs_performed != null && (
             <>
@@ -340,16 +335,6 @@ function SubRow({
           )}
           {sub.flagged_for_pm_binder && (
             <span className="ml-auto text-urgent">Flagged</span>
-          )}
-        </div>
-
-        {/* Reliability bar */}
-        <div className="h-1 bg-sand-2 relative overflow-hidden">
-          {rel != null && (
-            <div
-              className={`h-full ${barColor}`}
-              style={{ width: `${barWidth}%` }}
-            />
           )}
         </div>
       </div>

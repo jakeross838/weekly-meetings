@@ -43,7 +43,7 @@ export default async function SubPage({
     sub.reliability_pct != null ? sub.reliability_pct : null;
 
   return (
-    <main className="max-w-[480px] mx-auto min-h-screen bg-background">
+    <main className="max-w-[480px] lg:max-w-[960px] mx-auto min-h-screen bg-background">
       <Header />
 
       {/* Back link */}
@@ -86,10 +86,12 @@ export default async function SubPage({
           </div>
           <div className="flex-1 bg-paper px-4 py-3">
             <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
-              Reliability
+              Days / job
             </p>
             <p className="mt-1 font-mono text-2xl font-medium tabular-nums text-ink">
-              {reliability != null ? `${reliability}%` : "—"}
+              {sub.avg_days_per_job != null
+                ? sub.avg_days_per_job.toFixed(1)
+                : "—"}
             </p>
           </div>
           <div className="flex-1 bg-paper px-4 py-3">
@@ -101,31 +103,6 @@ export default async function SubPage({
             </p>
           </div>
         </div>
-
-        {/* Reliability bar */}
-        {reliability != null && (
-          <div className="mt-4">
-            <div className="h-1.5 bg-sand-2 relative overflow-hidden">
-              <div
-                className={
-                  "h-full " +
-                  (reliability >= 70
-                    ? "bg-success"
-                    : reliability >= 40
-                      ? "bg-high"
-                      : "bg-urgent")
-                }
-                style={{ width: `${Math.min(reliability, 100)}%` }}
-              />
-            </div>
-            <p className="mt-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
-              Based on Buildertrend log density
-              {sub.jobs_performed != null
-                ? ` · ${sub.jobs_performed} jobs`
-                : ""}
-            </p>
-          </div>
-        )}
 
         {sub.rating == null && (
           <p className="mt-4 px-3 py-2 border border-rule bg-sand-2/60 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
@@ -228,18 +205,19 @@ export default async function SubPage({
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] leading-snug text-ink-3 line-through line-clamp-2">
-                  {t.title}
+                  {t.edited_title ?? t.title}
                 </p>
                 <p className="mt-0.5 font-mono text-[10px] text-ink-3 tabular-nums">
                   {t.id} · {t.job}
                   {t.completed_at && (
                     <>
-                      {" "}
-                      · done{" "}
-                      {new Date(t.completed_at).toLocaleDateString("en-US", {
-                        month: "numeric",
-                        day: "numeric",
-                      })}
+                      {" · took "}
+                      {Math.round(
+                        (new Date(t.completed_at).getTime() -
+                          new Date(t.created_at).getTime()) /
+                          86_400_000
+                      )}
+                      d
                     </>
                   )}
                 </p>
@@ -286,10 +264,17 @@ function SubTodoRow({ todo }: { todo: Todo }) {
           )}
         </div>
         <p className="text-[15px] leading-snug text-foreground line-clamp-3">
-          {todo.title}
+          {todo.edited_title ?? todo.title}
         </p>
         <div className="mt-2 flex items-center justify-between gap-3 font-mono text-[11px] text-ink-3 tabular-nums">
           <span className="truncate">{todo.job}</span>
+          <span className="text-ink-2">
+            open{" "}
+            {Math.round(
+              (Date.now() - new Date(todo.created_at).getTime()) / 86_400_000
+            )}
+            d
+          </span>
           {todo.due_date && (
             <span>
               {shortDate(todo.due_date)} · {relativeOffset(todo.due_date)}

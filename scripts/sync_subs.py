@@ -135,8 +135,8 @@ def _compute_rating(rollups: list[dict]) -> tuple[float | None, list[str]]:
         deduction = min(0.5 * len(dragging), 1.5)
         rating -= deduction
         basis.append(
-            f"−{deduction:.1f} · {len(dragging)} phase(s) labeled 'dragging' "
-            f"(work pattern below benchmark density)"
+            f"−{deduction:.1f} · {len(dragging)} phase(s) below benchmark pace "
+            f"(longer than typical to complete)"
         )
 
     if not basis:
@@ -144,8 +144,7 @@ def _compute_rating(rollups: list[dict]) -> tuple[float | None, list[str]]:
         continuous = [r for r in rollups if r.get("primary_density_label") == "continuous"]
         if continuous:
             basis.append(
-                f"5.0★ baseline · {len(continuous)} phase(s) labeled 'continuous' "
-                f"(steady work pattern, no flags)"
+                f"5.0★ baseline · {len(continuous)} phase(s) at steady pace · no flags"
             )
         else:
             basis.append("5.0★ baseline · no flags found in BT analytics")
@@ -186,11 +185,17 @@ def main():
                 if r.get("flag_for_pm_binder") and r.get("flag_reasons"):
                     flag_reasons.extend(r["flag_reasons"])
             reliability = int(round(avg_density * 100)) if avg_density is not None else None
+            # Avg active days per (sub, phase, job) — pulled directly from the
+            # BT rollup data so we can show "this sub typically takes N days
+            # for this phase" without the density vocabulary.
+            day_medians = [r.get("primary_active_days_median") for r in rollup_entries if r.get("primary_active_days_median")]
+            avg_days = round(sum(day_medians) / len(day_medians), 1) if day_medians else None
         else:
             reliability = None
             jobs = None
             flagged = False
             flag_reasons = []
+            avg_days = None
         rows.append({
             "id": slug,
             "name": entry["name"],
@@ -198,6 +203,7 @@ def main():
             "aliases": entry["aliases"],
             "rating": rating,
             "reliability_pct": reliability,
+            "avg_days_per_job": avg_days,
             "jobs_performed": jobs,
             "flagged_for_pm_binder": flagged,
             "flag_reasons": flag_reasons[:5] or None,
