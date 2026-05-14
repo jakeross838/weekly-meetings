@@ -334,7 +334,18 @@ def sink_to_supabase(pm_name: str, binder: dict, transcript_filename: str, logge
     """Upsert each binder item into Supabase todos. Failures log but never
     raise. Returns count of rows attempted (skipped DISMISSED items not
     counted). binder JSON write must already have completed; this is a
-    secondary, failure-tolerant mirror."""
+    secondary, failure-tolerant mirror.
+
+    SELECT-then-merge: before upsert, fetch existing cockpit-side state for
+    these ids and apply two merge rules so cockpit edits aren't silently
+    reverted by the LLM round-trip:
+      - COMPLETION LOCK: if Supabase shows COMPLETE with a non-null
+        completed_at, the cockpit said so. Keep it.
+      - EDIT PRESERVATION: if Supabase has a non-null edited_title, that's
+        a manual cockpit edit. Preserve edited_title + edited_at.
+    Everything else (title, priority, due_date, category, sub_id,
+    source_excerpt, source_transcript, type, job) — LLM wins.
+    """
     client = _supabase_client()
     if client is None:
         logger.info("Supabase: client unavailable (missing env or import). Skipping sink.")
@@ -350,9 +361,51 @@ def sink_to_supabase(pm_name: str, binder: dict, transcript_filename: str, logge
     if not rows:
         logger.info(f"Supabase: no rows to upsert for {pm_name}.")
         return 0
+
+    # Read current cockpit-side state for these ids before overwriting.
+    # On read failure, abort the sink — overwriting blindly would lose
+    # cockpit completes/edits, which is exactly what this patch prevents.
+    ids = [r["id"] for r in rows]
+    try:
+        existing_resp = (
+            client.table("todos")
+            .select("id, status, completed_at, previous_status, edited_title, edited_at")
+            .in_("id", ids)
+            .execute()
+        )
+        existing_by_id = {r["id"]: r for r in (existing_resp.data or [])}
+    except Exception as e:
+        logger.error(
+            f"Supabase pre-merge SELECT failed for {pm_name}: {type(e).__name__}: {e}. "
+            f"Skipping sink to avoid clobber."
+        )
+        return 0
+
+    completion_locked = 0
+    edit_preserved = 0
+    for row in rows:
+        cur = existing_by_id.get(row["id"])
+        if not cur:
+            continue
+        # COMPLETION LOCK
+        if cur.get("status") == "COMPLETE" and cur.get("completed_at"):
+            if row.get("status") != "COMPLETE":
+                completion_locked += 1
+            row["status"] = "COMPLETE"
+            row["completed_at"] = cur["completed_at"]
+            row["previous_status"] = cur.get("previous_status")
+        # EDIT PRESERVATION
+        if cur.get("edited_title"):
+            row["edited_title"] = cur["edited_title"]
+            row["edited_at"] = cur["edited_at"]
+            edit_preserved += 1
+
     try:
         client.table("todos").upsert(rows, on_conflict="id").execute()
-        logger.info(f"Supabase: upserted {len(rows)} rows for {pm_name}.")
+        logger.info(
+            f"Supabase: upserted {len(rows)} rows for {pm_name} "
+            f"({completion_locked} completion-locked, {edit_preserved} edit-preserved)."
+        )
         return len(rows)
     except Exception as e:
         logger.error(f"Supabase upsert failed for {pm_name}: {type(e).__name__}: {e}")
