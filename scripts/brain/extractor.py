@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -189,6 +190,45 @@ def _build_user_message(transcript_text: str, meeting_metadata: dict) -> str:
     )
 
 
+def _normalize_claims(claims: list[dict]) -> list[dict]:
+    """Post-process: add speaker_canonical / subject_canonical fields per claim.
+
+    Database-driven (reads internal_people, pms, subs). Raw speaker/subject
+    preserved unchanged. Failures here must not block extraction — fall back
+    to copying raw values to canonical fields.
+    """
+    try:
+        from normalize import load_entity_index, normalize_entity
+    except ImportError:
+        # If normalize module isn't reachable, copy raw values through
+        for c in claims:
+            c["speaker_canonical"] = c.get("speaker")
+            c["subject_canonical"] = c.get("subject")
+            c["speaker_canonical_id"] = None
+            c["subject_canonical_id"] = None
+        return claims
+
+    try:
+        index = load_entity_index()
+    except Exception as e:
+        print(f"  extractor: load_entity_index failed ({e!r}); copying raw values", file=sys.stderr)
+        for c in claims:
+            c["speaker_canonical"] = c.get("speaker")
+            c["subject_canonical"] = c.get("subject")
+            c["speaker_canonical_id"] = None
+            c["subject_canonical_id"] = None
+        return claims
+
+    for c in claims:
+        spk = normalize_entity(c.get("speaker"), entity_index=index)
+        sub = normalize_entity(c.get("subject"), entity_index=index)
+        c["speaker_canonical"]    = spk["canonical"]
+        c["speaker_canonical_id"] = spk["canonical_id"]
+        c["subject_canonical"]    = sub["canonical"]
+        c["subject_canonical_id"] = sub["canonical_id"]
+    return claims
+
+
 def extract_claims(transcript_text: str, meeting_metadata: dict) -> dict:
     """Run the Extractor against one transcript. See module docstring."""
     import anthropic
@@ -232,6 +272,11 @@ def extract_claims(transcript_text: str, meeting_metadata: dict) -> dict:
         raise RuntimeError(f"Model returned invalid JSON: {e}\n\nText:\n{text_block.text[:500]}") from e
 
     claims = payload.get("claims", [])
+
+    # Add canonical fields via DB-driven normalize (Gate 2A.6)
+    # Import path: scripts/brain/normalize.py
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    claims = _normalize_claims(claims)
 
     usage = final.usage
     return {

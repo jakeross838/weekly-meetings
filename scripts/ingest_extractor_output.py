@@ -171,9 +171,36 @@ def ingest_meeting(
         meeting_id = m_resp.data[0]["id"]
 
     inserted = 0
+    # Canonical fields — use whatever's in the JSON or compute on-the-fly
+    # using the DB-driven normalizer (Gate 2A.6).
+    _canon_fn = None
+    if any("speaker_canonical" not in c for c in valid_claims):
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent / "brain"))
+            from normalize import load_entity_index, normalize_entity  # noqa
+            _ent_idx = load_entity_index(force_refresh=True)
+
+            def _canon(text):
+                return normalize_entity(text, entity_index=_ent_idx)
+
+            _canon_fn = _canon
+        except Exception as e:
+            print(f"  ingest: normalize unavailable ({e!r}); writing NULL canonical fields", file=sys.stderr)
+
     if valid_claims:
-        rows = [
-            {
+        rows = []
+        for c in valid_claims:
+            spk_canon = c.get("speaker_canonical")
+            spk_id    = c.get("speaker_canonical_id")
+            sub_canon = c.get("subject_canonical")
+            sub_id    = c.get("subject_canonical_id")
+            if spk_canon is None and _canon_fn:
+                r = _canon_fn(c.get("speaker"))
+                spk_canon, spk_id = r["canonical"], r["canonical_id"]
+            if sub_canon is None and _canon_fn:
+                r = _canon_fn(c.get("subject"))
+                sub_canon, sub_id = r["canonical"], r["canonical_id"]
+            rows.append({
                 "meeting_id":             meeting_id,
                 "speaker":                c.get("speaker"),
                 "claim_type":             c["claim_type"],
@@ -181,9 +208,11 @@ def ingest_meeting(
                 "statement":              c["statement"],
                 "raw_quote":              c.get("raw_quote"),
                 "position_in_transcript": c.get("position_in_transcript"),
-            }
-            for c in valid_claims
-        ]
+                "speaker_canonical":      spk_canon,
+                "speaker_canonical_id":   spk_id,
+                "subject_canonical":      sub_canon,
+                "subject_canonical_id":   sub_id,
+            })
         for i in range(0, len(rows), 500):
             batch = rows[i : i + 500]
             resp = client.table("claims").insert(batch).execute()

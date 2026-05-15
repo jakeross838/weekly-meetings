@@ -174,6 +174,50 @@ def _load_jobs() -> list[dict]:
     return r.data or []
 
 
+# Gate 2A.6 — corrections loop, current-PM lookup
+
+def _load_recent_corrections(limit: int = 20) -> list[dict]:
+    """Most-recent corrections from Jake to feed back into the prompt."""
+    r = (
+        _supabase()
+        .table("corrections")
+        .select("id, field_changed, before_value, after_value, correction_reason, context, applied_count, created_at")
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return r.data or []
+
+
+def _get_current_pm(job_id: str) -> str | None:
+    """Look up the active PM for a job via job_pm_assignments (Decision: PMs
+    transition by closing one row and inserting another, no schema rewrite)."""
+    r = (
+        _supabase()
+        .table("job_pm_assignments")
+        .select("pm_id")
+        .eq("job_id", job_id)
+        .is_("ended_at", "null")
+        .order("assigned_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if r.data:
+        return r.data[0]["pm_id"]
+    return None
+
+
+def _increment_correction_counts(correction_ids: list[str]) -> None:
+    """After a successful Reconciler run, count each correction as 'seen one more time'."""
+    if not correction_ids:
+        return
+    client = _supabase()
+    for cid in correction_ids:
+        existing = client.table("corrections").select("applied_count").eq("id", cid).execute()
+        cur = (existing.data[0]["applied_count"] if existing.data else 0) or 0
+        client.table("corrections").update({"applied_count": cur + 1}).eq("id", cid).execute()
+
+
 # ---------- DECISION 8: PER-CLAIM JOB ROUTING ----------
 
 def _route_claim_to_job(claim: dict, jobs: list[dict], default_job: str) -> str:
@@ -618,6 +662,7 @@ def _reconciler_call(
     subs_by_id: dict,
     cost_tracker: dict,
     prior_attempt_issues: list[dict] | None = None,
+    corrections: list[dict] | None = None,
 ) -> dict:
     """One Opus call per meeting."""
 
@@ -666,13 +711,32 @@ def _reconciler_call(
             f"{json.dumps(prior_attempt_issues, indent=2, default=str)}\n"
         )
 
+    corrections_block = ""
+    if corrections:
+        rows = []
+        for c in corrections:
+            ctx = c.get("context") or {}
+            ctx_str = json.dumps(ctx, default=str)[:240]
+            rows.append(
+                f"- field {c.get('field_changed')!r}: "
+                f"{c.get('before_value')!r} -> {c.get('after_value')!r}. "
+                f"Reason: {c.get('correction_reason') or 'no reason given'}. "
+                f"Context: {ctx_str}"
+            )
+        corrections_block = (
+            "\n\nRECENT CORRECTIONS FROM JAKE — these are authoritative overrides "
+            "of default judgment. Apply the same logic to similar claims this run.\n"
+            + "\n".join(rows)
+            + "\n"
+        )
+
     user_msg = (
         f"MEETING:\n"
         f"  id: {meeting['id']}\n"
         f"  date: {meeting['meeting_date']}\n"
         f"  type: {meeting['meeting_type']}\n"
         f"  primary_job_id: {meeting['job_id']}\n"
-        f"{prior_block}\n"
+        f"{prior_block}{corrections_block}\n"
         f"CLAIMS ({len(claims_compact)} total):\n"
         f"{json.dumps(claims_compact, indent=2, default=str)}\n\n"
         f"EXISTING OPEN ITEMS (for dedup, may be empty):\n"
@@ -886,10 +950,33 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
     subs = _load_subs()
     subs_by_id = {s["id"]: s for s in subs}
 
-    # Per-claim routing first to know which jobs we need pay_app + existing_items for.
+    # Gate 2A.6 — segmenter pre-pass for multi-job routing.
+    # Run on the meeting's raw transcript; tag each claim with the segment
+    # that contains its position_in_transcript. Falls back to the
+    # Decision-8 subject-substring heuristic when a claim's position isn't
+    # in any segment (shouldn't happen, but defensive).
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from segmenter import segment_transcript_by_job, find_segment_for_position
+        segments = segment_transcript_by_job(
+            meeting.get("raw_transcript_text") or "",
+            jobs,
+            meeting["job_id"],
+        )
+    except Exception as e:
+        print(f"  segmenter unavailable ({e!r}); using subject-routing fallback", file=sys.stderr)
+        segments = []
+
+    # Per-claim routing
     routed_jobs: set[str] = set()
     for c in claims:
-        c["_routed_job_id"] = _route_claim_to_job(c, jobs, meeting["job_id"])
+        seg = find_segment_for_position(segments, c.get("position_in_transcript")) if segments else None
+        if seg:
+            c["_routed_job_id"] = seg["inferred_job_id"]
+            c["_routed_via"] = "segmenter"
+        else:
+            c["_routed_job_id"] = _route_claim_to_job(c, jobs, meeting["job_id"])
+            c["_routed_via"] = "subject_fallback"
         routed_jobs.add(c["_routed_job_id"])
     job_ids_for_meeting = list(routed_jobs)
 
@@ -915,10 +1002,14 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
         elif c["claim_type"] in ("commitment", "status_update", "condition_observed"):
             pay_app_unmatched_count += 1
 
+    # Gate 2A.6 — load recent corrections and feed them as context.
+    corrections = _load_recent_corrections(limit=20)
+
     # The Opus reconciler call.
     llm_output = _reconciler_call(
         meeting, claims, existing_items, pay_lines_by_id, subs_by_id, cost_tracker,
         prior_attempt_issues=prior_attempt_issues,
+        corrections=corrections,
     )
 
     # Build a claim-id-keyed map for quick lookup
@@ -989,10 +1080,12 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
 
         # CREATE
         hid = _next_human_id(job_id, "item")
+        # Gate 2A.6 — current PM via job_pm_assignments (job-routed, not meeting-fixed)
+        current_pm = _get_current_pm(job_id) or meeting.get("pm_id")
         new_row = {
             "human_readable_id":     hid,
             "job_id":                job_id,
-            "pm_id":                 meeting.get("pm_id"),
+            "pm_id":                 current_pm,
             "type":                  it["type"],
             "title":                 it["title"],
             "detail":                it.get("detail"),
@@ -1051,7 +1144,11 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
         questions_created += 1
 
     # Mark meeting as reconciled
-    client.table("meetings").update({"reconciled_at": _now_iso(), "reconciler_version": "1.0"}).eq("id", meeting_id).execute()
+    client.table("meetings").update({"reconciled_at": _now_iso(), "reconciler_version": "2.0-hardening"}).eq("id", meeting_id).execute()
+
+    # Gate 2A.6 — increment applied_count for corrections used in this run
+    if corrections:
+        _increment_correction_counts([c["id"] for c in corrections])
 
     # Aggregate needs_review (from LLM output + any we added)
     for n in llm_output.get("needs_review", []):
