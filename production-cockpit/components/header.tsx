@@ -38,6 +38,12 @@ export function Header() {
             Subs
           </Link>
           <Link
+            href="/schedule"
+            className="text-ink-2 hover:text-accent transition-colors"
+          >
+            Schedule
+          </Link>
+          <Link
             href="/pace"
             className="text-ink-2 hover:text-accent transition-colors"
           >
