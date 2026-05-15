@@ -591,6 +591,7 @@ def _reconciler_call(
     pay_app_lines_by_id: dict,
     subs_by_id: dict,
     cost_tracker: dict,
+    prior_attempt_issues: list[dict] | None = None,
 ) -> dict:
     """One Opus call per meeting."""
 
@@ -631,12 +632,21 @@ def _reconciler_call(
             "matched_line_item_desc": line["description"] if line else None,
         })
 
+    prior_block = ""
+    if prior_attempt_issues:
+        prior_block = (
+            "\n\nPREVIOUS ATTEMPT HAD THESE AUDIT ISSUES — fix them this time. "
+            "Re-route, re-type, or re-prioritize as needed to address each issue:\n"
+            f"{json.dumps(prior_attempt_issues, indent=2, default=str)}\n"
+        )
+
     user_msg = (
         f"MEETING:\n"
         f"  id: {meeting['id']}\n"
         f"  date: {meeting['meeting_date']}\n"
         f"  type: {meeting['meeting_type']}\n"
-        f"  primary_job_id: {meeting['job_id']}\n\n"
+        f"  primary_job_id: {meeting['job_id']}\n"
+        f"{prior_block}\n"
         f"CLAIMS ({len(claims_compact)} total):\n"
         f"{json.dumps(claims_compact, indent=2, default=str)}\n\n"
         f"EXISTING OPEN ITEMS (for dedup, may be empty):\n"
@@ -830,8 +840,11 @@ def _find_dedup_candidate(
 
 # ---------- MAIN ENTRYPOINT ----------
 
-def reconcile_meeting(meeting_id: str, dry_run: bool = False) -> dict:
-    """Reconcile one meeting's claims into items + decisions + open_questions."""
+def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issues: list[dict] | None = None) -> dict:
+    """Reconcile one meeting's claims into items + decisions + open_questions.
+
+    When `prior_attempt_issues` is provided (Decision 12 retry path), the
+    Reconciler is told what the prior attempt got wrong and asked to fix it."""
     started = time.monotonic()
     cost_tracker = {
         "opus_in": 0, "opus_out": 0, "opus_cache_read": 0, "opus_cache_create": 0,
@@ -879,6 +892,7 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False) -> dict:
     # The Opus reconciler call.
     llm_output = _reconciler_call(
         meeting, claims, existing_items, pay_lines_by_id, subs_by_id, cost_tracker,
+        prior_attempt_issues=prior_attempt_issues,
     )
 
     # Build a claim-id-keyed map for quick lookup
