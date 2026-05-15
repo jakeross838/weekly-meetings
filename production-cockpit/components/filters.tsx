@@ -32,7 +32,7 @@ export function Filters({
   }
 
   return (
-    <div className="border-b border-rule rise" style={{ animationDelay: "120ms" }}>
+    <div className="border-b border-rule">
       {/* Open / Done segmented toggle — full-width, big touch targets */}
       <div className="grid grid-cols-2 border-b border-rule">
         <ToggleBtn
@@ -43,21 +43,18 @@ export function Filters({
         <ToggleBtn
           active={view === "done"}
           onClick={() => update({ view: "done" })}
-          label="Done · this week"
+          label="Done This Week"
           divider
         />
       </div>
 
       {/* PM pill row */}
-      <div className="px-5 py-3">
-        <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground mb-2">
-          PM
-        </p>
+      <div className="px-5 py-3.5">
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
           <Pill
             active={!selectedPm}
             onClick={() => update({ pm: null, job: null })}
-            label="All"
+            label="All PMs"
           />
           {pms.map((p) => (
             <Pill
@@ -70,17 +67,14 @@ export function Filters({
         </div>
       </div>
 
-      {/* Job pill row — only when something to filter by */}
-      {jobs.length > 0 && (
+      {/* Job pill row — only when a PM is selected (avoids the 11-job blast) */}
+      {selectedPm && jobs.length > 0 && (
         <div className="px-5 py-3 border-t border-rule">
-          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground mb-2">
-            Job
-          </p>
           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
             <Pill
               active={!selectedJob}
               onClick={() => update({ job: null })}
-              label="All"
+              label="All jobs"
             />
             {jobs.map((j) => (
               <Pill
@@ -114,11 +108,11 @@ function ToggleBtn({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "py-3.5 font-mono text-[11px] tracking-[0.22em] uppercase transition-colors " +
+        "py-4 font-mono text-[12px] tracking-[0.18em] uppercase transition-colors " +
         (divider ? "border-l border-rule " : "") +
         (active
           ? "bg-ink text-paper"
-          : "bg-transparent text-muted-foreground hover:text-foreground")
+          : "bg-transparent text-ink-2 hover:text-ink")
       }
     >
       {label}
@@ -141,10 +135,10 @@ function Pill({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "shrink-0 px-3 py-1.5 text-sm font-medium border transition-colors " +
+        "shrink-0 px-3.5 py-2 text-[14px] font-medium border transition-colors " +
         (active
           ? "bg-ink text-paper border-ink"
-          : "bg-transparent text-foreground border-rule hover:border-foreground")
+          : "bg-transparent text-ink border-rule hover:border-ink")
       }
     >
       {label}

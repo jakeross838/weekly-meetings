@@ -6,9 +6,9 @@ interface StatsBarProps {
 
 export function StatsBar({ open, doneThisWeek, overdue }: StatsBarProps) {
   return (
-    <div className="grid grid-cols-3 border-b border-rule rise" style={{ animationDelay: "60ms" }}>
+    <div className="grid grid-cols-3 border-b border-rule bg-paper">
       <Stat label="Open" value={open} />
-      <Stat label="Done · wk" value={doneThisWeek} divider />
+      <Stat label="Done this week" value={doneThisWeek} divider />
       <Stat
         label="Overdue"
         value={overdue}
@@ -30,23 +30,22 @@ function Stat({
   divider?: boolean;
   accent?: "urgent";
 }) {
-  const display = String(value).padStart(3, "0");
   return (
     <div
       className={
-        "px-4 py-5 flex flex-col items-start " +
+        "px-4 py-6 flex flex-col items-center text-center " +
         (divider ? "border-l border-rule" : "")
       }
     >
       <span
         className={
-          "font-mono text-4xl font-medium leading-none tabular-nums " +
-          (accent === "urgent" ? "text-urgent" : "")
+          "font-mono text-5xl font-medium leading-none tabular-nums " +
+          (accent === "urgent" ? "text-urgent" : "text-ink")
         }
       >
-        {display}
+        {value}
       </span>
-      <span className="mt-2 font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">
+      <span className="mt-2 font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3">
         {label}
       </span>
     </div>

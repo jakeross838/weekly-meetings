@@ -14,13 +14,6 @@ const ACCENT_BAR: Record<string, string> = {
   NORMAL: "bg-rule",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  NOT_STARTED: "NEW",
-  IN_PROGRESS: "WIP",
-  BLOCKED: "BLK",
-  COMPLETE: "DONE",
-};
-
 export function TodoRow({
   todo,
   allowComplete,
@@ -76,88 +69,63 @@ export function TodoRow({
         (!allowComplete || pending ? " opacity-70" : "")
       }
     >
-      {/* Priority bar — 3px, full row height */}
-      <span className={`w-[3px] shrink-0 ${bar}`} aria-hidden />
+      {/* Priority bar — 4px, full row height */}
+      <span className={`w-1 shrink-0 ${bar}`} aria-hidden />
 
-      <div className="flex-1 min-w-0 px-4 py-3.5">
-        {/* Meta row: ID · status · priority */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-muted-foreground">
-            {todo.id}
-          </span>
-          <span className="font-mono text-[10px] tracking-[0.12em] text-muted-foreground">
-            ·
-          </span>
-          <span className="font-mono text-[10px] tracking-[0.12em] text-muted-foreground">
-            {STATUS_LABEL[todo.status] ?? todo.status}
-          </span>
-          {priority === "URGENT" && (
-            <span className="ml-auto font-mono text-[10px] tracking-[0.18em] uppercase text-urgent">
-              Urgent
-            </span>
-          )}
-          {priority === "HIGH" && (
-            <span className="ml-auto font-mono text-[10px] tracking-[0.18em] uppercase text-high">
-              High
-            </span>
-          )}
-        </div>
-
-        {/* Title — uses edited_title when present */}
-        <p className="text-[15px] leading-snug text-foreground line-clamp-3">
+      <div className="flex-1 min-w-0 px-5 py-4">
+        {/* Title — large, readable */}
+        <p className="text-[17px] leading-snug text-ink">
           {displayTitle}
         </p>
 
-        {/* Sub chip — tappable when the todo is linked to a known sub */}
+        {/* Sub chip — quiet, only if linked */}
         {todo.sub && (
           <Link
             href={`/sub/${todo.sub.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="mt-2 inline-flex items-center gap-1.5 px-1.5 py-0.5 bg-paper border border-rule text-[11px] hover:border-ink transition-colors"
+            className="mt-2 inline-flex items-center gap-2 px-2 py-1 bg-paper border border-rule text-[12px] hover:border-ink transition-colors"
           >
-            <span className="font-medium text-ink truncate max-w-[180px]">
+            <span className="font-medium text-ink truncate max-w-[200px]">
               {todo.sub.name}
             </span>
-            {todo.sub.trade && (
-              <>
-                <span className="text-ink-3">·</span>
-                <span className="font-mono text-[10px] text-ink-3 uppercase tracking-wide">
-                  {todo.sub.trade}
-                </span>
-              </>
-            )}
             {todo.sub.rating != null && (
-              <span className="font-mono text-[10px] text-high tabular-nums ml-0.5">
+              <span className="font-mono text-[11px] text-high tabular-nums">
                 {todo.sub.rating.toFixed(1)}★
               </span>
             )}
           </Link>
         )}
 
-        {/* Footer: job · due date · relative */}
-        <div className="mt-2 flex items-center justify-between gap-3 font-mono text-[11px] text-muted-foreground tabular-nums">
-          <span className="truncate">{todo.job}</span>
+        {/* Meta row: job · due · priority tag · actions */}
+        <div className="mt-2.5 flex items-center flex-wrap gap-x-3 gap-y-1.5 font-mono text-[12px] text-ink-3 tabular-nums">
+          <span className="text-ink-2">{todo.job}</span>
           {todo.due_date && (
             <span className={isOverdue ? "text-urgent" : ""}>
-              {shortDate(todo.due_date)} · {relativeOffset(todo.due_date)}
+              due {shortDate(todo.due_date)} · {relativeOffset(todo.due_date)}
             </span>
           )}
-        </div>
-
-        {/* Actions: Edit (always) + Undo (Done view only) + edited tag */}
-        <div
-          className="mt-2 flex items-center gap-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <EditTodo todoId={todo.id} initialTitle={displayTitle} />
-          {!allowComplete && todo.status === "COMPLETE" && (
-            <UndoButton todoId={todo.id} completedAt={todo.completed_at} />
+          {priority === "URGENT" && (
+            <span className="uppercase tracking-[0.15em] text-urgent">
+              Urgent
+            </span>
+          )}
+          {priority === "HIGH" && (
+            <span className="uppercase tracking-[0.15em] text-high">
+              High
+            </span>
           )}
           {todo.edited_at && (
-            <span className="font-mono text-[10px] tracking-[0.12em] text-ink-3 ml-auto">
-              edited
-            </span>
+            <span className="text-ink-3 italic">edited</span>
           )}
+          <span
+            className="ml-auto flex items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EditTodo todoId={todo.id} initialTitle={displayTitle} />
+            {!allowComplete && todo.status === "COMPLETE" && (
+              <UndoButton todoId={todo.id} completedAt={todo.completed_at} />
+            )}
+          </span>
         </div>
       </div>
     </div>

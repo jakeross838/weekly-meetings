@@ -95,3 +95,5 @@ production-cockpit/node_modules/
 production-cockpit/.next/
 production-cockpit/.env.local
 production-cockpit/.env*.local
+
+.vercel

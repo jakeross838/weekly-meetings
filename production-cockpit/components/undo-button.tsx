@@ -50,7 +50,7 @@ export function UndoButton({
         undo();
       }}
       disabled={pending}
-      className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 hover:text-ink disabled:opacity-50"
+      className="font-mono text-[12px] tracking-[0.15em] uppercase text-ink-2 hover:text-ink disabled:opacity-50 px-2 py-1"
     >
       Undo
     </button>

@@ -158,33 +158,25 @@ export default async function Page({
               />
             ))}
           {todos.length === 0 && (
-            <div className="px-5 py-16 text-center">
-              <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-muted-foreground">
-                {view === "open" ? "Inbox zero" : "Nothing closed this week"}
+            <div className="px-5 py-20 text-center">
+              <p className="font-head text-xl text-ink-3">
+                {view === "open" ? "Nothing open" : "Nothing closed this week"}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer — brand mark + drafting-stock metadata strip */}
-      <footer className="mt-6 px-5 py-6 border-t border-rule bg-sand-2/40">
-        <div className="flex items-center gap-3 text-ink">
-          <RossBuiltMark size={20} className="opacity-80" />
-          <div className="flex-1 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 leading-tight">
-            <div className="text-ink">Ross Built · PD Cockpit</div>
-            <div>
-              Last sync ·{" "}
-              {new Date().toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </div>
-          </div>
-          <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
-            v2.0
-          </div>
-        </div>
+      {/* Footer — minimal brand + timestamp */}
+      <footer className="mt-8 px-5 py-6 border-t border-rule bg-sand-2/40 flex items-center justify-center gap-2.5 text-ink-3">
+        <RossBuiltMark size={18} className="opacity-70" />
+        <span className="font-mono text-[11px] tracking-[0.18em] uppercase">
+          Ross Built · Updated{" "}
+          {new Date().toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+        </span>
       </footer>
     </main>
   );
