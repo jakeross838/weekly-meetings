@@ -493,6 +493,30 @@ Use needs_review for claims where:
 - the title would be misleading or you can't write a faithful one
 - the speaker said something contradicting an existing item AND it's not clear which is current
 
+# ACTIONABILITY (Gate 2A.5 — STRICT)
+
+For each item you create or update, set `actionability` to one of:
+
+- **`actionable`** — the item has ALL THREE of:
+  1. **Specific actor**: a named sub (sub_id resolves) OR a named person (owner = "Lee Worthy", "Jake", "Bob" — NOT "we", "someone", "the team").
+  2. **Specific deliverable**: a thing with a definable "done" state. "Confirm the railing layout" is one. "Manage the situation" is not. "Order rebar for July pour" is. "Keep an eye on it" is not.
+  3. **Specific or inferable timing**: an explicit target_date (parsed), OR a relative phrase that maps to a reasonable target_date_text ("this week", "before slab pour", "next Monday"), OR tied to a known phase milestone.
+
+- **`signal`** — the item is information worth knowing but lacks ONE OR MORE of the three. Vague urges, observations about people or client dynamics, complaints with no path to resolution, ambient process risks, and topics that need awareness but no concrete action all go here.
+
+EXAMPLES:
+- "Sanger pool coping install end of next week" → **actionable** (actor: Tom Sanger; deliverable: pool coping installed; timing: end of next week)
+- "Kim ambushing site visits with FaceTime designer calls" → **signal** (no clear actor on the Ross side; no deliverable; no timing — it's a behavioral pattern to manage)
+- "Process risk: paying PO balances before final QC leaves no leverage" → **signal** (it's a concern, not an action — no actor, no deliverable, no timing)
+- "Order rebar for July pour" → **actionable** (actor: whoever the owner is; deliverable: rebar ordered; timing: before July pour)
+- "Walter Drywall coming on site next week for patches" → **actionable** (actor: Walter Drywall; deliverable: patches done; timing: next week)
+- "Jeff/Jason interpersonal conflict affecting work" → **signal** (no actor with a deliverable — a condition to manage, not an action)
+- "DB Welding: all railings on house by July 4" → **actionable** (actor: DB Welding; deliverable: railings on house; timing: July 4)
+
+**When in doubt, prefer `signal`.** The Monday document only renders actionable items in the work sections; signals are surfaced separately so the PM can decide whether to convert any of them to actions during the meeting.
+
+This applies to items only. Decisions and open_questions do not have actionability.
+
 # OUTPUT FORMAT
 
 Strict JSON. One top-level object. Every claim must end up exactly once in items/decisions/open_questions/dropped/needs_review."""
@@ -517,10 +541,12 @@ RECONCILER_OUTPUT_SCHEMA = {
                     "target_date_text":       {"anyOf": [{"type": "string"}, {"type": "null"}]},
                     "is_vague":               {"type": "boolean"},
                     "owner":                  {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                    "actionability":          {"type": "string", "enum": ["actionable", "signal"]},
                 },
                 "required": [
                     "claim_id", "decision", "existing_item_id", "type", "job_id",
                     "title", "detail", "target_date", "target_date_text", "is_vague", "owner",
+                    "actionability",
                 ],
                 "additionalProperties": False,
             },
@@ -954,6 +980,7 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
                 "type":                it["type"],
                 "sub_id":              c.get("sub_id"),
                 "pay_app_line_item_id":c.get("pay_app_line_item_id"),
+                "actionability":       it.get("actionability"),
             }
             merged = _apply_clobber_prevention(update_values, existing)
             client.table("items").update(merged).eq("id", existing["id"]).execute()
@@ -979,6 +1006,7 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
             "source_meeting_id":     meeting["id"],
             "pay_app_line_item_id":  c.get("pay_app_line_item_id"),
             "carryover_count":       0,
+            "actionability":         it.get("actionability"),
         }
         client.table("items").insert(new_row).execute()
         items_created += 1
