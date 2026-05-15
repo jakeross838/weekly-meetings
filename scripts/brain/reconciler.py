@@ -1032,7 +1032,28 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
 
     client = _supabase()
 
-    # ITEMS
+    # Gate 2B — Reconciler emits proposed_changes (NOT direct item/decision/question writes).
+    # One ingestion_event per meeting; proposed_changes rows link to it.
+    ie_resp = client.table("ingestion_events").insert({
+        "source_type":       "transcript",
+        "source_meeting_id": meeting_id,
+        "source_file_path":  meeting.get("transcript_file_path"),
+        "source_file_hash":  meeting.get("source_file_hash"),
+        "job_id":            meeting.get("job_id"),
+        "review_state":      "pending",
+        "proposed_count":    0,
+    }).execute()
+    ingestion_event_id = ie_resp.data[0]["id"]
+
+    proposed_added = 0
+    proposed_updates = 0
+    proposed_decisions = 0
+    proposed_questions = 0
+    proposed_signals = 0
+
+    items_by_existing_id = {e["id"]: e for e in existing_items}
+
+    # ITEMS (proposed)
     for it in llm_output.get("items", []):
         cid = it["claim_id"]
         c = claim_by_id.get(cid)
@@ -1049,43 +1070,12 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
             has_line=c.get("pay_app_line_item_id") is not None,
         )
 
-        # Job + PM
         job_id = it["job_id"] if it["job_id"] else c["_routed_job_id"]
+        actionability = it.get("actionability") or "actionable"
 
-        if it["decision"] == "update_existing" and it.get("existing_item_id"):
-            existing = next((e for e in existing_items if e["id"] == it["existing_item_id"]), None)
-            if existing is None:
-                needs_review.append({"claim_id": cid, "reason": f"LLM referenced unknown existing_item_id {it['existing_item_id']}"})
-                continue
-            update_values = {
-                "title":               it["title"],
-                "detail":              it.get("detail"),
-                "target_date":         target_date_iso,
-                "target_date_text":    it.get("target_date_text"),
-                "priority":            priority,
-                "confidence":          confidence,
-                "owner":               it.get("owner"),
-                "source_meeting_id":   meeting["id"],
-                "updated_at":          _now_iso(),
-                "carryover_count":     (existing.get("carryover_count") or 0) + 1,
-                "type":                it["type"],
-                "sub_id":              c.get("sub_id"),
-                "pay_app_line_item_id":c.get("pay_app_line_item_id"),
-                "actionability":       it.get("actionability"),
-            }
-            merged = _apply_clobber_prevention(update_values, existing)
-            client.table("items").update(merged).eq("id", existing["id"]).execute()
-            items_updated += 1
-            continue
-
-        # CREATE
-        hid = _next_human_id(job_id, "item")
-        # Gate 2A.6 — current PM via job_pm_assignments (job-routed, not meeting-fixed)
-        current_pm = _get_current_pm(job_id) or meeting.get("pm_id")
-        new_row = {
-            "human_readable_id":     hid,
+        proposed_item_data = {
             "job_id":                job_id,
-            "pm_id":                 current_pm,
+            "pm_id":                 _get_current_pm(job_id) or meeting.get("pm_id"),
             "type":                  it["type"],
             "title":                 it["title"],
             "detail":                it.get("detail"),
@@ -1099,12 +1089,57 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
             "source_meeting_id":     meeting["id"],
             "pay_app_line_item_id":  c.get("pay_app_line_item_id"),
             "carryover_count":       0,
-            "actionability":         it.get("actionability"),
+            "actionability":         actionability,
         }
-        client.table("items").insert(new_row).execute()
-        items_created += 1
 
-    # DECISIONS
+        if it["decision"] == "update_existing" and it.get("existing_item_id"):
+            existing = items_by_existing_id.get(it["existing_item_id"])
+            if existing is None:
+                needs_review.append({"claim_id": cid, "reason": f"LLM referenced unknown existing_item_id {it['existing_item_id']}"})
+                continue
+            # Diff proposed values against existing — only emit changed fields
+            field_changes: dict = {}
+            for field in (
+                "title", "detail", "target_date", "target_date_text", "priority",
+                "confidence", "type", "sub_id", "pay_app_line_item_id",
+                "actionability", "owner",
+            ):
+                new_val = proposed_item_data.get(field)
+                old_val = existing.get(field)
+                if new_val != old_val:
+                    field_changes[field] = {"before": old_val, "after": new_val}
+            if not field_changes:
+                continue  # exact-equal proposal — nothing to do
+            client.table("proposed_changes").insert({
+                "ingestion_event_id": ingestion_event_id,
+                "change_type":        "update_item",
+                "target_item_id":     existing["id"],
+                "field_changes":      field_changes,
+                "source_claim_ids":   [cid],
+                "confidence":         confidence,
+                "job_id":             job_id,
+                "sub_id":             c.get("sub_id"),
+            }).execute()
+            proposed_updates += 1
+            continue
+
+        # CREATE (new add_item or add_signal)
+        change_type = "add_signal" if actionability == "signal" else "add_item"
+        client.table("proposed_changes").insert({
+            "ingestion_event_id":  ingestion_event_id,
+            "change_type":         change_type,
+            "proposed_item_data":  proposed_item_data,
+            "source_claim_ids":    [cid],
+            "confidence":          confidence,
+            "job_id":              job_id,
+            "sub_id":              c.get("sub_id"),
+        }).execute()
+        if change_type == "add_signal":
+            proposed_signals += 1
+        else:
+            proposed_added += 1
+
+    # DECISIONS (proposed)
     for d in llm_output.get("decisions", []):
         cid = d["claim_id"]
         c = claim_by_id.get(cid)
@@ -1112,19 +1147,24 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
             needs_review.append({"claim_id": cid, "reason": "LLM referenced unknown claim_id (decision)"})
             continue
         job_id = d["job_id"] if d["job_id"] else c["_routed_job_id"]
-        hid = _next_human_id(job_id, "decision")
-        client.table("decisions").insert({
-            "human_readable_id":  hid,
-            "job_id":             job_id,
-            "source_meeting_id":  meeting["id"],
-            "description":        d["description"],
-            "decided_by":         d.get("decided_by"),
-            "decision_date":      _parse_target_date(d.get("decision_date")) or meeting["meeting_date"],
-            "source_claim_id":    cid,
+        proposed_decision_data = {
+            "job_id":            job_id,
+            "source_meeting_id": meeting["id"],
+            "description":       d["description"],
+            "decided_by":        d.get("decided_by"),
+            "decision_date":     _parse_target_date(d.get("decision_date")) or meeting["meeting_date"],
+            "source_claim_id":   cid,
+        }
+        client.table("proposed_changes").insert({
+            "ingestion_event_id":     ingestion_event_id,
+            "change_type":            "add_decision",
+            "proposed_decision_data": proposed_decision_data,
+            "source_claim_ids":       [cid],
+            "job_id":                 job_id,
         }).execute()
-        decisions_created += 1
+        proposed_decisions += 1
 
-    # OPEN QUESTIONS
+    # OPEN QUESTIONS (proposed)
     for q in llm_output.get("open_questions", []):
         cid = q["claim_id"]
         c = claim_by_id.get(cid)
@@ -1132,19 +1172,37 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
             needs_review.append({"claim_id": cid, "reason": "LLM referenced unknown claim_id (question)"})
             continue
         job_id = q["job_id"] if q["job_id"] else c["_routed_job_id"]
-        hid = _next_human_id(job_id, "question")
-        client.table("open_questions").insert({
-            "human_readable_id":  hid,
-            "job_id":             job_id,
-            "source_meeting_id":  meeting["id"],
-            "question":           q["question"],
-            "asked_by":           q.get("asked_by"),
-            "source_claim_id":    cid,
+        proposed_question_data = {
+            "job_id":            job_id,
+            "source_meeting_id": meeting["id"],
+            "question":          q["question"],
+            "asked_by":          q.get("asked_by"),
+            "source_claim_id":   cid,
+        }
+        client.table("proposed_changes").insert({
+            "ingestion_event_id":     ingestion_event_id,
+            "change_type":            "add_open_question",
+            "proposed_question_data": proposed_question_data,
+            "source_claim_ids":       [cid],
+            "job_id":                 job_id,
         }).execute()
-        questions_created += 1
+        proposed_questions += 1
+
+    total_proposed = proposed_added + proposed_updates + proposed_signals + proposed_decisions + proposed_questions
+
+    # Roll counts up to the ingestion_event
+    client.table("ingestion_events").update({
+        "proposed_count": total_proposed,
+    }).eq("id", ingestion_event_id).execute()
+
+    # Re-shape return-shape counters for backward compat with the runner
+    items_created = proposed_added
+    items_updated = proposed_updates
+    decisions_created = proposed_decisions
+    questions_created = proposed_questions
 
     # Mark meeting as reconciled
-    client.table("meetings").update({"reconciled_at": _now_iso(), "reconciler_version": "2.0-hardening"}).eq("id", meeting_id).execute()
+    client.table("meetings").update({"reconciled_at": _now_iso(), "reconciler_version": "2.1-diff-review"}).eq("id", meeting_id).execute()
 
     # Gate 2A.6 — increment applied_count for corrections used in this run
     if corrections:
@@ -1168,9 +1226,11 @@ def reconcile_meeting(meeting_id: str, dry_run: bool = False, prior_attempt_issu
 
     return {
         "meeting_id": meeting_id,
+        "ingestion_event_id": ingestion_event_id,
         "claims_processed": len(claims),
         "items_created": items_created,
         "items_updated": items_updated,
+        "proposed_signals": proposed_signals,
         "decisions_created": decisions_created,
         "open_questions_created": questions_created,
         "claims_dropped": dropped,
