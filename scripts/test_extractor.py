@@ -20,7 +20,7 @@ sys.path.insert(0, str(HERE / "brain"))
 from extractor import extract_claims  # noqa: E402
 
 
-OUTPUT_DIR = Path("/tmp/extractor-out")
+OUTPUT_DIR = Path("/tmp/extractor-out-v2")
 SPEND_CAP_USD = 5.00
 
 # Opus 4.7 pricing per 1M tokens: $5 input, $25 output.

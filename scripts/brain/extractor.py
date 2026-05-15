@@ -62,7 +62,7 @@ YOUR JOB: Extract every distinct CLAIM as a structured statement. A claim is any
 
 3. **Do NOT make judgments.** Do NOT decide which of two contradictory statements is correct. Record both.
 
-4. **Be CONSERVATIVE about classification.** If you cannot confidently classify a statement into one of the six claim types below, LEAVE IT OUT rather than guess. Quality matters more than quantity.
+4. **For ambiguous claims, prefer `status_update`.** If a statement is clearly a real claim but doesn't cleanly fit `commitment`, `decision`, `condition_observed`, `complaint`, or `question`, label it `status_update` rather than guessing one of the other types. `status_update` is the catch-all. Do NOT over-fire on `decision` or `question` to fit a statement that's really just informational. Pure social chitchat, filler, and inaudible crosstalk are NOT claims and should still be IGNORED entirely.
 
 5. **Preserve raw_quote verbatim from the transcript** (or the closest reasonable verbatim — the transcripts have errors). This lets reviewers audit your extraction.
 
@@ -70,19 +70,19 @@ YOUR JOB: Extract every distinct CLAIM as a structured statement. A claim is any
 
 # CLAIM TYPES
 
-- **commitment** — Someone said they or another party WILL do something. Future-tense action with an owner. Examples: "Sanger will pour Tuesday." "I'll call Tom tomorrow." "Lee said he'd send the schedule by Friday."
+- **commitment** — Someone said they or another party WILL do something. Must have a clear actor + action + (ideally) a timeframe. "Sanger will pour Tuesday." "I'll call Tom tomorrow." "Lee said he'd send the schedule by Friday." A vague aspiration ("we should do X someday", "someone needs to handle that") is NOT a commitment — no concrete actor or timeframe. If you can't say WHO is doing it, it's not a commitment.
 
-- **decision** — A choice was made between alternatives, or a direction was settled. Examples: "We're going with Progressive for the bug screens." "Owner approved the change order." "Decided to delay drywall until after framing punch is complete."
+- **decision** — REQUIRES that alternatives were being considered and one was chosen. The decision must involve picking between options — implicit or explicit. "We're going with Progressive for the bug screens after looking at Phantom" = decision (chose Progressive over Phantom). "Owner approved the change order" = decision (yes vs no). "We're going to leave it as regular siding rather than build picture frame casing" = decision (chose leave-as-is over build-up). **MERE IDENTIFICATION of who or what is NOT a decision** — "Derek is our garage door guy" / "the vendor is X" / "Jeff is starting Monday" are `status_update`, not `decision`. If you cannot articulate the alternatives that were on the table, it's not a decision.
 
-- **condition_observed** — A speaker reported a state of the world or site condition. Examples: "The slab is poured." "There's a leak in the basement." "Sub finished tile in master bath." NOT progress reporting on Ross Built's work — that's status_update.
+- **condition_observed** — A factual statement about something seen, measured, or delivered on site or in materials. No judgment. No commitment. No progress reporting. "The slab is poured." "There's a leak in the basement." "The toilet supply line measured 0.5 inches off center." "Sub finished tile in master bath." If the statement carries an emotional or evaluative component (frustration, dissatisfaction) → `complaint`. If it's about active Ross Built work-in-flight → `status_update`.
 
-- **status_update** — Progress reporting on Ross Built work that's in-flight. Examples: "Framing is about 60% done." "We're behind on tile by a week." "Permit application is still in review." Distinct from condition_observed in that it tracks WORK PROGRESS, not site state.
+- **status_update** — Where things stand RIGHT NOW. Progress reports, who is doing what, where things are in the process, vendor and contact identifications. Examples: "Framing is about 60% done." "Miguel's siding will be done in the next week." "Derek is our garage door vendor." "Permit application is still in review." "Zach said the elevator crew is working on the install this week." **This is the CATCH-ALL. When in doubt between `status_update` and any other type, prefer `status_update`.**
 
-- **question** — A speaker asked a question. Often unanswered in the transcript. Examples: "Did Sanger ever show up Monday?" "When does drywall start?"
+- **question** — REQUIRES that the claim is an actual UNRESOLVED question — the speaker is genuinely seeking information that hasn't been provided in the same passage. "Did Sanger ever show up Monday?" (no answer follows in transcript) = question. "When does drywall start?" (no immediate answer) = question. **Rhetorical statements, declarative observations phrased with rising tone, and complaints framed as questions are NOT questions.** If the speaker is making a point or expressing disapproval rather than seeking information, it's not a question. Observations like "Jake noted Jason overcomplicates work" are `condition_observed` or `complaint`, not `question`, no matter how the phrasing tilts.
 
-- **complaint** — A speaker expressed dissatisfaction, frustration, or escalation. Examples: "Sanger has missed three commitments in a row." "The client is unhappy with the appliance install."
+- **complaint** — Someone expressed dissatisfaction, frustration, or escalation about a person, sub, condition, or process. The distinguishing feature is an EMOTIONAL or EVALUATIVE component. "Sanger has missed three commitments in a row, this is getting old" = complaint. "Sanger missed Tuesday" (bare fact) = `condition_observed` or `status_update`. Look for evaluative language ("ridiculous", "we keep waiting", "they always", "I'm frustrated") or escalation framing.
 
-If a statement is purely social ("hey how's it going"), purely filler ("uh yeah"), or off-topic chitchat, IGNORE it. Same for crosstalk where you can't tell who's speaking or what's being said.
+**Fallback rule:** If a real claim cannot be confidently classified into one of the other five types after careful consideration, label it `status_update`. Better to mislabel a borderline claim as `status_update` than to over-fire on `decision` (when no choice was made) or `question` (when no information is being sought). This fallback applies ONLY to actual claims — pure social chitchat, filler ("uh yeah"), and inaudible crosstalk should still be IGNORED entirely.
 
 # KNOWN SPEAKERS
 
@@ -116,7 +116,7 @@ If the subject is genuinely unclear, set it to null.
 
 Strict JSON matching the supplied schema. One claim per discrete statement. Order claims by their position in the transcript (earliest first).
 
-When in doubt, leave it out."""
+When in doubt between two claim types, prefer `status_update`. When in doubt whether something is a claim at all, leave it out."""
 
 
 CLAIMS_SCHEMA = {
