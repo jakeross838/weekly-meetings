@@ -50,6 +50,7 @@ export default async function Page({
     pmsRes,
     todosRes,
     completedRes,
+    allJobsRes,
   ] = await Promise.all([
     supabase
       .from("todos")
@@ -85,22 +86,33 @@ export default async function Page({
       if (selectedJob) q = q.eq("job", selectedJob);
       return q;
     })(),
+    // Distinct (pm_id, job) pairs across ALL open todos — populates the Job
+    // pill row consistently regardless of which view (open/done/selections)
+    // is active. Otherwise picking Selections would hide jobs that have no
+    // current selection items, even though those jobs DO exist.
+    supabase
+      .from("todos")
+      .select("pm_id, job")
+      .in("status", OPEN_STATUSES as Status[])
+      .not("job", "is", null),
   ]);
 
   const pms = (pmsRes.data ?? []) as PM[];
   const todos = (todosRes.data ?? []) as Todo[];
   const recentlyCompleted = (completedRes.data ?? []) as Todo[];
+  const allJobRows = (allJobsRes.data ?? []) as { pm_id: string; job: string }[];
   const pmNames: Record<string, string> = Object.fromEntries(
     pms.map((p) => [p.id, p.full_name])
   );
 
-  // Job dropdown options for the currently selected PM (or all if no PM)
+  // Job filter list — pulled from ALL open todos (not view-scoped) so the
+  // job pills are stable across Open/Selections/Done.
   const jobsForFilter = Array.from(
     new Set(
       (selectedPm
-        ? todos.filter((t) => t.pm_id === selectedPm)
-        : todos
-      ).map((t) => t.job)
+        ? allJobRows.filter((r) => r.pm_id === selectedPm)
+        : allJobRows
+      ).map((r) => r.job)
     )
   ).sort();
 

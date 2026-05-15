@@ -55,7 +55,10 @@ export function Filters({
       </div>
 
       {/* PM pill row */}
-      <div className="px-5 py-3.5">
+      <div className="px-5 py-3">
+        <p className="text-[11px] tracking-[0.18em] uppercase text-ink-3 font-medium mb-2">
+          PM
+        </p>
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
           <Pill
             active={!selectedPm}
@@ -73,9 +76,13 @@ export function Filters({
         </div>
       </div>
 
-      {/* Job pill row — only when a PM is selected (avoids the 11-job blast) */}
-      {selectedPm && jobs.length > 0 && (
+      {/* Job pill row — always visible when jobs exist, narrows to the
+          selected PM's jobs when one is picked. */}
+      {jobs.length > 0 && (
         <div className="px-5 py-3 border-t border-rule">
+          <p className="text-[11px] tracking-[0.18em] uppercase text-ink-3 font-medium mb-2">
+            Job
+          </p>
           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
             <Pill
               active={!selectedJob}
