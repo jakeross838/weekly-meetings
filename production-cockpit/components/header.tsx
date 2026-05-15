@@ -24,18 +24,12 @@ export function Header() {
         >
           <RossBuiltLogo size={28} />
         </Link>
-        <nav className="flex items-center gap-5 sm:gap-7 text-[12px] font-medium tracking-[0.16em] uppercase">
+        <nav className="flex items-center gap-4 sm:gap-6 text-[12px] font-medium tracking-[0.16em] uppercase">
           <Link
             href="/"
             className="text-ink hover:text-accent transition-colors"
           >
             Todos
-          </Link>
-          <Link
-            href="/selections"
-            className="text-ink-2 hover:text-accent transition-colors"
-          >
-            Selections
           </Link>
           <Link
             href="/subs"
@@ -48,6 +42,12 @@ export function Header() {
             className="text-ink-2 hover:text-accent transition-colors"
           >
             Pace
+          </Link>
+          <Link
+            href="/import"
+            className="text-accent hover:text-ink transition-colors"
+          >
+            + Import
           </Link>
         </nav>
       </div>

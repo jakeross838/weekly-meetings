@@ -31,9 +31,12 @@ export default async function Page({
   const supabase = supabaseServer();
   const selectedPm = searchParams.pm ?? "";
   const selectedJob = searchParams.job ?? "";
-  const view = (searchParams.view === "done" ? "done" : "open") as
-    | "open"
-    | "done";
+  const view: "open" | "done" | "selections" =
+    searchParams.view === "done"
+      ? "done"
+      : searchParams.view === "selections"
+        ? "selections"
+        : "open";
 
   const monday = isoMondayUtc();
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -160,7 +163,11 @@ export default async function Page({
           {todos.length === 0 && (
             <div className="px-5 py-20 text-center">
               <p className="font-head text-xl text-ink-3">
-                {view === "open" ? "Nothing open" : "Nothing closed this week"}
+                {view === "open"
+                  ? "Nothing open"
+                  : view === "selections"
+                    ? "No outstanding selections"
+                    : "Nothing closed this week"}
               </p>
             </div>
           )}
@@ -184,17 +191,18 @@ export default async function Page({
 
 function buildTodoQuery(
   supabase: ReturnType<typeof supabaseServer>,
-  view: "open" | "done",
+  view: "open" | "done" | "selections",
   pm: string,
   job: string
 ) {
-  // Embed the linked sub so the row can render trade + rating without a
-  // second round-trip. Supabase resolves the FK via the column name `sub_id`.
   let q = supabase
     .from("todos")
     .select("*, sub:subs(id, name, trade, rating, reliability_pct)");
   if (view === "open") {
     q = q.in("status", OPEN_STATUSES as Status[]);
+  } else if (view === "selections") {
+    // Same status filter as Open, but narrowed to category=SELECTION.
+    q = q.in("status", OPEN_STATUSES as Status[]).eq("category", "SELECTION");
   } else {
     q = q.eq("status", "COMPLETE").gte("completed_at", isoMondayUtc());
   }
