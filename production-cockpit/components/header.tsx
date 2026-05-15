@@ -1,41 +1,58 @@
 import Link from "next/link";
 import { RossBuiltLogo } from "./logo";
 
+/**
+ * Header pulled toward rossbuilt.com's style: paper-white surface, stone-blue
+ * brand mark, generous whitespace, sans-serif nav with tracked uppercase.
+ * No more drafting-stock ink stripe — the brand color sits on white.
+ */
 export function Header() {
   const today = new Date();
   const stamp = today.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
+    year: "numeric",
   });
 
   return (
-    <header className="bg-ink text-paper">
-      {/* Brand stripe — slate ink with logo + nav */}
-      <div className="px-5 py-3.5 flex items-center justify-between gap-3 border-b border-ink">
-        <Link href="/" className="shrink-0">
-          <RossBuiltLogo size={24} className="text-paper" />
+    <header className="bg-paper border-b border-rule">
+      <div className="px-6 lg:px-10 py-5 flex items-center justify-between gap-6">
+        <Link
+          href="/"
+          className="shrink-0 text-ink hover:text-accent transition-colors"
+        >
+          <RossBuiltLogo size={28} />
         </Link>
-        <nav className="flex items-center gap-4 font-mono text-[11px] tracking-[0.18em] uppercase">
-          <Link href="/" className="text-paper hover:text-paper/80">
+        <nav className="flex items-center gap-5 sm:gap-7 text-[12px] font-medium tracking-[0.16em] uppercase">
+          <Link
+            href="/"
+            className="text-ink hover:text-accent transition-colors"
+          >
             Todos
           </Link>
-          <Link href="/selections" className="text-paper/70 hover:text-paper">
+          <Link
+            href="/selections"
+            className="text-ink-2 hover:text-accent transition-colors"
+          >
             Selections
           </Link>
-          <Link href="/subs" className="text-paper/70 hover:text-paper">
+          <Link
+            href="/subs"
+            className="text-ink-2 hover:text-accent transition-colors"
+          >
             Subs
           </Link>
-          <Link href="/pace" className="text-paper/70 hover:text-paper">
+          <Link
+            href="/pace"
+            className="text-ink-2 hover:text-accent transition-colors"
+          >
             Pace
           </Link>
         </nav>
       </div>
-      {/* Date — quiet, on sand. No "Sheet · PROD-01" decoration. */}
-      <div className="px-5 py-3 bg-background border-b border-rule text-center">
-        <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-3">
-          {stamp}
-        </span>
+      <div className="px-6 lg:px-10 pb-4 text-[12px] tracking-[0.18em] uppercase text-ink-3 font-medium">
+        {stamp}
       </div>
     </header>
   );

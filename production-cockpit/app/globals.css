@@ -14,6 +14,7 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-accent: var(--accent);
+  --color-gold: var(--gold);
   --color-urgent: var(--urgent);
   --color-high: var(--high);
   --color-success: var(--success);
@@ -24,55 +25,52 @@
   --font-mono: var(--font-mono), ui-monospace, Menlo, monospace;
 }
 
-/* Ross Built palette — mirrors monday-binder/assets/nightwork-tokens.css
-   so the cockpit and the meeting-prep PDFs share one visual identity.
-   slate-tile + stone-blue + white-sand · drafting-stock feel. */
+/* Ross Built v3 palette — pulled from rossbuilt.com itself.
+   Cool off-white background (less sand-warm than v2). Stone blue is the
+   brand color. Gold is the metallic accent (hardware in their portfolio).
+   Whitespace-forward, no grid pattern. */
 :root {
-  --sand:    #F7F5EC;   /* page background */
-  --sand-2:  #EFE9D9;   /* soft fill / muted bg */
-  --paper:   #FFFFFF;   /* high-contrast surfaces */
+  /* Page surface */
+  --paper:    #FFFFFF;
+  --background: #FAFAF7;   /* cool off-white — primary surface */
+  --sand:     #F4F1EB;     /* warmer fill used sparingly */
+  --sand-2:   #EEE9DF;     /* faint inset */
 
-  --ink:     #3B5864;   /* primary ink — slate */
-  --ink-2:   #557382;   /* secondary text */
-  --ink-3:   #7C95A1;   /* tertiary / muted labels */
+  /* Stone-blue ink (the brand color) */
+  --ink:      #3B5864;     /* primary text, brand */
+  --ink-2:    #5B7383;
+  --ink-3:    #8A9AA5;
 
-  --accent:  #5B8699;   /* stone — links, accents */
-  --rule:    #C9C0A8;   /* drafting-stock line */
-  --rule-soft: #DCD3BC; /* faint divider */
+  /* Stone accent for links/active states */
+  --accent:   #5B8699;
 
-  /* Semantic — warm ochre / rust / forest range */
-  --urgent:  #A14F3D;   /* rust (danger) */
-  --high:    #B57F3D;   /* warm ochre (warn) */
-  --success: #2F5E3A;   /* forest */
-  --info:    #4D6F8A;
+  /* Gold — Ross Built's metallic accent (kitchen hardware, pendant lights) */
+  --gold:     #B08D57;
 
-  --background: var(--sand);
+  /* Hairlines — cooler, lighter than v2's drafting-tan */
+  --rule:     #E2DFD9;
+  --rule-soft: #EDEBE5;
+
+  /* Semantic */
+  --urgent:   #A14F3D;
+  --high:     #B57F3D;
+  --success:  #3F7A4D;
+  --info:     #4D6F8A;
+
   --foreground: var(--ink);
   --muted: var(--sand-2);
   --muted-foreground: var(--ink-3);
 }
 
-/* Subtle drafting-paper grid — very faint, large pitch */
+/* No drafting grid — pure cool off-white surface, matching the
+   spacious editorial feel of rossbuilt.com. */
 body {
-  background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--rule-soft) 60%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--rule-soft) 60%, transparent) 1px, transparent 1px);
-  background-size: 56px 56px;
-  background-position: 0 0;
+  background-color: var(--background);
 }
 
 ::selection {
   background: var(--ink);
-  color: var(--sand);
-}
-
-/* Stagger reveal on mount */
-@keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.rise {
-  animation: rise 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  color: var(--paper);
 }
 
 /* Tap-to-complete slide-out */
@@ -87,12 +85,13 @@ body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Square corners — drafting-stock feel from the binder PDFs */
-button, input, select { border-radius: 0; }
+/* Square corners on form controls; everything else can have a subtle radius
+   for the modern luxury feel. */
+input, select, textarea { border-radius: 0; }
+button { border-radius: 0; }
 
-/* Explicit utility rules — pinned outside @layer so Tailwind v4's content
-   scanner can't drop them. These are the brand classes the cockpit relies
-   on; defining them as plain CSS guarantees they ship to production. */
+/* Explicit utility rules — pinned as plain CSS so Tailwind v4's content
+   scanner cannot tree-shake the brand classes. */
 .bg-paper          { background-color: var(--paper); }
 .bg-paper\/30      { background-color: color-mix(in oklab, var(--paper) 30%, transparent); }
 .bg-sand           { background-color: var(--sand); }
@@ -113,8 +112,14 @@ button, input, select { border-radius: 0; }
 .bg-high           { background-color: var(--high); }
 .bg-success        { background-color: var(--success); }
 .bg-ink            { background-color: var(--ink); }
+.bg-accent         { background-color: var(--accent); }
 .text-paper        { color: var(--paper); }
 .text-paper\/70    { color: color-mix(in oklab, var(--paper) 70%, transparent); }
+.text-paper\/80    { color: color-mix(in oklab, var(--paper) 80%, transparent); }
 .text-sand         { color: var(--sand); }
 .text-rule         { color: var(--rule); }
+.text-gold         { color: var(--gold); }
+.text-accent       { color: var(--accent); }
 .border-ink        { border-color: var(--ink); }
+.border-gold       { border-color: var(--gold); }
+.border-accent     { border-color: var(--accent); }
