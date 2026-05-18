@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
+import { getActor } from "@/lib/actor";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export async function POST(
 ) {
   const { item_id } = params;
   const supabase = supabaseServer();
+  const actor = getActor(req);
 
   let body: { completion_basis?: string } = {};
   try {
@@ -38,7 +40,7 @@ export async function POST(
       status: "complete",
       completed_at: new Date().toISOString(),
       previous_status: prevStatus,
-      completed_by: "jake",
+      completed_by: actor,
       completion_basis: body.completion_basis ?? "manual",
       manually_edited_at: new Date().toISOString(),
       manually_edited_fields: meFields,

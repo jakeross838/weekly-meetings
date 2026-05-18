@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
+import { getActor } from "@/lib/actor";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export async function POST(
 ) {
   const { ingestion_event_id } = params;
   const supabase = supabaseServer();
+  const actor = getActor(req);
 
   let body: { decisions: Decision[] };
   try {
@@ -239,7 +241,7 @@ export async function POST(
           }),
           after_value: JSON.stringify({ edited: d.edited_data }),
           correction_reason: "human edited before accept",
-          corrected_by: "jake",
+          corrected_by: actor,
           context: {
             ingestion_event_id,
             proposed_change_id: change.id,
@@ -281,7 +283,7 @@ export async function POST(
     .update({
       review_state: finalState,
       reviewed_at: new Date().toISOString(),
-      reviewed_by: "jake",
+      reviewed_by: actor,
       accepted_count: acceptedCount,
       rejected_count: rejectedCount,
       edited_count: editedCount,

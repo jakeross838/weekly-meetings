@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
+import { getActor } from "@/lib/actor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export async function POST(
 ) {
   const { item_id } = params;
   const supabase = supabaseServer();
+  const actor = getActor(req);
 
   let body: { proposed_target_date?: string; proposed_target_date_text?: string; proposed_sub_id?: string } = {};
   try {
@@ -50,7 +52,7 @@ export async function POST(
       job_id: item.job_id,
       review_state: "pending",
       proposed_count: 1,
-      ingested_by: "jake",
+      ingested_by: actor,
       notes: `convert-to-action for ${item.human_readable_id}`,
     })
     .select("id")
