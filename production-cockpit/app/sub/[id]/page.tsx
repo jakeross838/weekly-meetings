@@ -10,6 +10,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
 import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
+import { CategoryFilterPills } from "@/components/category-filter-pills";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,12 @@ function daysBetween(a: string, b: string): number {
 
 export default async function SubPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { cat?: string };
 }) {
+  const catFilter = searchParams.cat ?? null;
   const supabase = supabaseServer();
 
   const [subRes, openRes, doneRes, manualSpecRes] = await Promise.all([
@@ -156,6 +160,12 @@ export default async function SubPage({
   }
 
   const openTodos = (openRes.data ?? []) as Todo[];
+  const availableCategories = Array.from(
+    new Set(openTodos.map((t) => t.category).filter(Boolean) as string[])
+  ).sort();
+  const filteredOpenTodos = catFilter
+    ? openTodos.filter((t) => t.category === catFilter)
+    : openTodos;
   const doneTodos = (doneRes.data ?? []) as Todo[];
 
   const today = todayIso();
@@ -374,15 +384,25 @@ export default async function SubPage({
       </section>
 
       {/* Open items */}
-      <section className="px-5 pt-10">
+      <CategoryFilterPills
+        basePath={`/sub/${params.id}`}
+        activeCategory={catFilter}
+        availableCategories={availableCategories}
+      />
+      <section className="px-5 pt-6">
         <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Open · {openTodos.length}
+          Open · {filteredOpenTodos.length}
+          {catFilter && (
+            <span className="text-ink-3"> of {openTodos.length}</span>
+          )}
         </h2>
-        {openTodos.length === 0 ? (
-          <p className="text-ink-3 text-sm">None open.</p>
+        {filteredOpenTodos.length === 0 ? (
+          <p className="text-ink-3 text-sm">
+            {catFilter ? `No ${catFilter} items.` : "None open."}
+          </p>
         ) : (
           <ul className="space-y-2">
-            {openTodos.map((t) => {
+            {filteredOpenTodos.map((t) => {
               const isPastDue =
                 t.due_date != null && t.due_date < today;
               return (

@@ -12,6 +12,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
+import { CategoryFilterPills } from "@/components/category-filter-pills";
 
 export const dynamic = "force-dynamic";
 
@@ -61,10 +62,13 @@ function dayLabel(iso: string, today: string): string {
 
 export default async function V2JobPage({
   params,
+  searchParams,
 }: {
   params: { job_id: string };
+  searchParams: { cat?: string };
 }) {
   const { job_id } = params;
+  const catFilter = searchParams.cat ?? null;
   const supabase = supabaseServer();
 
   // First fetch the job so we know its display name (todos.job uses
@@ -209,7 +213,13 @@ export default async function V2JobPage({
     is_signal: false,
   }));
 
-  const actionable = [...itemRows, ...todoRows].filter((r) => !r.is_signal);
+  const allActionable = [...itemRows, ...todoRows].filter((r) => !r.is_signal);
+  const availableCategories = Array.from(
+    new Set(allActionable.map((r) => r.category).filter(Boolean) as string[])
+  ).sort();
+  const actionable = catFilter
+    ? allActionable.filter((r) => r.category === catFilter)
+    : allActionable;
 
   const today = todayIso();
   const in7 = inDaysIso(7);
@@ -293,8 +303,16 @@ export default async function V2JobPage({
         </div>
       </header>
 
+      <CategoryFilterPills
+        basePath={`/v2/job/${job_id}`}
+        activeCategory={catFilter}
+        availableCategories={availableCategories}
+      />
+
       {actionable.length === 0 && (
-        <p className="px-5 pt-8 text-ink-3 text-sm">All clear.</p>
+        <p className="px-5 pt-8 text-ink-3 text-sm">
+          {catFilter ? `No ${catFilter} items.` : "All clear."}
+        </p>
       )}
 
       <Section title="Today" rows={todayRows} today={today} subs={subs} highlight />

@@ -88,6 +88,8 @@ interface ExtractedItem {
   job: string;
   priority: "URGENT" | "HIGH" | "NORMAL";
   due_date: string | null;
+  suggested_due_date?: string | null;
+  suggested_due_date_reason?: string | null;
   category: string;
   type: string;
   source_excerpt?: string | null;
@@ -112,6 +114,8 @@ interface RowState {
   enabled: boolean;
   title: string;
   due_date: string | null;
+  suggested_due_date: string | null;
+  suggested_due_date_reason: string | null;
   sub_id: string | null;
   sub_name: string | null;
   category: string;
@@ -232,6 +236,8 @@ export function ImportForm({
             enabled: true,
             title: item.title,
             due_date: item.due_date,
+            suggested_due_date: item.suggested_due_date ?? null,
+            suggested_due_date_reason: item.suggested_due_date_reason ?? null,
             sub_id: g.sub_id,
             sub_name: g.sub_name,
             category: item.category,
@@ -445,6 +451,23 @@ export function ImportForm({
                                   className="bg-paper border border-rule px-2 py-1 text-xs text-ink focus:outline-none focus:border-ink"
                                   aria-label="Due date"
                                 />
+                                {!row.due_date && row.suggested_due_date && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRow(key, {
+                                        due_date: row.suggested_due_date,
+                                      })
+                                    }
+                                    title={
+                                      row.suggested_due_date_reason ??
+                                      "AI suggestion"
+                                    }
+                                    className="text-xs px-2 py-1 border border-accent/40 bg-accent/5 text-accent hover:bg-accent hover:text-paper transition-colors"
+                                  >
+                                    ✨ use {row.suggested_due_date}
+                                  </button>
+                                )}
                                 <select
                                   value={row.sub_id ?? ""}
                                   onChange={(e) => {

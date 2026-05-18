@@ -11,6 +11,12 @@ interface ExtractedItem {
   job: string;
   priority: "URGENT" | "HIGH" | "NORMAL";
   due_date: string | null;
+  // AI-suggested fallback due date for open-ended items (when due_date is
+  // null). Populated for every item with a defensible estimate based on
+  // priority + category. The UI shows it as a one-click "use this" hint
+  // next to the empty date field — never auto-applied.
+  suggested_due_date: string | null;
+  suggested_due_date_reason: string | null;
   category:
     | "SELECTION"
     | "SCHEDULE"
@@ -81,6 +87,8 @@ Read the transcript. Return a JSON object with this exact shape:
       "job": "<job name — Fish, Krauss, Markgraf, Pou, Dewberry, Drummond, Molinari, Ruthven, Biales, Harllee, Clark, Johnson, etc.>",
       "priority": "URGENT" | "HIGH" | "NORMAL",
       "due_date": "<YYYY-MM-DD or null>",
+      "suggested_due_date": "<YYYY-MM-DD — your best-guess fallback even when due_date is null>",
+      "suggested_due_date_reason": "<≤80 chars explaining why this date>",
       "category": "SELECTION|SCHEDULE|PROCUREMENT|SUB-TRADE|CLIENT|QUALITY|BUDGET|ADMIN",
       "type": "SELECTION|CONFIRMATION|PRICING|SCHEDULE|CO_INVOICE|FIELD|FOLLOWUP",
       "source_excerpt": "<≤200 chars verbatim transcript snippet that grounds this item>"
@@ -99,7 +107,19 @@ AUTO-MATCH RULES (do these before emitting any item):
    - "by next week" / "early next week" → meeting_date + 7 days
    - "by end of month" → last day of meeting_date's month
    - "by [Month] [Day]" → resolve to YYYY-MM-DD using meeting_date's year (or next year if the date already passed)
-   Return YYYY-MM-DD. Leave null only if the transcript is genuinely open-ended.
+   Return YYYY-MM-DD in due_date. Leave due_date null only if the transcript is genuinely open-ended.
+
+   SUGGESTED FALLBACK (suggested_due_date) — ALWAYS populate this, even when
+   due_date is set. When due_date has a value, suggested_due_date should
+   equal it. When due_date is null, infer a sensible fallback from priority
+   + category (each builds off meeting_date ${meetingDate}):
+     • URGENT → meeting_date + 3 days
+     • HIGH → meeting_date + 7 days
+     • NORMAL + SELECTION/CLIENT → meeting_date + 14 days
+     • NORMAL + SCHEDULE/PROCUREMENT/SUB-TRADE/QUALITY → meeting_date + 10 days
+     • NORMAL + BUDGET/ADMIN → meeting_date + 21 days
+   Write a short suggested_due_date_reason (≤80 chars) explaining the pick,
+   e.g. "urgent — 3-day buffer" or "no explicit date, NORMAL procurement default".
 
 3. CATEGORY INFERENCE — pick the most specific:
    - SELECTION = waiting on client/designer choice (colors, fixtures, finishes, hardware, paint specs)
