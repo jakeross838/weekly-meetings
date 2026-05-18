@@ -3,6 +3,7 @@
 // Reads jobs + pms server-side, renders a form. Client component handles
 // the file upload + POST to /v2/api/upload.
 
+import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { UploadForm } from "./upload-form";
@@ -30,7 +31,19 @@ export default async function UploadPage() {
           Drop a transcript
         </h1>
         <p className="mt-2 text-ink-3 text-sm">
-          Jake-only · v2 review pipeline
+          v2 review pipeline · queues the meeting for the brain to extract,
+          then you review and commit at{" "}
+          <Link href="/v2/review" className="text-accent hover:underline">
+            /v2/review
+          </Link>
+          .
+        </p>
+        <p className="mt-2 text-xs text-ink-3">
+          For the direct v1 extract (writes straight to to-dos), use{" "}
+          <Link href="/import" className="text-accent hover:underline">
+            /import
+          </Link>
+          .
         </p>
       </div>
 

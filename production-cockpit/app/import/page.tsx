@@ -31,18 +31,19 @@ export default async function ImportPage() {
     <main className="max-w-[560px] mx-auto min-h-screen bg-background">
       <Header />
       <div className="px-5 pt-8">
-        <Link
-          href="/"
-          className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink"
-        >
-          ← Back
-        </Link>
-        <h1 className="mt-4 font-head text-[28px] leading-none tracking-tight text-foreground">
+        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
           Import transcript
         </h1>
         <p className="mt-2 text-ink-3 text-sm">
-          Drop a Plaud .txt — PM, job, date, and meeting type auto-fill from the
-          filename.
+          Drop a Plaud .txt — Claude extracts action items and writes them
+          straight to the to-do tables.
+        </p>
+        <p className="mt-2 text-xs text-ink-3">
+          For the v2 review pipeline (extract → review → commit), use{" "}
+          <Link href="/v2/upload" className="text-accent hover:underline">
+            /v2/upload
+          </Link>{" "}
+          instead.
         </p>
       </div>
       <ImportForm pms={pms} jobs={jobs} assignments={assignments} />

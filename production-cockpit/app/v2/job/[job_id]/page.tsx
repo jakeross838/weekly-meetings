@@ -160,9 +160,15 @@ export default async function V2JobPage({
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
-      {/* HEADER — just job name and address. Pending-review badge if anything's queued. */}
-      <header className="px-5 pt-10 pb-6">
-        <div className="flex items-start justify-between gap-3">
+      {/* HEADER — minimal: back link, job name, address, pending-review badge. */}
+      <header className="px-5 pt-8 pb-6">
+        <Link
+          href="/"
+          className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink"
+        >
+          ← Jobs
+        </Link>
+        <div className="mt-4 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
               {job.name}
