@@ -64,6 +64,7 @@ export function BtSyncButton() {
   const [jobs, setJobs] = useState("");
   const [skipPhotos, setSkipPhotos] = useState(false);
   const [extractVision, setExtractVision] = useState(true);
+  const [headed, setHeaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [error, setError] = useState<SyncError | string | null>(null);
@@ -110,6 +111,7 @@ export function BtSyncButton() {
           jobs: jobs.trim() || undefined,
           skipPhotos,
           extractVision,
+          headed,
         }),
       });
       const data = (await r.json()) as SyncResult | SyncError;
@@ -246,6 +248,16 @@ export function BtSyncButton() {
                     className="h-4 w-4 accent-accent"
                   />
                   Run Claude vision on photos
+                </label>
+                <label className="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={headed}
+                    onChange={(e) => setHeaded(e.target.checked)}
+                    disabled={busy}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  Show browser window (debugging / MFA)
                 </label>
               </div>
 

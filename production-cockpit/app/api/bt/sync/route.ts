@@ -25,9 +25,13 @@ import { promises as fs } from "fs";
 import path from "path";
 
 export const dynamic = "force-dynamic";
-// Spawning Playwright + scraping can easily take a couple of minutes for
-// 5+ jobs. Max we can reach in dev; serverless never executes this route.
-export const maxDuration = 300;
+// Local dev only — the route refuses to run when VERCEL=1, so this
+// number is informational. Kept under 60 to avoid Vercel-plan warnings
+// during a Next.js compile if the file is ever picked up server-side.
+export const maxDuration = 60;
+// Manual timeout used for the spawned child process. Independent of
+// `maxDuration` above so we control it without tripping any Next checks.
+const CHILD_TIMEOUT_SEC = 290;
 
 const DEFAULT_SCRAPER_DIR = "C:\\Users\\Greg\\buildertrend-scraper";
 
@@ -39,6 +43,10 @@ interface SyncBody {
   skipPhotos?: boolean;
   maxPhotosPerLog?: number;
   extractVision?: boolean;
+  // Debug — when true, scraper runs with --headed so the operator can
+  // see what BT is actually showing. Required for first-time auth on
+  // MFA-protected accounts.
+  headed?: boolean;
 }
 
 function jsonError(message: string, status = 400, extra: object = {}) {
@@ -108,6 +116,7 @@ export async function POST(req: NextRequest) {
   if (jobs) args.push("--jobs", jobs);
   if (skipPhotos) args.push("--skip-photos");
   args.push("--max-photos-per-log", String(maxPhotos));
+  if (body.headed) args.push("--headed");
   // We always want logs; pass -v so the operator can see what's
   // happening in the response payload.
   args.push("-v");
@@ -138,14 +147,14 @@ export async function POST(req: NextRequest) {
     stderrBuf += chunk.toString("utf-8");
   });
 
-  // Manual timeout — kill the child if it runs past maxDuration - 10s.
+  // Manual timeout — kill the child if it runs past CHILD_TIMEOUT_SEC.
   const killTimer = setTimeout(() => {
     try {
       proc.kill();
     } catch {
       // ignore
     }
-  }, (maxDuration - 10) * 1000);
+  }, CHILD_TIMEOUT_SEC * 1000);
 
   const exitCode: number = await new Promise((resolve) => {
     proc.on("close", (code) => resolve(code ?? -1));
@@ -157,7 +166,31 @@ export async function POST(req: NextRequest) {
   const stdoutTail = redact(stdoutBuf.slice(-3000), password);
   const stderrTail = redact(stderrBuf.slice(-3000), password);
 
+  // Server-side: dump the failure to a debug file so the operator (or
+  // me, the dev) can inspect it without copy-pasting from the modal.
+  // Path is intentionally outside the cockpit repo so it doesn't trigger
+  // a Next file-watcher reload. Password is already redacted above.
   if (exitCode !== 0) {
+    try {
+      const debugPath = path.join(scraperDir, ".session", "last-failure.log");
+      await fs.mkdir(path.dirname(debugPath), { recursive: true });
+      await fs.writeFile(
+        debugPath,
+        `=== BT sync failure ${new Date().toISOString()} ===\n` +
+          `exit=${exitCode} elapsed=${Math.round(elapsedMs / 1000)}s\n\n` +
+          `--- stderr ---\n${stderrTail}\n\n` +
+          `--- stdout ---\n${stdoutTail}\n`,
+        "utf-8"
+      );
+      console.error(
+        `[bt/sync] scraper failed (exit ${exitCode}, ${Math.round(elapsedMs / 1000)}s). ` +
+          `Tail dump at ${debugPath}. stderr last 500 chars: ${stderrBuf
+            .slice(-500)
+            .replace(password, "[redacted]")}`
+      );
+    } catch (e) {
+      console.error("[bt/sync] failed to write debug dump:", e);
+    }
     return jsonError(
       `Scraper exited ${exitCode} after ${Math.round(elapsedMs / 1000)}s`,
       500,
