@@ -5,17 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const CATEGORIES = [
-  "SCHEDULE",
-  "QUALITY",
-  "PROCUREMENT",
-  "SELECTION",
-  "BUDGET",
-  "CLIENT",
-  "ADMIN",
-  "SUB-TRADE",
-];
+import { CATEGORIES } from "@/lib/categories";
 
 export interface SubOpt {
   id: string;

@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { CheckOffButton } from "./check-off-button";
 import { EditRowModal, SubOpt, RowEditValues } from "./edit-row";
+import { CategoryPillEdit } from "./category-pill-edit";
 
 function dayLabel(iso: string, today: string): string {
   if (iso < today) {
@@ -27,17 +28,6 @@ function dayLabel(iso: string, today: string): string {
   }
   return `${days}d`;
 }
-
-const CATEGORY_STYLE: Record<string, string> = {
-  SCHEDULE: "text-sky-700 bg-sky-50",
-  QUALITY: "text-amber-700 bg-amber-50",
-  PROCUREMENT: "text-purple-700 bg-purple-50",
-  SELECTION: "text-pink-700 bg-pink-50",
-  BUDGET: "text-emerald-700 bg-emerald-50",
-  CLIENT: "text-indigo-700 bg-indigo-50",
-  ADMIN: "text-slate-700 bg-slate-100",
-  "SUB-TRADE": "text-stone-700 bg-stone-100",
-};
 
 export interface RowClientProps {
   id: string;
@@ -99,16 +89,8 @@ export function RowClient({
                 <span className="text-ink-3"> · {subLabel}</span>
               )}
             </p>
-            {category && (
-              <span
-                className={`mt-1 inline-block font-mono text-[9px] tracking-[0.12em] px-1.5 py-0.5 ${
-                  CATEGORY_STYLE[category] ?? "text-ink-3 bg-sand-2"
-                }`}
-              >
-                {category}
-              </span>
-            )}
           </button>
+          <CategoryPillEdit id={id} source={source} category={category} />
           {!hideRightSlot && target_date && (
             <span
               className={`shrink-0 text-xs font-mono ${

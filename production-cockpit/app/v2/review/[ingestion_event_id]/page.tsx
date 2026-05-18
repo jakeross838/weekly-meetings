@@ -118,6 +118,26 @@ export default async function ReviewDetailPage({
   const closed =
     event.review_state !== "pending" && event.review_state !== "in_review";
 
+  // Multi-job detection: count proposals per job_id. If more than one job
+  // appears we surface a banner so the user knows the transcript spans
+  // multiple sites before approving.
+  const jobNameById: Record<string, string> = {};
+  for (const j of jobs) jobNameById[j.id] = j.name;
+  const countsByJob: Record<string, number> = {};
+  for (const c of changes) {
+    const jid =
+      (c.job_id as string | null) ??
+      ((c.proposed_item_data as { job_id?: string } | null)?.job_id ?? null) ??
+      ((c.proposed_decision_data as { job_id?: string } | null)?.job_id ?? null) ??
+      ((c.proposed_question_data as { job_id?: string } | null)?.job_id ?? null);
+    if (!jid) continue;
+    countsByJob[jid] = (countsByJob[jid] ?? 0) + 1;
+  }
+  const jobBreakdown = Object.entries(countsByJob).sort(
+    (a, b) => b[1] - a[1]
+  );
+  const multiJob = jobBreakdown.length > 1;
+
   return (
     <main className="max-w-[640px] mx-auto min-h-screen bg-background pb-24">
       <Header />
@@ -141,6 +161,38 @@ export default async function ReviewDetailPage({
           {event.proposed_count === 1 ? "" : "s"} · {event.review_state}
         </p>
       </header>
+
+      {multiJob && (
+        <div className="px-5 pt-4">
+          <div className="border-2 border-high bg-high/5 px-4 py-3">
+            <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-high mb-2">
+              Multi-job transcript · {jobBreakdown.length} jobs
+            </p>
+            <p className="text-ink-2 text-sm leading-snug mb-2">
+              This Plaud transcript proposes changes across multiple jobs.
+              Approvals will land on each job&apos;s page separately.
+            </p>
+            <ul className="space-y-1">
+              {jobBreakdown.map(([jid, count]) => (
+                <li
+                  key={jid}
+                  className="flex items-baseline justify-between gap-3 text-sm"
+                >
+                  <Link
+                    href={`/v2/job/${jid}`}
+                    className="text-accent hover:underline"
+                  >
+                    {jobNameById[jid] ?? jid}
+                  </Link>
+                  <span className="font-mono text-xs text-ink-3 tabular-nums">
+                    {count} proposal{count === 1 ? "" : "s"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="px-5 pt-6">
         <ReviewForm
