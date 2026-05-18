@@ -47,6 +47,25 @@ export default async function SubPage({
   const sub = subRes.data as Sub | null;
   if (!sub) notFound();
 
+  // No-show count: rows in daily_logs.absent_crews that match this sub's
+  // name or any of its aliases. Degrades to null if the daily_logs table
+  // doesn't exist yet (migration 009 not applied) so the UI shows "—".
+  const candidateNames = Array.from(
+    new Set([sub.name, ...((sub.aliases ?? []) as string[])])
+  ).filter(Boolean);
+  let noShowCount: number | null = null;
+  if (candidateNames.length > 0) {
+    const { count, error } = await supabase
+      .from("daily_logs")
+      .select("id", { count: "exact", head: true })
+      .overlaps("absent_crews", candidateNames);
+    if (!error) {
+      noShowCount = count ?? 0;
+    } else if (!/PGRST205|does not exist/i.test(error.message)) {
+      console.error("daily_logs no-show query failed:", error);
+    }
+  }
+
   const openTodos = (openRes.data ?? []) as Todo[];
   const doneTodos = (doneRes.data ?? []) as Todo[];
 
@@ -90,14 +109,22 @@ export default async function SubPage({
         )}
       </header>
 
-      {/* Headline metrics — three numbers, no decoration */}
+      {/* Headline metrics — four numbers, no decoration */}
       <section className="px-5 pt-2">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4">
           <Metric label="Open" value={openTodos.length} />
           <Metric
             label="Past due"
             value={pastDue.length}
             accent={pastDue.length > 0 ? "urgent" : undefined}
+          />
+          <Metric
+            label="No-shows"
+            value={noShowCount == null ? "—" : noShowCount}
+            accent={
+              noShowCount != null && noShowCount > 0 ? "urgent" : undefined
+            }
+            sub={noShowCount == null ? "no log data" : "from daily logs"}
           />
           <Metric
             label="Avg drift"

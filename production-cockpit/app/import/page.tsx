@@ -42,8 +42,15 @@ export default async function ImportPage() {
           For the v2 review pipeline (extract → review → commit), use{" "}
           <Link href="/v2/upload" className="text-accent hover:underline">
             /v2/upload
-          </Link>{" "}
-          instead.
+          </Link>
+          . For Buildertrend daily logs, use{" "}
+          <Link
+            href="/v2/daily-logs/upload"
+            className="text-accent hover:underline"
+          >
+            /v2/daily-logs/upload
+          </Link>
+          .
         </p>
       </div>
       <ImportForm pms={pms} jobs={jobs} assignments={assignments} />

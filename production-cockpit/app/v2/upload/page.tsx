@@ -43,6 +43,13 @@ export default async function UploadPage() {
           <Link href="/import" className="text-accent hover:underline">
             /import
           </Link>
+          . For Buildertrend daily logs, use{" "}
+          <Link
+            href="/v2/daily-logs/upload"
+            className="text-accent hover:underline"
+          >
+            /v2/daily-logs/upload
+          </Link>
           .
         </p>
       </div>
