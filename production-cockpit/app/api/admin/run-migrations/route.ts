@@ -173,6 +173,26 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (
     SELECT 1 FROM public.schedule_items s WHERE s.name = v.name
 );
+
+-- Per-job summary documents — one row per refresh, latest wins. Powers
+-- the big AI-generated summary panel on /v2/job/[id]. We keep history
+-- (not just overwrite) so we can diff "what changed this week".
+CREATE TABLE IF NOT EXISTS public.job_summaries (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id text NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+    generated_at timestamptz NOT NULL DEFAULT now(),
+    summary jsonb NOT NULL,
+    last_data_through date,       -- most recent daily_log.log_date considered
+    log_count int NOT NULL DEFAULT 0,
+    photo_count int NOT NULL DEFAULT 0,
+    open_todo_count int NOT NULL DEFAULT 0,
+    done_todo_count int NOT NULL DEFAULT 0,
+    model text,                   -- e.g. claude-opus-4-7
+    elapsed_ms int
+);
+
+CREATE INDEX IF NOT EXISTS job_summaries_job_recent_idx
+    ON public.job_summaries (job_id, generated_at DESC);
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -300,7 +320,9 @@ export async function POST(req: NextRequest) {
         (SELECT count(*) FROM public.schedule_items)                                                                                                                              AS schedule_items_rowcount,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='sub_specialties' AND column_name='schedule_item_id')                          AS has_sub_specialty_schedule_item,
         -- F7 — per-sub running checklist
-        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sub_checklist_items')                                                        AS has_sub_checklist
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sub_checklist_items')                                                        AS has_sub_checklist,
+        -- F9 — per-job AI summary
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='job_summaries')                                                              AS has_job_summaries
     `);
     const verified = verifyRes.rows[0] as Record<string, unknown>;
     // Flag any boolean check that came back false so the operator sees

@@ -13,6 +13,11 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
+import {
+  JobSummaryPanel,
+  JobSummary,
+  SummaryMeta,
+} from "./job-summary-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -77,8 +82,19 @@ export default async function V2JobPage({
     pm_id: string | null;
   };
 
-  const [itemsRes, todosRes, completedItemsRes, completedTodosRes, pendingEventsRes, subsRes] =
-    await Promise.all([
+  // Pull the latest job summary + daily-log photo counts in parallel
+  // with the existing queries. Both tolerate missing tables/columns —
+  // they just go null/zero so the panel renders an empty-state.
+  const [
+    itemsRes,
+    todosRes,
+    completedItemsRes,
+    completedTodosRes,
+    pendingEventsRes,
+    subsRes,
+    summaryRes,
+    photoLogsRes,
+  ] = await Promise.all([
       supabase
         .from("items")
         .select(
@@ -115,6 +131,24 @@ export default async function V2JobPage({
         .eq("job_id", job_id)
         .in("review_state", ["pending", "in_review"]),
       supabase.from("subs").select("id, name").order("name"),
+      // F9 — latest job_summaries row for this job. Tolerates missing table.
+      supabase
+        .from("job_summaries")
+        .select(
+          "summary, generated_at, last_data_through, log_count, photo_count, open_todo_count, done_todo_count, model, elapsed_ms"
+        )
+        .eq("job_id", job_id)
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Daily logs for this job, restricted to ones with photos — used
+      // to compute pending vs. analyzed counts for the summary panel.
+      supabase
+        .from("daily_logs")
+        .select("id, photo_urls, photo_summary")
+        .ilike("job_key", `${job.name}%`)
+        .not("photo_urls", "is", null)
+        .limit(500),
     ]);
 
   const pendingEvents = (pendingEventsRes.data ?? []) as {
@@ -148,6 +182,52 @@ export default async function V2JobPage({
   };
 
   const subs = (subsRes.data ?? []) as { id: string; name: string }[];
+
+  // F9 — summary + photo-status derivation. Both pieces are graceful:
+  // if the table doesn't exist, summary is null, photoLogs is empty.
+  const summaryRow =
+    summaryRes && !summaryRes.error
+      ? (summaryRes.data as {
+          summary: JobSummary;
+          generated_at: string;
+          last_data_through: string | null;
+          log_count: number;
+          photo_count: number;
+          open_todo_count: number;
+          done_todo_count: number;
+          model: string | null;
+          elapsed_ms: number | null;
+        } | null)
+      : null;
+  const initialSummary: JobSummary | null = summaryRow?.summary ?? null;
+  const initialMeta: SummaryMeta | null = summaryRow
+    ? {
+        generated_at: summaryRow.generated_at,
+        log_count: summaryRow.log_count,
+        photo_count: summaryRow.photo_count,
+        open_todo_count: summaryRow.open_todo_count,
+        done_todo_count: summaryRow.done_todo_count,
+        last_data_through: summaryRow.last_data_through,
+        model: summaryRow.model ?? undefined,
+        elapsed_ms: summaryRow.elapsed_ms ?? undefined,
+      }
+    : null;
+  const photoLogs =
+    photoLogsRes && !photoLogsRes.error
+      ? ((photoLogsRes.data ?? []) as {
+          id: string;
+          photo_urls: unknown;
+          photo_summary: unknown;
+        }[])
+      : [];
+  let totalPhotos = 0;
+  let initialPendingPhotos = 0;
+  for (const l of photoLogs) {
+    const urls = Array.isArray(l.photo_urls) ? l.photo_urls : [];
+    if (urls.length === 0) continue;
+    totalPhotos += urls.length;
+    if (l.photo_summary == null) initialPendingPhotos += urls.length;
+  }
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -282,6 +362,16 @@ export default async function V2JobPage({
           )}
         </div>
       </header>
+
+      {/* F9 — Claude-generated job summary document + photo analysis status. */}
+      <JobSummaryPanel
+        jobId={job.id}
+        jobName={job.name}
+        initialSummary={initialSummary}
+        initialMeta={initialMeta}
+        initialPendingPhotos={initialPendingPhotos}
+        totalPhotos={totalPhotos}
+      />
 
       <CategoryFilterPills
         basePath={`/v2/job/${job_id}`}
