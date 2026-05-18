@@ -109,6 +109,24 @@ AUTO-MATCH RULES (do these before emitting any item):
    - "by [Month] [Day]" → resolve to YYYY-MM-DD using meeting_date's year (or next year if the date already passed)
    Return YYYY-MM-DD in due_date. Leave due_date null only if the transcript is genuinely open-ended.
 
+   TITLE-DATE RULE — STRICT:
+   The "title" field must NEVER contain a relative-time phrase. Forbidden
+   substrings (case-insensitive): "today", "tomorrow", "yesterday", "tonight",
+   "this week", "next week", "this month", "next month", "by Friday",
+   "by Monday", "by [any weekday]", "this Friday", "next Friday",
+   "this [weekday]", "end of week", "end of month", "soon", "ASAP",
+   "in a few days", "shortly".
+
+   If the action has a date, write the resolved YYYY-MM-DD into the title
+   instead, e.g. "Walter to confirm drywall start 2026-05-22" — not
+   "Walter to confirm drywall start tomorrow". If the action is
+   genuinely open-ended, leave the date out of the title entirely
+   (the due_date and suggested_due_date fields carry timing — the title
+   should not duplicate or paraphrase relative time).
+
+   If you find yourself writing one of the forbidden phrases, STOP, look up
+   the resolved YYYY-MM-DD via the rules above, and substitute it.
+
    SUGGESTED FALLBACK (suggested_due_date) — ALWAYS populate this, even when
    due_date is set. When due_date has a value, suggested_due_date should
    equal it. When due_date is null, infer a sensible fallback from priority
@@ -249,6 +267,35 @@ export async function POST(req: NextRequest) {
       },
       { status: 502 }
     );
+  }
+
+  // Defence-in-depth scrub: even with the prompt rule above, Claude
+  // occasionally slips a relative-time phrase into the title. Strip the
+  // common ones and substitute the resolved ISO date so the title that
+  // lands on the to-do list is always self-explanatory at a glance.
+  const md = new Date(meetingDate + "T00:00:00Z");
+  const isoOffset = (days: number) =>
+    new Date(md.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+  const tomorrowIso = isoOffset(1);
+  const yesterdayIso = isoOffset(-1);
+  const todayIso = meetingDate;
+  const RELATIVE_REPLACEMENTS: Array<[RegExp, string]> = [
+    [/\btomorrow\b/gi, tomorrowIso],
+    [/\btonight\b/gi, todayIso],
+    [/\btoday\b/gi, todayIso],
+    [/\byesterday\b/gi, yesterdayIso],
+    [/\bthis morning\b/gi, todayIso],
+    [/\bthis afternoon\b/gi, todayIso],
+    [/\bthis evening\b/gi, todayIso],
+  ];
+  function scrubTitle(t: string | null | undefined): string {
+    if (!t) return "";
+    let out = t;
+    for (const [re, rep] of RELATIVE_REPLACEMENTS) out = out.replace(re, rep);
+    return out;
+  }
+  for (const item of parsed.items ?? []) {
+    item.title = scrubTitle(item.title);
   }
 
   // Canonicalize sub_name → sub_id, group items per sub

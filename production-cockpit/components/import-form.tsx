@@ -31,6 +31,15 @@ interface ImportFormProps {
   subs?: SubOpt[];
 }
 
+// The extractor writes a job name string per item (e.g. "Krauss") rather than
+// a job id. The review row keeps the same shape so users can override it via
+// the new per-row Job dropdown — matching by name (case-insensitive) against
+// the jobs catalog. Items whose extractor-guessed name is not in the catalog
+// stay free-text until the user picks a known job.
+function jobNameMatchesOption(rowJob: string, opt: JobOpt): boolean {
+  return rowJob.toLowerCase().trim() === opt.name.toLowerCase().trim();
+}
+
 // Parse Plaud filenames like:
 //   "04-15 Fish Site Production Meeting-transcript (1).txt"
 //   "04-09 Lee W Office Production Meeting-transcript.txt"
@@ -497,6 +506,45 @@ export function ImportForm({
                                     extractor said: {row.sub_name}
                                   </span>
                                 )}
+                                {/* Per-row Job dropdown — lets the user reassign
+                                    a row to a different job (e.g. switch one to
+                                    Dewberry) before pushing. Changing this
+                                    re-groups the row under the new job header
+                                    on the next render. */}
+                                <select
+                                  value={(() => {
+                                    const hit = jobs.find((j) =>
+                                      jobNameMatchesOption(row.job, j)
+                                    );
+                                    return hit ? hit.id : "__free__";
+                                  })()}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    if (v === "__free__") return; // leave free-text as-is
+                                    const j = jobs.find((x) => x.id === v);
+                                    if (j) updateRow(key, { job: j.name });
+                                  }}
+                                  className="bg-paper border border-rule px-2 py-1 text-xs text-ink focus:outline-none focus:border-ink"
+                                  aria-label="Job"
+                                  title="Move this item to a different job"
+                                >
+                                  {/* When the extractor's job is not in the
+                                      catalog, surface it as a free-text
+                                      placeholder so the user can see what
+                                      Claude wrote, then re-pick a known job. */}
+                                  {!jobs.some((j) =>
+                                    jobNameMatchesOption(row.job, j)
+                                  ) && (
+                                    <option value="__free__">
+                                      {row.job ? `~ ${row.job}` : "— pick job —"}
+                                    </option>
+                                  )}
+                                  {jobs.map((j) => (
+                                    <option key={j.id} value={j.id}>
+                                      {j.name}
+                                    </option>
+                                  ))}
+                                </select>
                                 <select
                                   value={row.category ?? ""}
                                   onChange={(e) =>
