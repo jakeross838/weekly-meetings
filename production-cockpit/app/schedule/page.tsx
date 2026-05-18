@@ -128,13 +128,16 @@ export default async function SchedulePage({
       {bucketOrder.map((bucket) => {
         const items = buckets.get(bucket) ?? [];
         if (items.length === 0) return null;
+        const cap = bucket === "Past due" ? 20 : items.length;
+        const shown = items.slice(0, cap);
+        const hidden = items.length - shown.length;
         return (
           <section key={bucket} className="px-5 pt-8">
             <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
               {bucket} · {items.length}
             </h2>
             <ul className="space-y-2">
-              {items.map((t) => (
+              {shown.map((t) => (
                 <ItemRow
                   key={t.id}
                   todo={t}
@@ -143,6 +146,11 @@ export default async function SchedulePage({
                 />
               ))}
             </ul>
+            {hidden > 0 && (
+              <p className="mt-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
+                + {hidden} more · open a job to see all
+              </p>
+            )}
           </section>
         );
       })}

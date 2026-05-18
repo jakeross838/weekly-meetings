@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
+import { Header } from "@/components/header";
 
 export const dynamic = "force-dynamic";
 
@@ -89,17 +90,18 @@ export default async function ReviewQueuePage() {
   }
 
   return (
-    <main className="max-w-[480px] lg:max-w-[960px] mx-auto min-h-screen bg-background pb-24">
-      <header className="px-5 pt-10 pb-6 border-b border-rule">
-        <h1 className="font-head text-[28px] lg:text-[32px] leading-none tracking-tight text-foreground">
+    <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
+      <Header />
+      <div className="px-5 pt-8">
+        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
           Pending review
         </h1>
-        <p className="mt-2 text-ink-3 text-xs font-mono uppercase tracking-[0.06em]">
+        <p className="mt-2 text-ink-3 text-sm">
           {events.length === 0
-            ? "no events queued"
+            ? "No events queued."
             : `${events.length} event${events.length === 1 ? "" : "s"} · ${events.reduce((n, e) => n + e.proposed_count, 0)} proposals total`}
         </p>
-      </header>
+      </div>
 
       {events.length === 0 ? (
         <div className="px-5 pt-12 text-center">
