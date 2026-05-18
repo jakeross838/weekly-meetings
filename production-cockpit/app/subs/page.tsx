@@ -6,7 +6,6 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
-import { SeedSpecialtiesButton } from "./seed-button";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +67,6 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
           Subs
         </h1>
         <p className="mt-1 text-ink-3 text-sm">{subs.length} on file</p>
-        <SeedSpecialtiesButton />
       </div>
 
       {/* Trade filter — single horizontal pill row */}

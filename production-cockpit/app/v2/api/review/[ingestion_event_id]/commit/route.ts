@@ -7,6 +7,7 @@
 // for update_item types. Updates ingestion_events review_state + counts.
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 import { getActor } from "@/lib/actor";
 
@@ -289,6 +290,11 @@ export async function POST(
       edited_count: editedCount,
     })
     .eq("id", ingestion_event_id);
+
+  revalidatePath("/");
+  revalidatePath("/subs");
+  revalidatePath("/v2/review");
+  if (event.job_id) revalidatePath(`/v2/job/${event.job_id}`);
 
   return NextResponse.json({
     ingestion_event_id,

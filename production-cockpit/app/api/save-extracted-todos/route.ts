@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +89,18 @@ export async function POST(req: NextRequest) {
       { ok: false, error: e instanceof Error ? e.message : String(e) },
       { status: 500 }
     );
+  }
+
+  const jobNames = Array.from(new Set(rows.map((r) => r.job)));
+  const subIds = Array.from(
+    new Set(rows.map((r) => r.sub_id).filter(Boolean) as string[])
+  );
+  revalidatePath("/");
+  revalidatePath("/subs");
+  for (const sid of subIds) revalidatePath(`/sub/${sid}`);
+  for (const jname of jobNames) {
+    const slug = jname.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    if (slug) revalidatePath(`/v2/job/${slug}`);
   }
 
   return NextResponse.json({ ok: true, saved: rows.length });
