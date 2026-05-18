@@ -1,30 +1,31 @@
-// /v2/job/[job_id] — PM home page (simplified).
+// /v2/job/[job_id] — PM home page.
 //
-// Three sections only: Today, Soon, Open. Empty sections are hidden.
-// One-line rows. No signals, no confidence dots, no decoration.
+// Three sections: Today, Soon, Open. Empty sections hidden.
+// Merges two underlying sources into one list:
+//   • v2 items table  (job_id = slug)
+//   • v1 todos table  (job = display name)
+// Each row knows which table it came from so the check-off button can
+// hit the right endpoint.
 
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
+import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 
 export const dynamic = "force-dynamic";
 
-type ItemStatus = "open" | "in_progress" | "complete" | "blocked" | "cancelled";
-
-interface ItemRow {
+// Normalized row shape — both items and todos collapse into this.
+interface RowData {
   id: string;
-  human_readable_id: string;
-  job_id: string;
+  source: "item" | "todo";
   title: string;
-  sub_id: string | null;
+  sub_name: string | null;
   owner: string | null;
-  target_date: string | null;
-  status: ItemStatus;
-  actionability: "actionable" | "signal" | null;
-  carryover_count: number | null;
+  target_date: string | null; // ISO yyyy-mm-dd
+  carryover_count: number;
   created_at: string;
   completed_at: string | null;
-  sub: { id: string; name: string } | null;
+  is_signal: boolean;
 }
 
 function todayIso(): string {
@@ -63,33 +64,13 @@ export default async function V2JobPage({
   const { job_id } = params;
   const supabase = supabaseServer();
 
-  const [jobRes, itemsRes, completedRes, pendingEventsRes] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select("id, name, address, pm_id")
-      .eq("id", job_id)
-      .maybeSingle(),
-    supabase
-      .from("items")
-      .select(
-        "id, human_readable_id, job_id, title, sub_id, owner, target_date, status, actionability, carryover_count, created_at, completed_at, sub:subs(id, name)"
-      )
-      .eq("job_id", job_id)
-      .in("status", ["open", "in_progress", "blocked"]),
-    supabase
-      .from("items")
-      .select("id, title, completed_at")
-      .eq("job_id", job_id)
-      .eq("status", "complete")
-      .gte("completed_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
-      .order("completed_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("ingestion_events")
-      .select("id, proposed_count")
-      .eq("job_id", job_id)
-      .in("review_state", ["pending", "in_review"]),
-  ]);
+  // First fetch the job so we know its display name (todos.job uses
+  // display name like "Krauss" while jobs.id is the slug "krauss").
+  const jobRes = await supabase
+    .from("jobs")
+    .select("id, name, address, pm_id")
+    .eq("id", job_id)
+    .maybeSingle();
 
   if (!jobRes.data) {
     return (
@@ -108,59 +89,171 @@ export default async function V2JobPage({
     address: string | null;
     pm_id: string | null;
   };
-  const items = ((itemsRes.data ?? []) as unknown) as ItemRow[];
-  const completed = (completedRes.data ?? []) as {
-    id: string;
-    title: string;
-    completed_at: string;
-  }[];
+
+  const [itemsRes, todosRes, completedItemsRes, completedTodosRes, pendingEventsRes] =
+    await Promise.all([
+      supabase
+        .from("items")
+        .select(
+          "id, title, sub_id, owner, target_date, status, actionability, carryover_count, created_at, completed_at, sub:subs(id, name)"
+        )
+        .eq("job_id", job_id)
+        .in("status", ["open", "in_progress", "blocked"]),
+      supabase
+        .from("todos")
+        .select(
+          "id, title, edited_title, due_date, status, sub_id, created_at, completed_at, sub:subs(id, name)"
+        )
+        .eq("job", job.name)
+        .in("status", OPEN_STATUSES as Status[]),
+      supabase
+        .from("items")
+        .select("id, title, completed_at")
+        .eq("job_id", job_id)
+        .eq("status", "complete")
+        .gte("completed_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+        .order("completed_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("todos")
+        .select("id, title, edited_title, completed_at")
+        .eq("job", job.name)
+        .eq("status", "COMPLETE")
+        .gte("completed_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+        .order("completed_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("ingestion_events")
+        .select("id, proposed_count")
+        .eq("job_id", job_id)
+        .in("review_state", ["pending", "in_review"]),
+    ]);
+
   const pendingEvents = (pendingEventsRes.data ?? []) as {
     id: string;
     proposed_count: number;
   }[];
 
+  type RawItem = {
+    id: string;
+    title: string;
+    sub_id: string | null;
+    owner: string | null;
+    target_date: string | null;
+    actionability: "actionable" | "signal" | null;
+    carryover_count: number | null;
+    created_at: string;
+    completed_at: string | null;
+    sub: { id: string; name: string } | null;
+  };
+  type RawTodo = {
+    id: string;
+    title: string;
+    edited_title: string | null;
+    due_date: string | null;
+    sub_id: string | null;
+    created_at: string;
+    completed_at: string | null;
+    sub: { id: string; name: string } | null;
+  };
+
+  const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
+  const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
+  const completedItems = (completedItemsRes.data ?? []) as {
+    id: string;
+    title: string;
+    completed_at: string;
+  }[];
+  const completedTodos = ((completedTodosRes.data ?? []) as unknown) as {
+    id: string;
+    title: string;
+    edited_title: string | null;
+    completed_at: string;
+  }[];
+
+  // Normalize both sources into RowData
+  const itemRows: RowData[] = items.map((i) => ({
+    id: i.id,
+    source: "item",
+    title: i.title,
+    sub_name: i.sub?.name ?? null,
+    owner: i.owner,
+    target_date: i.target_date,
+    carryover_count: i.carryover_count ?? 0,
+    created_at: i.created_at,
+    completed_at: i.completed_at,
+    is_signal: i.actionability === "signal",
+  }));
+  const todoRows: RowData[] = todos.map((t) => ({
+    id: t.id,
+    source: "todo",
+    title: t.edited_title ?? t.title,
+    sub_name: t.sub?.name ?? null,
+    owner: null,
+    target_date: t.due_date,
+    carryover_count: 0,
+    created_at: t.created_at,
+    completed_at: t.completed_at,
+    is_signal: false,
+  }));
+
+  const actionable = [...itemRows, ...todoRows].filter((r) => !r.is_signal);
+
   const today = todayIso();
   const in7 = inDaysIso(7);
   const in60 = inDaysIso(60);
 
-  // Actionable only — drop signals from the PM view entirely.
-  const actionable = items.filter((i) => i.actionability !== "signal");
-
   // 1. Today — past-due, carryover ≥2, or due in next 7 days
-  const todayItems = actionable.filter((i) => {
-    if (i.target_date && i.target_date < today) return true;
-    if ((i.carryover_count ?? 0) >= 2) return true;
-    if (i.target_date && i.target_date >= today && i.target_date <= in7)
-      return true;
+  const todayRows = actionable.filter((r) => {
+    if (r.target_date && r.target_date < today) return true;
+    if (r.carryover_count >= 2) return true;
+    if (r.target_date && r.target_date >= today && r.target_date <= in7) return true;
     return false;
   });
-  todayItems.sort((a, b) =>
+  todayRows.sort((a, b) =>
     (a.target_date ?? "9999").localeCompare(b.target_date ?? "9999")
   );
 
-  const todaySet = new Set(todayItems.map((i) => i.id));
+  const usedKeys = new Set(todayRows.map((r) => `${r.source}:${r.id}`));
 
   // 2. Soon — due 8..60 days out
-  const soon = actionable.filter(
-    (i) =>
-      !todaySet.has(i.id) &&
-      i.target_date &&
-      i.target_date > in7 &&
-      i.target_date <= in60
+  const soonRows = actionable.filter(
+    (r) =>
+      !usedKeys.has(`${r.source}:${r.id}`) &&
+      r.target_date &&
+      r.target_date > in7 &&
+      r.target_date <= in60
   );
-  soon.sort((a, b) =>
+  soonRows.sort((a, b) =>
     (a.target_date ?? "").localeCompare(b.target_date ?? "")
   );
-
-  const soonSet = new Set<string>([...Array.from(todaySet), ...soon.map((i) => i.id)]);
+  soonRows.forEach((r) => usedKeys.add(`${r.source}:${r.id}`));
 
   // 3. Open — no date (or >60d)
-  const open = actionable.filter((i) => !soonSet.has(i.id));
-  open.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const openRows = actionable.filter(
+    (r) => !usedKeys.has(`${r.source}:${r.id}`)
+  );
+  openRows.sort((a, b) => a.created_at.localeCompare(b.created_at));
+
+  // Done — merge completed items + todos within last 7 days
+  const completedRows = [
+    ...completedItems.map((i) => ({
+      id: i.id,
+      source: "item" as const,
+      title: i.title,
+      completed_at: i.completed_at,
+    })),
+    ...completedTodos.map((t) => ({
+      id: t.id,
+      source: "todo" as const,
+      title: t.edited_title ?? t.title,
+      completed_at: t.completed_at,
+    })),
+  ];
+  completedRows.sort((a, b) => b.completed_at.localeCompare(a.completed_at));
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
-      {/* HEADER — minimal: back link, job name, address, pending-review badge. */}
       <header className="px-5 pt-8 pb-6">
         <Link
           href="/"
@@ -192,25 +285,25 @@ export default async function V2JobPage({
         <p className="px-5 pt-8 text-ink-3 text-sm">All clear.</p>
       )}
 
-      <Section title="Today" items={todayItems} today={today} highlight />
-      <Section title="Soon" items={soon} today={today} />
-      <Section title="Open" items={open} today={today} hideRightSlot />
+      <Section title="Today" rows={todayRows} today={today} highlight />
+      <Section title="Soon" rows={soonRows} today={today} />
+      <Section title="Open" rows={openRows} today={today} hideRightSlot />
 
-      {completed.length > 0 && (
+      {completedRows.length > 0 && (
         <section className="px-5 pt-10">
           <details>
             <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-2">
-              Done this week · {completed.length}
+              Done this week · {completedRows.length}
             </summary>
             <ul className="mt-2 space-y-1.5">
-              {completed.map((i) => (
+              {completedRows.map((r) => (
                 <li
-                  key={i.id}
+                  key={`${r.source}:${r.id}`}
                   className="flex gap-3 items-baseline py-1 min-h-[32px]"
                 >
-                  <CheckOffButton itemId={i.id} completed />
+                  <CheckOffButton itemId={r.id} source={r.source} completed />
                   <span className="text-ink-3 text-sm line-through">
-                    {i.title}
+                    {r.title}
                   </span>
                 </li>
               ))}
@@ -224,31 +317,31 @@ export default async function V2JobPage({
 
 function Section({
   title,
-  items,
+  rows,
   today,
   highlight,
   hideRightSlot,
 }: {
   title: string;
-  items: ItemRow[];
+  rows: RowData[];
   today: string;
   highlight?: boolean;
   hideRightSlot?: boolean;
 }) {
-  if (items.length === 0) return null;
+  if (rows.length === 0) return null;
   return (
     <section className="px-5 pt-8">
       <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-        {title} · {items.length}
+        {title} · {rows.length}
       </h2>
       <ul className="space-y-2">
-        {items.map((i) => (
+        {rows.map((r) => (
           <Row
-            key={i.id}
-            item={i}
+            key={`${r.source}:${r.id}`}
+            row={r}
             today={today}
             highlight={
-              highlight && i.target_date != null && i.target_date < today
+              highlight && r.target_date != null && r.target_date < today
             }
             hideRightSlot={hideRightSlot}
           />
@@ -259,17 +352,17 @@ function Section({
 }
 
 function Row({
-  item,
+  row,
   today,
   highlight,
   hideRightSlot,
 }: {
-  item: ItemRow;
+  row: RowData;
   today: string;
   highlight?: boolean;
   hideRightSlot?: boolean;
 }) {
-  const subLabel = item.sub?.name ?? item.owner ?? null;
+  const subLabel = row.sub_name ?? row.owner ?? null;
   return (
     <li
       className={`py-1.5 min-h-[40px] ${
@@ -277,18 +370,18 @@ function Row({
       }`}
     >
       <div className="flex gap-3 items-baseline">
-        <CheckOffButton itemId={item.id} />
+        <CheckOffButton itemId={row.id} source={row.source} />
         <p className="flex-1 min-w-0 text-foreground text-sm leading-snug">
-          {item.title}
+          {row.title}
           {subLabel && <span className="text-ink-3"> · {subLabel}</span>}
         </p>
-        {!hideRightSlot && item.target_date && (
+        {!hideRightSlot && row.target_date && (
           <span
             className={`shrink-0 text-xs font-mono ${
               highlight ? "text-urgent" : "text-ink-3"
             }`}
           >
-            {dayLabel(item.target_date, today)}
+            {dayLabel(row.target_date, today)}
           </span>
         )}
       </div>

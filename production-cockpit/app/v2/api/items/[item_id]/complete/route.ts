@@ -56,7 +56,6 @@ export async function POST(
   const jobId = (data?.job_id as string | undefined) ?? undefined;
   if (jobId) revalidatePath(`/v2/job/${jobId}`);
   revalidatePath("/");
-  revalidatePath("/schedule");
 
   return NextResponse.json({ item: data });
 }

@@ -23,9 +23,6 @@ export function Header() {
           <Link href="/subs" className="hover:text-ink transition-colors">
             Subs
           </Link>
-          <Link href="/schedule" className="hover:text-ink transition-colors">
-            Schedule
-          </Link>
           <Link
             href="/import"
             className="text-accent hover:text-ink transition-colors"

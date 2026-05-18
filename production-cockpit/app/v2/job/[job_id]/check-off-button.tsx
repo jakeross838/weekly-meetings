@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+// Polymorphic toggle. `source="item"` hits the v2 items API; `source="todo"`
+// hits the v1 todos API. Same UX, different backend.
 export function CheckOffButton({
   itemId,
   completed = false,
+  source = "item",
 }: {
   itemId: string;
   completed?: boolean;
+  source?: "item" | "todo";
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -20,11 +24,21 @@ export function CheckOffButton({
     setOptimistic(next);
     setBusy(true);
     try {
-      const path = next ? "complete" : "uncomplete";
-      const res = await fetch(`/v2/api/items/${itemId}/${path}`, {
+      let url: string;
+      let body: string | undefined;
+      if (source === "item") {
+        const path = next ? "complete" : "uncomplete";
+        url = `/v2/api/items/${itemId}/${path}`;
+        body = next ? JSON.stringify({ completion_basis: "manual" }) : undefined;
+      } else {
+        const path = next ? "complete" : "uncomplete";
+        url = `/api/${path}`;
+        body = JSON.stringify({ id: itemId });
+      }
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: next ? JSON.stringify({ completion_basis: "manual" }) : undefined,
+        body,
       });
       if (!res.ok) {
         setOptimistic(!next);
