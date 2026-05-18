@@ -2,6 +2,7 @@
 // Body: { completion_basis?: string }
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -48,5 +49,12 @@ export async function POST(
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Invalidate all surfaces that show item counts so the next render is fresh.
+  const jobId = (data?.job_id as string | undefined) ?? undefined;
+  if (jobId) revalidatePath(`/v2/job/${jobId}`);
+  revalidatePath("/");
+  revalidatePath("/schedule");
+
   return NextResponse.json({ item: data });
 }
