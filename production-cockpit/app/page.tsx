@@ -1,210 +1,167 @@
+// / — portfolio home (simplified).
+// One row per job, sorted by past-due count. Click → /v2/job/[id].
+// Single column, mobile-first, no decoration.
+
+import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
-import { Todo, PM, OPEN_STATUSES, Status } from "@/lib/types";
-import { isoMondayUtc } from "@/lib/week";
+import { OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
-import { StatsBar } from "@/components/stats-bar";
-import { Filters } from "@/components/filters";
-import { PMSection } from "@/components/pm-section";
-import { CompletedSection } from "@/components/completed-section";
-import { RossBuiltMark } from "@/components/logo";
-import { PriorityPanel } from "@/components/priority-panel";
-
-interface SP {
-  pm?: string;
-  job?: string;
-  view?: string;
-}
-
-const PRIORITY_RANK: Record<string, number> = {
-  URGENT: 0,
-  HIGH: 1,
-  NORMAL: 2,
-};
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: SP;
-}) {
+type JobRow = {
+  id: string;
+  name: string;
+  address: string | null;
+  pm_id: string | null;
+};
+
+export default async function Page() {
   const supabase = supabaseServer();
-  const selectedPm = searchParams.pm ?? "";
-  const selectedJob = searchParams.job ?? "";
-  const view: "open" | "done" = searchParams.view === "done" ? "done" : "open";
-
-  const monday = isoMondayUtc();
   const todayIso = new Date().toISOString().slice(0, 10);
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
 
-  // Stats — always portfolio-wide (not PM-filtered) so Jake sees totals.
-  const [
-    openCountRes,
-    doneCountRes,
-    overdueCountRes,
-    pmsRes,
-    todosRes,
-    completedRes,
-    allJobsRes,
-  ] = await Promise.all([
+  const [jobsRes, openTodosRes, pmsRes, assignRes, pendingRes] = await Promise.all([
+    supabase.from("jobs").select("id, name, address, pm_id").order("name"),
     supabase
       .from("todos")
-      .select("id", { count: "exact", head: true })
+      .select("job, due_date")
       .in("status", OPEN_STATUSES as Status[]),
+    supabase.from("pms").select("id, full_name"),
     supabase
-      .from("todos")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "COMPLETE")
-      .gte("completed_at", monday),
+      .from("job_pm_assignments")
+      .select("job_id, pm_id")
+      .is("ended_at", null),
     supabase
-      .from("todos")
-      .select("id", { count: "exact", head: true })
-      .in("status", OPEN_STATUSES as Status[])
-      .lt("due_date", todayIso),
-    supabase
-      .from("pms")
-      .select("id, full_name, active")
-      .eq("active", true)
-      .order("full_name"),
-    buildTodoQuery(supabase, view, selectedPm, selectedJob),
-    // Recently completed — last 7 days, most recent first, optionally scoped
-    // to the selected PM. Capped at 30 rows to keep the bottom section tight.
-    (() => {
-      let q = supabase
-        .from("todos")
-        .select("*")
-        .eq("status", "COMPLETE")
-        .gte("completed_at", sevenDaysAgo)
-        .order("completed_at", { ascending: false })
-        .limit(30);
-      if (selectedPm) q = q.eq("pm_id", selectedPm);
-      if (selectedJob) q = q.eq("job", selectedJob);
-      return q;
-    })(),
-    // Distinct (pm_id, job) pairs across ALL open todos — populates the Job
-    // pill row consistently regardless of which view (open/done) is active.
-    supabase
-      .from("todos")
-      .select("pm_id, job")
-      .in("status", OPEN_STATUSES as Status[])
-      .not("job", "is", null),
+      .from("ingestion_events")
+      .select("job_id")
+      .in("review_state", ["pending", "in_review"]),
   ]);
 
-  const pms = (pmsRes.data ?? []) as PM[];
-  const todos = (todosRes.data ?? []) as Todo[];
-  const recentlyCompleted = (completedRes.data ?? []) as Todo[];
-  const allJobRows = (allJobsRes.data ?? []) as { pm_id: string; job: string }[];
-  const pmNames: Record<string, string> = Object.fromEntries(
-    pms.map((p) => [p.id, p.full_name])
-  );
+  const jobs = (jobsRes.data ?? []) as JobRow[];
+  const todos = (openTodosRes.data ?? []) as {
+    job: string | null;
+    due_date: string | null;
+  }[];
+  const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
+  const assignments = (assignRes.data ?? []) as {
+    job_id: string;
+    pm_id: string;
+  }[];
+  const pending = (pendingRes.data ?? []) as { job_id: string | null }[];
 
-  // Job filter list — pulled from ALL open todos (not view-scoped) so the
-  // job pills are stable across Open/Done.
-  const jobsForFilter = Array.from(
-    new Set(
-      (selectedPm
-        ? allJobRows.filter((r) => r.pm_id === selectedPm)
-        : allJobRows
-      ).map((r) => r.job)
-    )
-  ).sort();
+  const pmNameById = new Map(pms.map((p) => [p.id, p.full_name]));
+  const activePmByJob = new Map<string, string>();
+  for (const a of assignments) activePmByJob.set(a.job_id, a.pm_id);
 
-  // Group by pm, sort URGENT-first then due ascending
-  const byPm: Record<string, Todo[]> = {};
+  // Index counts by job (todos.job is text, matching the job.id slug)
+  const openByJob = new Map<string, { open: number; past_due: number }>();
   for (const t of todos) {
-    if (!byPm[t.pm_id]) byPm[t.pm_id] = [];
-    byPm[t.pm_id].push(t);
+    if (!t.job) continue;
+    const rec = openByJob.get(t.job) ?? { open: 0, past_due: 0 };
+    rec.open += 1;
+    if (t.due_date && t.due_date < todayIso) rec.past_due += 1;
+    openByJob.set(t.job, rec);
   }
-  Object.values(byPm).forEach((arr) => {
-    arr.sort((a, b) => {
-      const pr =
-        (PRIORITY_RANK[a.priority ?? "NORMAL"] ?? 3) -
-        (PRIORITY_RANK[b.priority ?? "NORMAL"] ?? 3);
-      if (pr !== 0) return pr;
-      const ad = a.due_date ?? "9999-12-31";
-      const bd = b.due_date ?? "9999-12-31";
-      return ad.localeCompare(bd);
-    });
+
+  const pendingByJob = new Map<string, number>();
+  for (const e of pending) {
+    if (!e.job_id) continue;
+    pendingByJob.set(e.job_id, (pendingByJob.get(e.job_id) ?? 0) + 1);
+  }
+
+  // todos.job stores the display name ("Krauss"), jobs.id is the slug ("krauss").
+  // Match by job.name.
+  const countsFor = (j: JobRow) =>
+    openByJob.get(j.name) ?? { open: 0, past_due: 0 };
+
+  // Sort: past-due desc → open desc → name
+  const rows = [...jobs].sort((a, b) => {
+    const ao = countsFor(a);
+    const bo = countsFor(b);
+    if (bo.past_due !== ao.past_due) return bo.past_due - ao.past_due;
+    if (bo.open !== ao.open) return bo.open - ao.open;
+    return a.name.localeCompare(b.name);
   });
 
-  return (
-    <main className="max-w-[480px] lg:max-w-[1200px] mx-auto min-h-screen bg-background">
-      <Header />
-      <StatsBar
-        open={openCountRes.count ?? 0}
-        doneThisWeek={doneCountRes.count ?? 0}
-        overdue={overdueCountRes.count ?? 0}
-      />
-      <Filters
-        pms={pms}
-        jobs={jobsForFilter}
-        selectedPm={selectedPm}
-        selectedJob={selectedJob}
-        view={view}
-      />
-      {/* Desktop ≥lg becomes a 2-column layout: priority + recently-completed
-          on the left rail, PM sections on the right. Mobile stays single-col. */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:divide-x lg:divide-rule">
-        <div>
-          {view === "open" && (
-            <PriorityPanel todos={todos} pmNames={pmNames} />
-          )}
-          {view === "open" && (
-            <CompletedSection todos={recentlyCompleted} pmNames={pmNames} />
-          )}
-        </div>
-        <div>
-          {pms
-            .filter((pm) => (byPm[pm.id] ?? []).length > 0)
-            .map((pm, idx) => (
-              <PMSection
-                key={pm.id}
-                pmFullName={pm.full_name}
-                todos={byPm[pm.id] ?? []}
-                allowComplete={view === "open"}
-                index={idx}
-              />
-            ))}
-          {todos.length === 0 && (
-            <div className="px-5 py-20 text-center">
-              <p className="font-head text-xl text-ink-3">
-                {view === "open" ? "Nothing open" : "Nothing closed this week"}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+  const totalOpen = todos.length;
+  const totalPastDue = todos.filter(
+    (t) => t.due_date != null && t.due_date < todayIso
+  ).length;
 
-      {/* Footer — minimal brand + timestamp */}
-      <footer className="mt-8 px-5 py-6 border-t border-rule bg-sand-2/40 flex items-center justify-center gap-2.5 text-ink-3">
-        <RossBuiltMark size={18} className="opacity-70" />
-        <span className="font-mono text-[11px] tracking-[0.18em] uppercase">
-          Ross Built · Updated{" "}
-          {new Date().toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          })}
-        </span>
-      </footer>
+  return (
+    <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
+      <Header />
+
+      <header className="px-5 pt-8 pb-2">
+        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
+          Jobs
+        </h1>
+        <p className="mt-2 text-ink-3 text-sm">
+          {totalOpen} open
+          {totalPastDue > 0 && (
+            <>
+              {" · "}
+              <span className="text-urgent">{totalPastDue} past due</span>
+            </>
+          )}
+        </p>
+      </header>
+
+      <ul className="mt-4">
+        {rows.length === 0 ? (
+          <li className="px-5 py-16 text-center text-ink-3 text-sm">
+            No jobs.
+          </li>
+        ) : (
+          rows.map((j) => {
+            const counts = countsFor(j);
+            const activePm = activePmByJob.get(j.id) ?? j.pm_id;
+            const pmName = activePm ? pmNameById.get(activePm) : null;
+            const pendingCount = pendingByJob.get(j.id) ?? 0;
+            return (
+              <li key={j.id}>
+                <Link
+                  href={`/v2/job/${j.id}`}
+                  className="flex items-baseline gap-3 px-5 py-3.5 border-b border-rule hover:bg-sand-2/40 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-foreground text-sm leading-snug truncate">
+                      {j.name}
+                    </p>
+                    {(pmName || j.address) && (
+                      <p className="mt-0.5 text-ink-3 text-xs truncate">
+                        {pmName ?? ""}
+                        {pmName && j.address ? " · " : ""}
+                        {j.address ?? ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-baseline gap-2 font-mono text-xs">
+                    {pendingCount > 0 && (
+                      <span
+                        className="text-accent"
+                        title={`${pendingCount} pending review`}
+                      >
+                        {pendingCount}△
+                      </span>
+                    )}
+                    {counts.past_due > 0 && (
+                      <span className="text-urgent">
+                        {counts.past_due} late
+                      </span>
+                    )}
+                    {counts.open > 0 ? (
+                      <span className="text-ink-2">{counts.open} open</span>
+                    ) : (
+                      <span className="text-ink-3">—</span>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            );
+          })
+        )}
+      </ul>
     </main>
   );
-}
-
-function buildTodoQuery(
-  supabase: ReturnType<typeof supabaseServer>,
-  view: "open" | "done",
-  pm: string,
-  job: string
-) {
-  let q = supabase
-    .from("todos")
-    .select("*, sub:subs(id, name, trade, rating, reliability_pct)");
-  if (view === "open") {
-    q = q.in("status", OPEN_STATUSES as Status[]);
-  } else {
-    q = q.eq("status", "COMPLETE").gte("completed_at", isoMondayUtc());
-  }
-  if (pm) q = q.eq("pm_id", pm);
-  if (job) q = q.eq("job", job);
-  return q.order("due_date", { ascending: true, nullsFirst: false });
 }

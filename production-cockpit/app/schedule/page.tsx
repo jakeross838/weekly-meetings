@@ -1,14 +1,44 @@
+// /schedule — flat upcoming list grouped by date.
+// One row per item; click a job → /v2/job/[id].
+
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
-import { ScheduleList } from "@/components/schedule-list";
 
 export const dynamic = "force-dynamic";
 
 interface SP {
-  pm?: string;
   days?: string;
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function inDaysIso(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function dateBucket(due: string, today: string): string {
+  if (due < today) return "Past due";
+  if (due === today) return "Today";
+  const tomorrow = inDaysIso(1);
+  if (due === tomorrow) return "Tomorrow";
+  const in7 = inDaysIso(7);
+  if (due <= in7) return "This week";
+  const in14 = inDaysIso(14);
+  if (due <= in14) return "Next week";
+  return "Later";
+}
+
+function fullLabel(iso: string): string {
+  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export default async function SchedulePage({
@@ -17,116 +47,171 @@ export default async function SchedulePage({
   searchParams: SP;
 }) {
   const supabase = supabaseServer();
-  const selectedPm = searchParams.pm ?? "";
   const horizonDays = searchParams.days === "30" ? 30 : 14;
 
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
-  const horizon = new Date(today.getTime() + horizonDays * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const today = todayIso();
+  const horizon = inDaysIso(horizonDays);
 
-  // Upcoming todos in the horizon, sub-embedded
-  let q = supabase
-    .from("todos")
-    .select("*, sub:subs(id, name, trade, rating)")
-    .in("status", OPEN_STATUSES as Status[])
-    .gte("due_date", todayIso)
-    .lte("due_date", horizon)
-    .order("due_date", { ascending: true });
-  if (selectedPm) q = q.eq("pm_id", selectedPm);
-
-  // All open todos for prerequisite lookup
-  const [todosRes, allOpenRes, pmsRes] = await Promise.all([
-    q,
+  const [todosRes, jobsRes] = await Promise.all([
     supabase
       .from("todos")
-      .select("id, job, category, due_date, status, title, edited_title, priority")
+      .select("*, sub:subs(id, name, trade, rating, reliability_pct, avg_days_per_job)")
       .in("status", OPEN_STATUSES as Status[])
-      .lte("due_date", horizon),
-    supabase
-      .from("pms")
-      .select("id, full_name, active")
-      .eq("active", true)
-      .order("full_name"),
+      .not("due_date", "is", null)
+      .lte("due_date", horizon)
+      .order("due_date", { ascending: true }),
+    supabase.from("jobs").select("id, name"),
   ]);
 
   const todos = (todosRes.data ?? []) as Todo[];
-  const allOpen = allOpenRes.data ?? [];
-  const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
+  const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
+  const jobNameById = new Map(jobs.map((j) => [j.id, j.name]));
+
+  // Group by bucket
+  const buckets = new Map<string, Todo[]>();
+  for (const t of todos) {
+    if (!t.due_date) continue;
+    const b = dateBucket(t.due_date, today);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b)!.push(t);
+  }
+
+  const bucketOrder = [
+    "Past due",
+    "Today",
+    "Tomorrow",
+    "This week",
+    "Next week",
+    "Later",
+  ];
+
+  const pastDueCount = (buckets.get("Past due") ?? []).length;
 
   return (
-    <main className="max-w-[480px] lg:max-w-[1200px] mx-auto min-h-screen bg-background">
+    <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
-      <div className="px-6 lg:px-10 pt-6 pb-3 border-b border-rule">
-        <p className="text-[12px] tracking-[0.18em] uppercase text-ink-3 font-medium">
-          Upcoming · next {horizonDays} days
-        </p>
-        <h1 className="mt-1 font-head text-4xl font-semibold leading-tight text-ink">
+      <header className="px-5 pt-8 pb-2">
+        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
           Schedule
         </h1>
-      </div>
+        <p className="mt-2 text-ink-3 text-sm">
+          {todos.length} item{todos.length === 1 ? "" : "s"} in the next{" "}
+          {horizonDays} days
+          {pastDueCount > 0 && (
+            <>
+              {" · "}
+              <span className="text-urgent">{pastDueCount} past due</span>
+            </>
+          )}
+        </p>
+      </header>
 
-      {/* PM + horizon filters */}
-      <div className="px-6 lg:px-10 py-3 border-b border-rule flex flex-wrap items-center gap-3 text-[13px]">
-        <span className="text-ink-3 font-medium tracking-[0.12em] uppercase text-[11px]">
-          PM
-        </span>
-        <FilterLink href={`/schedule${horizonDays !== 14 ? `?days=${horizonDays}` : ""}`} active={!selectedPm}>
-          All
-        </FilterLink>
-        {pms.map((p) => {
-          const q2 = new URLSearchParams();
-          q2.set("pm", p.id);
-          if (horizonDays !== 14) q2.set("days", String(horizonDays));
-          return (
-            <FilterLink key={p.id} href={`/schedule?${q2}`} active={selectedPm === p.id}>
-              {p.full_name.split(" ")[0]}
-            </FilterLink>
-          );
-        })}
-        <span className="ml-auto flex gap-2">
-          <FilterLink
-            href={selectedPm ? `/schedule?pm=${selectedPm}` : "/schedule"}
-            active={horizonDays === 14}
-          >
-            14d
-          </FilterLink>
-          <FilterLink
-            href={`/schedule?${selectedPm ? `pm=${selectedPm}&` : ""}days=30`}
+      {/* Horizon toggle — 14 / 30 */}
+      <div className="px-5 pt-4">
+        <div className="flex gap-1.5">
+          <HorizonPill href="/schedule" active={horizonDays === 14} label="14 days" />
+          <HorizonPill
+            href="/schedule?days=30"
             active={horizonDays === 30}
-          >
-            30d
-          </FilterLink>
-        </span>
+            label="30 days"
+          />
+        </div>
       </div>
 
-      <ScheduleList todos={todos} allOpen={allOpen} />
+      {todos.length === 0 && (
+        <p className="px-5 pt-10 text-ink-3 text-sm">
+          Nothing scheduled in the next {horizonDays} days.
+        </p>
+      )}
+
+      {bucketOrder.map((bucket) => {
+        const items = buckets.get(bucket) ?? [];
+        if (items.length === 0) return null;
+        return (
+          <section key={bucket} className="px-5 pt-8">
+            <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+              {bucket} · {items.length}
+            </h2>
+            <ul className="space-y-2">
+              {items.map((t) => (
+                <ItemRow
+                  key={t.id}
+                  todo={t}
+                  jobName={t.job ? jobNameById.get(t.job) ?? t.job : "—"}
+                  highlight={bucket === "Past due"}
+                />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </main>
   );
 }
 
-function FilterLink({
+function HorizonPill({
   href,
   active,
-  children,
+  label,
 }: {
   href: string;
   active: boolean;
-  children: React.ReactNode;
+  label: string;
 }) {
   return (
     <Link
       href={href}
       className={
-        "px-3 py-1.5 text-[13px] font-medium border transition-colors " +
+        "shrink-0 px-3 py-1.5 text-xs font-medium border transition-colors " +
         (active
           ? "bg-ink text-paper border-ink"
-          : "bg-paper text-ink border-rule hover:border-ink")
+          : "bg-transparent text-ink-2 border-rule hover:border-ink hover:text-ink")
       }
     >
-      {children}
+      {label}
     </Link>
+  );
+}
+
+function ItemRow({
+  todo,
+  jobName,
+  highlight,
+}: {
+  todo: Todo;
+  jobName: string;
+  highlight?: boolean;
+}) {
+  const subLabel = todo.sub?.name ?? null;
+  return (
+    <li
+      className={`py-1.5 min-h-[40px] ${
+        highlight ? "border-l-2 border-urgent pl-2 -ml-2" : ""
+      }`}
+    >
+      <div className="flex gap-3 items-baseline">
+        <Link
+          href={todo.job ? `/v2/job/${todo.job}` : "#"}
+          className="flex-1 min-w-0 text-foreground text-sm leading-snug hover:text-accent transition-colors"
+        >
+          {todo.edited_title ?? todo.title}
+          <span className="text-ink-3">
+            {" · "}
+            {jobName}
+            {subLabel && ` · ${subLabel}`}
+          </span>
+        </Link>
+        {todo.due_date && (
+          <span
+            className={`shrink-0 text-xs font-mono ${
+              highlight ? "text-urgent" : "text-ink-3"
+            }`}
+          >
+            {fullLabel(todo.due_date)}
+          </span>
+        )}
+      </div>
+    </li>
   );
 }
