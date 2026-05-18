@@ -280,21 +280,42 @@ export async function POST(req: NextRequest) {
     await client.query(MIGRATIONS_SQL);
     await client.query("COMMIT");
 
-    // Verify the new objects exist
+    // Verify the new objects exist. Extended after the 2026-05-18 round
+    // so the response surfaces which piece is missing if a partial apply
+    // ever happens.
     const verifyRes = await client.query(`
       SELECT
-        EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='daily_logs')        AS has_daily_logs,
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='daily_logs' AND column_name='parent_group_activities') AS has_parent_group,
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='category') AS has_items_category,
-        EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='sub_specialties') AS has_sub_specialties,
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sub_specialties' AND column_name='duration_days_manual_override') AS has_duration_override
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='daily_logs')                                                                AS has_daily_logs,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='parent_group_activities')                       AS has_parent_group,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='items'      AND column_name='category')                                      AS has_items_category,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sub_specialties')                                                            AS has_sub_specialties,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='sub_specialties' AND column_name='duration_days_manual_override')             AS has_duration_override,
+        -- F3 / F6 / F8 — new daily_logs columns
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='crew_counts')                                   AS has_crew_counts,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='inspections')                                   AS has_inspections,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='photo_urls')                                    AS has_photo_urls,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='photo_summary')                                 AS has_photo_summary,
+        -- F5 — canonical schedule items
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='schedule_items')                                                             AS has_schedule_items,
+        (SELECT count(*) FROM public.schedule_items)                                                                                                                              AS schedule_items_rowcount,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='sub_specialties' AND column_name='schedule_item_id')                          AS has_sub_specialty_schedule_item,
+        -- F7 — per-sub running checklist
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sub_checklist_items')                                                        AS has_sub_checklist
     `);
-    const verified = verifyRes.rows[0];
+    const verified = verifyRes.rows[0] as Record<string, unknown>;
+    // Flag any boolean check that came back false so the operator sees
+    // exactly what's still missing instead of having to diff manually.
+    const missing = Object.entries(verified)
+      .filter(([, v]) => v === false)
+      .map(([k]) => k);
     return NextResponse.json({
-      ok: true,
+      ok: missing.length === 0,
       message:
-        "All migrations applied. Click 'Seed default specialties' on /subs next.",
+        missing.length === 0
+          ? "All migrations applied. Click 'Seed default specialties' on /subs next."
+          : `Migration ran but ${missing.length} object(s) missing — see 'missing' field.`,
       verified,
+      missing,
     });
   } catch (e) {
     try {

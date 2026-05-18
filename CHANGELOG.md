@@ -1,5 +1,129 @@
 # CHANGELOG
 
+## 2026-05-18 — Cockpit polish round + BT scraper rebuild
+
+Eight feature asks landed across the cockpit, plus a fresh standalone
+Buildertrend scraper to replace the unreachable Jake-machine sidecar.
+
+### Part A — Import review popup (cockpit)
+- **Per-row Job dropdown** in the Step-2 review surface so the operator
+  can reassign an extracted to-do to a different job (e.g. switch one to
+  Dewberry) before pushing. When the extractor writes a job name not in
+  the catalog, that name appears as a free-text placeholder so it's
+  visible while the operator re-picks.
+- **Strict no-relative-time-in-title rule** in the extractor. Prompt
+  forbids "today / tomorrow / by Friday / next week / soon / ASAP / …";
+  the resolved YYYY-MM-DD goes into the title instead. Server-side regex
+  scrub substitutes the resolved ISO date for the common phrases as
+  defence-in-depth before rows reach the review popup.
+
+### Part B — Sub profile rework (cockpit)
+- **A-F grading removed.** The composite rating tile + score breakdown
+  on `/sub/[id]` are gone. The four metric tiles (Open, Past due,
+  No-shows, Avg drift) carry the facts; no opinionated letter grade.
+- **Crew size per sub per activity.** New `daily_logs.crew_counts` jsonb
+  column ({sub_name: headcount}). The sub profile averages headcount per
+  activity tag from days this sub was on site; renders as `~4.2 crew`
+  next to the duration on each specialty row.
+- **Canonical schedule items.** New `schedule_items` reference table
+  seeded with 37 canonical items (T-Pole, Underground Plumbing,
+  Electrical Rough, Stucco Brown, Drywall Hang, Tile Set, Punch, …).
+  Each specialty row is matched against canonical names + aliases; the
+  canonical label renders next to the BT tag as `≈ Electrical Rough` so
+  durations are comparable across subs.
+- **Inspections per sub** from `daily_logs.inspections`. Best-effort
+  attribution: every inspection on a day the sub was on site shows up,
+  deduped by text+date+job. Surfaced as a dedicated section on the sub
+  profile.
+- **Running checklist** with two lenses (Safety / Schedule). New
+  `sub_checklist_items` table + `/api/sub-checklist` route handle add /
+  remove / toggle / edit. Click to edit, check to toggle done, × to
+  remove. Lens-specific placeholder hints suggest typical entries.
+
+### Part C — Daily-log photo vision (cockpit)
+- **Photo URL ingest** in the daily-log upload route. Accepts `photo_urls`
+  (array) or `photos` ([{url}]) shapes from the scraper.
+- **New `/v2/api/daily-logs/extract-photos` route** calls Claude Opus 4.7
+  vision on each log's photos (max 6 per log) and writes a structured
+  jsonb summary `{headline, work_stage, subs_visible, work_observed,
+  hazards, weather_notes, confidence}` to `daily_logs.photo_summary`.
+- **Local file path support.** Detects file://, Windows `C:\...`, and
+  POSIX `/...` paths in photo_urls, reads the file off disk, sends it as
+  a base64 image block so the scraper-driven path works without a public
+  host. Remote URLs still use the url source unchanged. Per-photo
+  failures don't fail the whole log; all-photos-fail surfaces a clear
+  message.
+- **Trigger button** on the daily-log upload success screen. Processes
+  the 10 most-recent unprocessed logs per click; failures collapse into
+  an inspectable list.
+
+### Part D — Schema migration
+- 4 new `daily_logs` columns (crew_counts, inspections, photo_urls,
+  photo_summary) + `photo_summary_at` timestamp.
+- New `schedule_items` table seeded with 37 canonical items.
+- Optional `schedule_item_id` FK on `sub_specialties`.
+- New `sub_checklist_items` table.
+- Verify block extended — surfaces every missing object by name so a
+  partial apply is debuggable.
+
+### Part E — buildertrend-scraper (new sibling repo)
+- Standalone repo at `C:\Users\Greg\buildertrend-scraper`.
+- Credentials stored in **Windows Credential Manager** via `keyring`
+  (DPAPI-encrypted). `python auth.py {set|status|clear}`.
+- Playwright sync API with persistent `storage_state` cached in
+  `.session/state.json`; subsequent runs skip the login form.
+- **Auth0 Universal Login compatible.** Login selectors verified
+  against the live BT form on 2026-05-18 — BT uses
+  `input#username` + `input#password` + submit button with
+  `name=action, value=default, text=Login`. MFA-aware: pauses in headed
+  mode for the user to clear the code.
+- Daily-log walk: for each job in JOB_NAME_MAP, navigate the project
+  list → click project → click Daily Logs → paginate within --days
+  window → click each row → extract fields → download photos through
+  the logged-in cookie jar to `photos/{jobShort}/{logId}/photo_NNN.jpg`
+  → stamp absolute local paths into `photo_urls`.
+- Output `data/daily-logs.json` in the {byJob: {jobKey: [BTRecord]}}
+  shape the cockpit's upload route consumes.
+- Flags: `--headed --days N --jobs A,B --skip-photos
+  --max-photos-per-log N --inspect-only --mock -v`.
+- `--mock` copies `fixtures/mock-daily-logs.json` to `data/daily-logs.json`
+  so the cockpit ingest + UI plumbing can be exercised without a real
+  scrape or BT credentials.
+- BT-specific selectors tagged `# TUNE` for easy adjustment if BT
+  changes its DOM.
+
+### Part F — Multi-machine path resolver
+- `constants.py:DAILY_LOGS_PATH` now honors `$BT_DAILY_LOGS_PATH` first,
+  otherwise picks the first existing candidate from the known scraper
+  locations (Greg's, then Jake's), falling back to the historical Jake
+  path for recognizable error messages. The downstream Python pipeline
+  auto-promotes to Greg's scraper output the moment its first file
+  appears.
+
+### Validation
+| # | Check | Result |
+|---|---|---|
+| V1 | TypeScript (`tsc --noEmit`) | **PASS** — clean |
+| V2 | ESLint (`next lint`) | **PASS** — no warnings or errors |
+| V3 | Python (`py_compile` × 4) | **PASS** — auth, jobs, bt_session, scrape all compile |
+| V4 | Mock scrape (`scrape.py --mock`) | **PASS** — wrote 3 records to data/daily-logs.json |
+| V5 | BT login selectors | **PASS** — confirmed live against Auth0 form 2026-05-18 |
+| V6 | Migration verify block | **PASS** — covers all 11 new objects, returns `missing[]` array |
+| V7 | Local file path detection in extract-photos | **PASS** — file://, C:\, /... all routed to base64 branch |
+| V8 | Atomic commits | **PASS** — 7 commits in weekly-meetings + 1 init in buildertrend-scraper |
+
+### Known follow-ups
+- BT DOM selectors past the login page (project list, daily logs list,
+  log detail) are educated guesses tagged `# TUNE`. First headed run
+  will surface what needs adjusting — use `--inspect-only` to dump the
+  rendered HTML for offline tuning.
+- Photo vision works only when BT photos are reachable. The scraper
+  downloads through the logged-in cookie jar at scrape time so by the
+  time vision runs they're local bytes — no signed-URL expiry concern.
+- Migrations need to be applied once via `/admin/run-migrations` for
+  the new sub-profile sections to actually populate. Everything degrades
+  gracefully until then (sections just stay empty).
+
 ## 2026-04-28 — Phase 18 phase-centric analytics + denser sub view
 
 Three discrete improvements on top of the Phase 17 substrate. NO change
