@@ -69,6 +69,30 @@ OLD_TO_NEW_STATUS: dict[str, str] = {
 # trigger setting closed_date on the item).
 CLOSED_STATUSES: set[str] = {"COMPLETE", "DISMISSED"}
 
-# Canonical path to the Buildertrend scraper's daily-logs output. The
-# weekly-meetings system never writes to this file; it only reads.
-DAILY_LOGS_PATH: Path = Path(r"C:\Users\Jake\buildertrend-scraper\data\daily-logs.json")
+"""
+Canonical path to the Buildertrend scraper's daily-logs output. The
+weekly-meetings system never writes to this file; it only reads.
+
+The scraper repo lives on whichever machine actually scrapes Buildertrend.
+Historically that was Jake's box; Greg now runs a sibling scraper. We
+honor an explicit BT_DAILY_LOGS_PATH env var first, then fall through a
+list of candidates and pick the first that exists. If none exist,
+DAILY_LOGS_PATH still resolves to the historical default so error
+messages stay recognizable.
+"""
+import os
+
+def _resolve_daily_logs_path() -> Path:
+    env = os.environ.get("BT_DAILY_LOGS_PATH")
+    if env:
+        return Path(env)
+    candidates = [
+        Path(r"C:\Users\Greg\buildertrend-scraper\data\daily-logs.json"),
+        Path(r"C:\Users\Jake\buildertrend-scraper\data\daily-logs.json"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[-1]  # historical default for error messages
+
+DAILY_LOGS_PATH: Path = _resolve_daily_logs_path()
