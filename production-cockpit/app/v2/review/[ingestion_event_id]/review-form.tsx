@@ -114,6 +114,36 @@ export function ReviewForm({
     [rows]
   );
 
+  // Pre-commit impact: which jobs will this commit touch, with counts?
+  // Uses the edited override when present, else the proposed_item_data,
+  // else the change's job_id, else the meeting's primary job.
+  const enabledJobsBreakdown = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of changes) {
+      const state = rows[c.id];
+      if (!state?.enabled) continue;
+      const d = (c.proposed_item_data ?? {}) as Record<string, unknown>;
+      const job =
+        (state.edited as { job?: string }).job ??
+        ((d.job_id as string) || c.job_id || "(no job)");
+      m.set(job, (m.get(job) ?? 0) + 1);
+    }
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [changes, rows]);
+
+  // All jobs referenced anywhere in the proposed changes, regardless of
+  // whether they're enabled. Used for the "also touched" header banner so
+  // the operator knows this batch reaches beyond the meeting's primary job.
+  const allReferencedJobs = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of changes) {
+      const d = (c.proposed_item_data ?? {}) as Record<string, unknown>;
+      const job = (d.job_id as string) || c.job_id;
+      if (job) s.add(job);
+    }
+    return Array.from(s).sort();
+  }, [changes]);
+
   function updateRow(id: string, patch: Partial<RowState>) {
     setRows((s) => ({ ...s, [id]: { ...s[id], ...patch } }));
   }
@@ -215,9 +245,24 @@ export function ReviewForm({
       </h2>
       <p className="mt-2 text-xs text-ink-3">
         Fix anything the brain got wrong — title, date, sub, category.
-        Uncheck a row to skip it. Green button at the bottom commits everything
-        checked.
+        Uncheck a row to skip it. Every row cites the transcript line it came
+        from. Green button at the bottom commits everything checked.
       </p>
+
+      {/* "Also touched" banner — show all jobs referenced by this batch.
+          Surfaces multi-job impact before the operator commits. */}
+      {allReferencedJobs.length > 1 && (
+        <div className="mt-4 border-l-2 border-accent bg-accent/5 px-4 py-3">
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-accent mb-1">
+            Touches {allReferencedJobs.length} jobs · check each one
+          </p>
+          <p className="text-sm text-ink-2 leading-snug">
+            {allReferencedJobs
+              .map((j) => j.charAt(0).toUpperCase() + j.slice(1))
+              .join(" · ")}
+          </p>
+        </div>
+      )}
 
       {/* EDITABLE: add_item + add_signal grouped by Job → Category */}
       {sortedJobs.map((job) => {
@@ -411,7 +456,26 @@ export function ReviewForm({
 
       {err && <p className="mt-4 text-sm text-urgent">{err}</p>}
 
-      <div className="flex items-center justify-between gap-4 sticky bottom-0 bg-background border-t border-rule -mx-5 px-5 py-4 mt-8">
+      {/* Pre-commit impact summary — which jobs the green button will touch
+          right now (based on currently-checked rows). Updates as the user
+          toggles rows. */}
+      {enabledJobsBreakdown.length > 0 && (
+        <div className="mt-8 px-4 py-3 border border-rule-soft bg-sand-2/30">
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1">
+            This push will affect
+          </p>
+          <p className="text-sm text-ink-2 leading-snug">
+            {enabledJobsBreakdown
+              .map(
+                ([job, n]) =>
+                  `${job.charAt(0).toUpperCase() + job.slice(1)} (${n})`
+              )
+              .join(" · ")}
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-4 sticky bottom-0 bg-background border-t border-rule -mx-5 px-5 py-4 mt-4">
         <p className="font-mono text-[10px] text-ink-3 tabular-nums">
           {totalEnabled} of {changes.length} included
         </p>
