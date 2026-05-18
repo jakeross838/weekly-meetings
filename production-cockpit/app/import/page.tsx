@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const [pmsRes, jobsRes, assignRes] = await Promise.all([
+  const [pmsRes, jobsRes, assignRes, subsRes] = await Promise.all([
     supabase
       .from("pms")
       .select("id, full_name, active")
@@ -25,6 +25,7 @@ export default async function ImportPage() {
       .from("job_pm_assignments")
       .select("job_id, pm_id")
       .is("ended_at", null),
+    supabase.from("subs").select("id, name").order("name"),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
   const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
@@ -32,6 +33,7 @@ export default async function ImportPage() {
     job_id: string;
     pm_id: string;
   }[];
+  const subs = (subsRes.data ?? []) as { id: string; name: string }[];
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -59,7 +61,7 @@ export default async function ImportPage() {
             v2 review pipeline →
           </Link>
         </p>
-        <ImportForm pms={pms} jobs={jobs} assignments={assignments} />
+        <ImportForm pms={pms} jobs={jobs} assignments={assignments} subs={subs} />
       </section>
 
       {/* DAILY LOG SECTION */}

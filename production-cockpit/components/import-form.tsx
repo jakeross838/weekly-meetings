@@ -13,6 +13,11 @@ interface JobOpt {
   name: string;
 }
 
+interface SubOpt {
+  id: string;
+  name: string;
+}
+
 interface Assignment {
   job_id: string;
   pm_id: string;
@@ -22,6 +27,7 @@ interface ImportFormProps {
   pms: PMOpt[];
   jobs?: JobOpt[];
   assignments?: Assignment[];
+  subs?: SubOpt[];
 }
 
 // Parse Plaud filenames like:
@@ -100,10 +106,23 @@ interface ExtractResp {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
+interface RowState {
+  enabled: boolean;
+  title: string;
+  due_date: string | null;
+  sub_id: string | null;
+  sub_name: string | null;
+  category: string;
+  priority: "URGENT" | "HIGH" | "NORMAL";
+  type: string;
+  job: string;
+}
+
 export function ImportForm({
   pms,
   jobs = [],
   assignments = [],
+  subs = [],
 }: ImportFormProps) {
   const router = useRouter();
   const [pmId, setPmId] = useState(pms[0]?.id ?? "");
@@ -122,8 +141,9 @@ export function ImportForm({
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Per-item checked state — drives what gets saved
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({});
+  // Per-row state keyed by `${gi}:${ii}` — holds editable overrides on the
+  // extractor's output plus an enabled flag.
+  const [rows, setRows] = useState<Record<string, RowState>>({});
   const itemKey = (gi: number, ii: number) => `${gi}:${ii}`;
 
   function onFile(file: File) {
@@ -201,14 +221,24 @@ export function ImportForm({
         return;
       }
       setExtract(data);
-      // Default: everything enabled
-      const init: Record<string, boolean> = {};
+      // Default per-row state: everything enabled, original values from extractor
+      const init: Record<string, RowState> = {};
       data.grouped.forEach((g: SubGroup, gi: number) => {
-        g.items.forEach((_, ii) => {
-          init[itemKey(gi, ii)] = true;
+        g.items.forEach((item: ExtractedItem, ii: number) => {
+          init[itemKey(gi, ii)] = {
+            enabled: true,
+            title: item.title,
+            due_date: item.due_date,
+            sub_id: g.sub_id,
+            sub_name: g.sub_name,
+            category: item.category,
+            priority: item.priority,
+            type: item.type,
+            job: item.job,
+          };
         });
       });
-      setEnabled(init);
+      setRows(init);
       setStep("review");
       setProcessing(false);
     } catch (err) {
@@ -222,10 +252,17 @@ export function ImportForm({
     setSaving(true);
     setError(null);
     const items: (ExtractedItem & { sub_id: string | null })[] = [];
-    extract.grouped.forEach((g, gi) => {
-      g.items.forEach((item, ii) => {
-        if (!enabled[itemKey(gi, ii)]) return;
-        items.push({ ...item, sub_id: g.sub_id });
+    Object.values(rows).forEach((r) => {
+      if (!r.enabled) return;
+      items.push({
+        title: r.title,
+        sub_name: r.sub_name,
+        job: r.job,
+        priority: r.priority,
+        due_date: r.due_date,
+        category: r.category,
+        type: r.type,
+        sub_id: r.sub_id,
       });
     });
     try {
@@ -253,89 +290,197 @@ export function ImportForm({
   }
 
   if (step === "review" && extract) {
-    const totalEnabled = Object.values(enabled).filter(Boolean).length;
+    const rowEntries = Object.entries(rows);
+    const totalEnabled = rowEntries.filter(([, r]) => r.enabled).length;
+
+    // Regroup the flat rowEntries by Job → Category → row[]
+    const byJob = new Map<
+      string,
+      Map<string, { key: string; row: RowState }[]>
+    >();
+    for (const [key, row] of rowEntries) {
+      const job = row.job || "(no job)";
+      const cat = row.category || "(uncategorized)";
+      if (!byJob.has(job)) byJob.set(job, new Map());
+      const catMap = byJob.get(job)!;
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat)!.push({ key, row });
+    }
+    const sortedJobs = Array.from(byJob.keys()).sort();
+    const CAT_ORDER = [
+      "SCHEDULE",
+      "QUALITY",
+      "PROCUREMENT",
+      "SELECTION",
+      "BUDGET",
+      "CLIENT",
+      "ADMIN",
+      "SUB-TRADE",
+    ];
+
+    const updateRow = (key: string, patch: Partial<RowState>) => {
+      setRows((s) => ({ ...s, [key]: { ...s[key], ...patch } }));
+    };
+
     return (
-      <div className="px-6 lg:px-10 pb-12">
+      <div className="px-5 pb-32">
         <div className="py-6">
-          <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3">
-            Step 2 of 2 · Review &amp; save
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+            Step 2 of 2 · Review, edit, then commit
           </p>
           <h2 className="mt-2 font-head text-2xl font-semibold text-ink">
             {extract.totalItems} item{extract.totalItems === 1 ? "" : "s"}{" "}
             extracted
           </h2>
           {extract.summary && (
-            <p className="mt-3 text-[15px] text-ink-2 leading-relaxed">
+            <p className="mt-3 text-sm text-ink-2 leading-relaxed">
               {extract.summary}
             </p>
           )}
+          <p className="mt-3 text-xs text-ink-3">
+            Click any field to edit. Uncheck rows to skip them. Category is
+            extractor-set — edit it later from the to-do list if needed.
+          </p>
         </div>
 
-        {extract.grouped.map((g, gi) => (
-          <section
-            key={gi}
-            className="mb-6 border border-rule bg-paper"
-          >
-            <header className="px-5 py-3 bg-sand-2/50 border-b border-rule flex items-center justify-between">
-              <h3 className="font-head text-base font-semibold text-ink">
-                {g.sub_name || "No sub linked"}
-                {!g.sub_id && g.sub_name && (
-                  <span className="ml-2 font-mono text-[11px] text-ink-3">
-                    (not in catalog — will save without link)
-                  </span>
-                )}
-              </h3>
-              <span className="font-mono text-[12px] text-ink-3 tabular-nums">
-                {g.items.length}
-              </span>
-            </header>
-            <ul>
-              {g.items.map((item, ii) => {
-                const k = itemKey(gi, ii);
-                const on = enabled[k];
+        {sortedJobs.map((job) => {
+          const catMap = byJob.get(job)!;
+          const jobTotal = Array.from(catMap.values()).reduce(
+            (n, arr) => n + arr.length,
+            0
+          );
+          const orderedCats = [
+            ...CAT_ORDER.filter((c) => catMap.has(c)),
+            ...Array.from(catMap.keys()).filter((c) => !CAT_ORDER.includes(c)),
+          ];
+          return (
+            <section
+              key={job}
+              className="mb-6 border border-rule bg-paper"
+            >
+              <header className="px-4 py-3 bg-sand-2/40 border-b border-rule flex items-baseline justify-between">
+                <h3 className="font-head text-base font-semibold text-ink">
+                  {job}
+                </h3>
+                <span className="font-mono text-[11px] text-ink-3 tabular-nums">
+                  {jobTotal}
+                </span>
+              </header>
+              {orderedCats.map((cat) => {
+                const arr = catMap.get(cat)!;
                 return (
-                  <li
-                    key={ii}
+                  <div
+                    key={cat}
                     className="border-b border-rule-soft last:border-b-0"
                   >
-                    <label className="flex items-start gap-3 px-5 py-3 cursor-pointer hover:bg-sand-2/30">
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={(e) =>
-                          setEnabled((s) => ({
-                            ...s,
-                            [k]: e.target.checked,
-                          }))
-                        }
-                        className="mt-1 h-4 w-4 accent-accent"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[15px] leading-snug text-ink">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 font-mono text-[11px] text-ink-3 tabular-nums">
-                          {item.job} · {item.category} · {item.priority}
-                          {item.due_date && ` · due ${item.due_date}`}
-                        </p>
-                      </div>
-                    </label>
-                  </li>
+                    <div className="px-4 py-2 bg-sand-2/20">
+                      <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+                        {cat} · {arr.length}
+                      </span>
+                    </div>
+                    <ul>
+                      {arr.map(({ key, row }) => (
+                        <li
+                          key={key}
+                          className="border-b border-rule-soft last:border-b-0 px-4 py-3"
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={row.enabled}
+                              onChange={(e) =>
+                                updateRow(key, {
+                                  enabled: e.target.checked,
+                                })
+                              }
+                              className="mt-1 h-4 w-4 accent-accent shrink-0"
+                              aria-label="Include in commit"
+                            />
+                            <div
+                              className={`flex-1 min-w-0 space-y-2 ${
+                                row.enabled ? "" : "opacity-40"
+                              }`}
+                            >
+                              <textarea
+                                value={row.title}
+                                onChange={(e) =>
+                                  updateRow(key, { title: e.target.value })
+                                }
+                                rows={2}
+                                className="w-full bg-transparent border-b border-rule-soft focus:border-ink text-sm text-ink resize-none focus:outline-none"
+                              />
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <input
+                                  type="date"
+                                  value={row.due_date ?? ""}
+                                  onChange={(e) =>
+                                    updateRow(key, {
+                                      due_date: e.target.value || null,
+                                    })
+                                  }
+                                  className="bg-paper border border-rule px-2 py-1 text-xs text-ink focus:outline-none focus:border-ink"
+                                  aria-label="Due date"
+                                />
+                                <select
+                                  value={row.sub_id ?? ""}
+                                  onChange={(e) => {
+                                    const sid = e.target.value || null;
+                                    const sname = sid
+                                      ? subs.find((s) => s.id === sid)
+                                          ?.name ?? null
+                                      : null;
+                                    updateRow(key, {
+                                      sub_id: sid,
+                                      sub_name: sname,
+                                    });
+                                  }}
+                                  className="bg-paper border border-rule px-2 py-1 text-xs text-ink focus:outline-none focus:border-ink flex-1 min-w-[120px]"
+                                  aria-label="Sub"
+                                >
+                                  <option value="">— no sub —</option>
+                                  {subs.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                {!row.sub_id && row.sub_name && (
+                                  <span className="font-mono text-[10px] text-ink-3">
+                                    extractor said: {row.sub_name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 );
               })}
-            </ul>
-          </section>
-        ))}
+            </section>
+          );
+        })}
+
+        {/* Raw API output — collapsible */}
+        <details className="mb-6 border border-rule bg-paper">
+          <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink">
+            View raw extractor output (JSON)
+          </summary>
+          <pre className="px-4 py-3 text-[11px] leading-snug text-ink-2 overflow-x-auto bg-sand-2/30 font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
+            {JSON.stringify(extract, null, 2)}
+          </pre>
+        </details>
 
         {error && (
-          <p className="mb-4 text-[13px] text-urgent">{error}</p>
+          <p className="mb-4 text-sm text-urgent">{error}</p>
         )}
 
-        <div className="flex items-center justify-between gap-4 sticky bottom-0 bg-background border-t border-rule -mx-6 lg:-mx-10 px-6 lg:px-10 py-4">
+        <div className="flex items-center justify-between gap-4 sticky bottom-0 bg-background border-t border-rule -mx-5 px-5 py-4">
           <button
             type="button"
             onClick={() => setStep("upload")}
-            className="text-[13px] tracking-[0.15em] uppercase text-ink-2 hover:text-ink"
+            className="text-xs tracking-[0.18em] uppercase text-ink-2 hover:text-ink"
             disabled={saving}
           >
             Back
@@ -344,11 +489,11 @@ export function ImportForm({
             type="button"
             onClick={save}
             disabled={saving || totalEnabled === 0}
-            className="bg-ink text-paper px-5 py-2.5 text-[13px] tracking-[0.15em] uppercase font-medium hover:bg-accent disabled:opacity-50 transition-colors"
+            className="bg-ink text-paper px-5 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50 transition-colors"
           >
             {saving
-              ? "Saving..."
-              : `Save ${totalEnabled} item${totalEnabled === 1 ? "" : "s"}`}
+              ? "Committing…"
+              : `Commit ${totalEnabled} item${totalEnabled === 1 ? "" : "s"}`}
           </button>
         </div>
       </div>
