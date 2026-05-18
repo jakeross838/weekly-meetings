@@ -90,6 +90,7 @@ interface ExtractedItem {
   due_date: string | null;
   category: string;
   type: string;
+  source_excerpt?: string | null;
 }
 
 interface SubGroup {
@@ -102,6 +103,7 @@ interface ExtractResp {
   summary: string;
   grouped: SubGroup[];
   totalItems: number;
+  jobs_mentioned?: string[];
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -116,6 +118,7 @@ interface RowState {
   priority: "URGENT" | "HIGH" | "NORMAL";
   type: string;
   job: string;
+  source_excerpt: string | null;
 }
 
 export function ImportForm({
@@ -235,6 +238,7 @@ export function ImportForm({
             priority: item.priority,
             type: item.type,
             job: item.job,
+            source_excerpt: item.source_excerpt ?? null,
           };
         });
       });
@@ -339,10 +343,29 @@ export function ImportForm({
           )}
           <p className="mt-3 text-xs text-ink-3">
             Fix anything Claude got wrong — title, due date, sub. Uncheck rows
-            to drop them. When it looks right, hit the green button. Category
-            is auto-set; edit it later from the to-do list if needed.
+            to drop them. Every row cites the exact transcript line it came
+            from. When it looks right, hit the green button.
           </p>
         </div>
+
+        {/* Other jobs mentioned — flag so the operator knows to check those job pages too */}
+        {extract.jobs_mentioned && extract.jobs_mentioned.length > 0 && (() => {
+          const here = new Set(sortedJobs.map((j) => j.toLowerCase()));
+          const elsewhere = extract.jobs_mentioned.filter(
+            (j) => !here.has(j.toLowerCase())
+          );
+          if (elsewhere.length === 0) return null;
+          return (
+            <div className="mb-6 border-l-2 border-accent bg-accent/5 px-4 py-3">
+              <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-accent mb-1">
+                Also mentioned · check those job pages
+              </p>
+              <p className="text-sm text-ink-2 leading-snug">
+                {elsewhere.join(" · ")}
+              </p>
+            </div>
+          );
+        })()}
 
         {sortedJobs.map((job) => {
           const catMap = byJob.get(job)!;
@@ -451,6 +474,11 @@ export function ImportForm({
                                   </span>
                                 )}
                               </div>
+                              {row.source_excerpt && (
+                                <p className="pt-1 font-mono text-[10px] text-ink-3 italic leading-snug">
+                                  “{row.source_excerpt}”
+                                </p>
+                              )}
                             </div>
                           </div>
                         </li>

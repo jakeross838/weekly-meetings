@@ -28,11 +28,19 @@ interface ExtractedItem {
     | "CO_INVOICE"
     | "FIELD"
     | "FOLLOWUP";
+  // Verbatim transcript snippet (≤200 chars) that grounds this item.
+  // Used by the UI to show "where Claude got this" and to keep extraction
+  // honest — items without quotable evidence are filtered out.
+  source_excerpt: string | null;
 }
 
 interface ExtractionResult {
   summary: string;
   items: ExtractedItem[];
+  // Job names referenced anywhere in the transcript, including jobs that
+  // don't have action items of their own. Powers the "also mentioned" banner
+  // on the preview screen — reminds the operator to check those job pages.
+  jobs_mentioned: string[];
 }
 
 /**
@@ -58,35 +66,60 @@ function buildPrompt(
 
 META: PM=${pmName} | Date=${meetingDate} | Type=${meetingType}
 
-KNOWN SUBS (use the exact "name" string when referenced):
+KNOWN SUBS (canonicalize references to these exact "name" strings — match aliases first, then partial/last-name matches; only leave sub_name null if no sub is plausibly referenced):
 ${catalog}
 
 Read the transcript. Return a JSON object with this exact shape:
 
 {
   "summary": "<1-2 sentence overview of the meeting>",
+  "jobs_mentioned": ["<job-name>", ...],
   "items": [
     {
       "title": "<owner + verb + specific deliverable + hard due date>",
-      "sub_name": "<exact name from catalog, or null if no sub is referenced>",
-      "job": "<job name — e.g., Fish, Krauss, Markgraf, Pou, etc.>",
+      "sub_name": "<exact name from catalog above, or null>",
+      "job": "<job name — Fish, Krauss, Markgraf, Pou, Dewberry, Drummond, Molinari, Ruthven, Biales, Harllee, Clark, Johnson, etc.>",
       "priority": "URGENT" | "HIGH" | "NORMAL",
       "due_date": "<YYYY-MM-DD or null>",
       "category": "SELECTION|SCHEDULE|PROCUREMENT|SUB-TRADE|CLIENT|QUALITY|BUDGET|ADMIN",
-      "type": "SELECTION|CONFIRMATION|PRICING|SCHEDULE|CO_INVOICE|FIELD|FOLLOWUP"
+      "type": "SELECTION|CONFIRMATION|PRICING|SCHEDULE|CO_INVOICE|FIELD|FOLLOWUP",
+      "source_excerpt": "<≤200 chars verbatim transcript snippet that grounds this item>"
     }
   ]
 }
 
-Rules:
-- Every item must pass the Monday Morning Test: specific person + specific verb + specific deliverable + hard date.
-- Priority: URGENT if due ≤3 days or blocks critical path or financial exposure; HIGH if due ≤7 days or sub coordination; NORMAL otherwise.
-- Category SELECTION = waiting on client/designer to pick something (colors, finishes, hardware).
-- Category SCHEDULE = sub start/end dates, schedule moves.
-- Category PROCUREMENT = orders, deliveries, buyouts.
-- Category SUB-TRADE = sub performance concerns (NOT scheduling).
-- Use sub_name = null when the item is purely internal (PM action only).
-- Do NOT fabricate. Skip vague items entirely rather than inventing detail.
+AUTO-MATCH RULES (do these before emitting any item):
+
+1. SUB MATCHING — work hard to fill sub_name. If the speaker says "Terry", check the aliases in the catalog above. If they say "Walter", match "Walter Drywall". If they say "Watts", match "Jeff Watts Plastering and Stucco". Only return null when the action is genuinely PM-internal (Lee to send X, Jake to draft Y) AND no sub is named.
+
+2. DATE INFERENCE from the meeting date ${meetingDate}:
+   - "today" → ${meetingDate}
+   - "tomorrow" → meeting_date + 1 day
+   - "by Friday" / "this Friday" → next Friday on or after meeting_date
+   - "by next week" / "early next week" → meeting_date + 7 days
+   - "by end of month" → last day of meeting_date's month
+   - "by [Month] [Day]" → resolve to YYYY-MM-DD using meeting_date's year (or next year if the date already passed)
+   Return YYYY-MM-DD. Leave null only if the transcript is genuinely open-ended.
+
+3. CATEGORY INFERENCE — pick the most specific:
+   - SELECTION = waiting on client/designer choice (colors, fixtures, finishes, hardware, paint specs)
+   - SCHEDULE = sub start/end dates, sequencing, moves
+   - PROCUREMENT = orders, deliveries, vendor buyouts, lead times
+   - SUB-TRADE = sub performance concerns / quality / back-charges (NOT routine scheduling)
+   - CLIENT = client communication, status updates, written approvals
+   - QUALITY = quality assurance, rework, callbacks, hinge replacements, paint touch-ups
+   - BUDGET = pricing, change orders, cost coding, back-charges with $ amounts
+   - ADMIN = permits, policies, internal documents, company-wide rules
+
+4. JOBS_MENTIONED — list every job name that appears in the transcript, even ones with no action items. The operator may need to check those job pages too. Dedupe but keep them.
+
+5. SOURCE_EXCERPT — for each item, copy 1-3 sentences verbatim from the transcript that contain the trigger phrase. Cap at 200 characters with an ellipsis if you have to. DO NOT paraphrase. If you cannot find a quotable line, DROP THE ITEM — do not include it.
+
+6. Every item must pass the Monday Morning Test: specific person + specific verb + specific deliverable + hard date.
+
+7. Priority: URGENT if due ≤3 days or blocks critical path or has financial exposure; HIGH if due ≤7 days or involves sub coordination; NORMAL otherwise.
+
+NEVER fabricate. If the transcript is vague, drop the item. The source_excerpt check is your honesty gate.
 
 Return ONLY the JSON. No prose, no fences.`;
 }
@@ -226,6 +259,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     summary: parsed.summary,
+    jobs_mentioned: Array.isArray(parsed.jobs_mentioned)
+      ? Array.from(new Set(parsed.jobs_mentioned.filter(Boolean)))
+      : [],
     grouped: Object.values(groupedBySub),
     totalItems: (parsed.items ?? []).length,
   });
