@@ -140,7 +140,7 @@ export default async function Page() {
                     {pendingCount > 0 && (
                       <span
                         className="text-accent"
-                        title={`${pendingCount} pending review`}
+                        title={`${pendingCount} plaud transcript${pendingCount === 1 ? "" : "s"} to approve`}
                       >
                         {pendingCount}△
                       </span>

@@ -94,18 +94,18 @@ export default async function ReviewQueuePage() {
       <Header />
       <div className="px-5 pt-8">
         <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
-          Pending review
+          Plaud transcripts to approve
         </h1>
         <p className="mt-2 text-ink-3 text-sm">
           {events.length === 0
-            ? "No events queued."
-            : `${events.length} event${events.length === 1 ? "" : "s"} · ${events.reduce((n, e) => n + e.proposed_count, 0)} proposals total`}
+            ? "Nothing queued."
+            : `${events.length} transcript${events.length === 1 ? "" : "s"} · ${events.reduce((n, e) => n + e.proposed_count, 0)} proposals total`}
         </p>
       </div>
 
       {events.length === 0 ? (
         <div className="px-5 pt-12 text-center">
-          <p className="text-ink-3 text-sm">Nothing pending review.</p>
+          <p className="text-ink-3 text-sm">No transcripts to approve.</p>
           <p className="mt-2 text-ink-3 text-xs">
             Drop a transcript at{" "}
             <Link href="/v2/upload" className="text-accent underline">

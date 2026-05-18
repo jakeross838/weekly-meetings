@@ -9,13 +9,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
-
-interface SpecialtyRow {
-  name: string;
-  days: number;
-  jobs: number;
-  avgDurationDays: number | null;
-}
+import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +30,7 @@ export default async function SubPage({
 }) {
   const supabase = supabaseServer();
 
-  const [subRes, openRes, doneRes] = await Promise.all([
+  const [subRes, openRes, doneRes, manualSpecRes] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("todos")
@@ -51,6 +45,10 @@ export default async function SubPage({
       .eq("status", "COMPLETE")
       .order("completed_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("sub_specialties")
+      .select("specialty, source, duration_days_manual_override")
+      .eq("sub_id", params.id),
   ]);
 
   const sub = subRes.data as Sub | null;
@@ -109,6 +107,54 @@ export default async function SubPage({
     }
   }
 
+  // Peer comparison: other subs in the same trade. We resolve their names
+  // (+ aliases) and run one overlapping query per peer for now — the catalog
+  // is ~54 entries so the worst-case fan-out is manageable. If perf bites,
+  // collapse to a single GROUP BY query via an RPC later.
+  type PeerStat = {
+    id: string;
+    name: string;
+    byActivity: Map<string, number>;
+  };
+  let peers: PeerStat[] = [];
+  if (sub.trade) {
+    const peerRes = await supabase
+      .from("subs")
+      .select("id, name, aliases")
+      .eq("trade", sub.trade)
+      .neq("id", sub.id);
+    const peerRows = (peerRes.data ?? []) as {
+      id: string;
+      name: string;
+      aliases: string[] | null;
+    }[];
+    peers = await Promise.all(
+      peerRows.map(async (p) => {
+        const names = Array.from(
+          new Set([p.name, ...((p.aliases ?? []) as string[])])
+        ).filter(Boolean);
+        if (names.length === 0)
+          return { id: p.id, name: p.name, byActivity: new Map() };
+        const r = await supabase
+          .from("daily_logs")
+          .select("parent_group_activities")
+          .overlaps("crews_present", names)
+          .limit(500);
+        const byA = new Map<string, number>();
+        if (!r.error) {
+          for (const row of (r.data ?? []) as {
+            parent_group_activities: string[] | null;
+          }[]) {
+            for (const tag of row.parent_group_activities ?? []) {
+              byA.set(tag, (byA.get(tag) ?? 0) + 1);
+            }
+          }
+        }
+        return { id: p.id, name: p.name, byActivity: byA };
+      })
+    );
+  }
+
   const openTodos = (openRes.data ?? []) as Todo[];
   const doneTodos = (doneRes.data ?? []) as Todo[];
 
@@ -164,6 +210,20 @@ export default async function SubPage({
             ? "D"
             : "F";
 
+  // F1+F3+I2: Specialties — auto (from daily logs) merged with manual.
+  // Auto: tag, days, jobs. Manual rows carry an optional duration override
+  // that wins over the daily-log streak estimate when present.
+  type ManualSpec = {
+    specialty: string;
+    source: string;
+    duration_days_manual_override: number | null;
+  };
+  const manualSpecs = (manualSpecRes.data ?? []) as ManualSpec[];
+  const manualNames = new Set(manualSpecs.map((m) => m.specialty));
+  const manualDurations = new Map<string, number | null>(
+    manualSpecs.map((m) => [m.specialty, m.duration_days_manual_override])
+  );
+
   // avg duration per specialty: for each tag, find contiguous presence
   // streaks per job, average their length. Approximate but cheap.
   const streaksByTag: Record<string, number[]> = {};
@@ -203,7 +263,11 @@ export default async function SubPage({
     }
   }
 
-  const specialtyRows: SpecialtyRow[] = Array.from(activityCounts.keys())
+  const allSpecNames = new Set<string>([
+    ...Array.from(activityCounts.keys()),
+    ...Array.from(manualNames),
+  ]);
+  const specialtyRows: SpecialtyRow[] = Array.from(allSpecNames)
     .map((name) => {
       const auto = activityCounts.get(name);
       const streaks = streaksByTag[name] ?? [];
@@ -211,11 +275,24 @@ export default async function SubPage({
         streaks.length > 0
           ? streaks.reduce((a, b) => a + b, 0) / streaks.length
           : null;
+      const peerCounts = peers
+        .map((p) => ({
+          name: p.name,
+          days: p.byActivity.get(name) ?? 0,
+        }))
+        .filter((p) => p.days > 0)
+        .sort((a, b) => b.days - a.days)
+        .slice(0, 3);
       return {
         name,
+        source: manualNames.has(name)
+          ? ("manual" as const)
+          : ("auto" as const),
         days: auto?.days ?? 0,
         jobs: auto?.jobs.size ?? 0,
         avgDurationDays: avg,
+        manualDurationDays: manualDurations.get(name) ?? null,
+        peers: peerCounts,
       };
     })
     .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
@@ -285,39 +362,16 @@ export default async function SubPage({
         </div>
       </section>
 
-      {/* Specialties — read-only, derived from daily logs */}
-      {specialtyRows.length > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            Specialties · {specialtyRows.length}
-          </h2>
-          <ul className="border-t border-rule">
-            {specialtyRows.map((r) => (
-              <li
-                key={r.name}
-                className="flex items-baseline justify-between gap-3 py-2 border-b border-rule"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-foreground text-sm leading-snug">
-                    {r.name}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3">
-                    {r.days}d on site · {r.jobs} job{r.jobs === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <span className="shrink-0 font-mono text-xs tabular-nums text-ink-2">
-                  {r.avgDurationDays != null
-                    ? `~${r.avgDurationDays.toFixed(1)}d avg`
-                    : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-            derived from daily logs · avg = mean streak length
-          </p>
-        </section>
-      )}
+      {/* Specialties — auto + manual */}
+      <section className="px-5 pt-10">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+          Specialties · {specialtyRows.length}
+        </h2>
+        <SpecialtiesEditor subId={sub.id} rows={specialtyRows} />
+        <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+          auto entries come from daily logs · manual entries are declared
+        </p>
+      </section>
 
       {/* Open items */}
       <section className="px-5 pt-10">

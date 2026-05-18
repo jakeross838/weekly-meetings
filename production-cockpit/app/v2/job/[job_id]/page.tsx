@@ -287,7 +287,7 @@ export default async function V2JobPage({
               href={`/v2/review`}
               className="shrink-0 text-[10px] font-mono uppercase tracking-[0.12em] text-urgent border border-urgent/60 px-2 py-1 hover:bg-urgent hover:text-paper transition-colors"
             >
-              {pendingEvents.length} pending review
+              {pendingEvents.length} plaud transcript{pendingEvents.length === 1 ? "" : "s"} to approve
             </Link>
           )}
         </div>
