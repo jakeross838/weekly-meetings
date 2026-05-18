@@ -20,6 +20,7 @@ type BTRecord = {
   crews_clean?: string[];
   crews?: string;
   absent_crews?: string[];
+  parent_group_activities?: string[];
   daily_workforce?: number | string | null;
   weatherHigh?: number | string | null;
   weatherLow?: number | string | null;
@@ -128,6 +129,9 @@ export async function POST(req: NextRequest) {
           crews_present: pickCrews(r),
           absent_crews: Array.isArray(r.absent_crews)
             ? r.absent_crews.map((s) => (s ?? "").trim()).filter(Boolean)
+            : [],
+          parent_group_activities: Array.isArray(r.parent_group_activities)
+            ? r.parent_group_activities.map((s) => (s ?? "").trim()).filter(Boolean)
             : [],
           daily_workforce: safeInt(r.daily_workforce),
           weather_high: safeInt(r.weatherHigh),
