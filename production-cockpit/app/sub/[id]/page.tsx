@@ -1,12 +1,15 @@
-// /sub/[id] — simplified sub profile.
-// Headline metrics: open, past-due, avg drift days.
-// Body: open items (action) + recently done (collapsed).
+// /sub/[id] — sub profile.
+// Header: composite Rating tile + 4 metric tiles (Open, Past due,
+// No-shows, Avg drift).
+// Specialties: auto-detected from daily logs + manually declared.
+// Body: open items + collapsed timeline + collapsed Done.
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
+import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +30,7 @@ export default async function SubPage({
 }) {
   const supabase = supabaseServer();
 
-  const [subRes, openRes, doneRes] = await Promise.all([
+  const [subRes, openRes, doneRes, manualSpecRes] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("todos")
@@ -42,6 +45,10 @@ export default async function SubPage({
       .eq("status", "COMPLETE")
       .order("completed_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("sub_specialties")
+      .select("specialty, source")
+      .eq("sub_id", params.id),
   ]);
 
   const sub = subRes.data as Sub | null;
@@ -171,28 +178,150 @@ export default async function SubPage({
         ) / driftSamples.length
       : null;
 
+  // F2: Composite rating. Transparent score 0-100 with simple weights.
+  // Inputs: past-due ratio (×40), drift days (×30 capped at 14), no-shows
+  // (×30 capped at 10). Lower score = worse. Grade letter from bands.
+  const totalOpen = openTodos.length;
+  const pastDueRatio = totalOpen > 0 ? pastDue.length / totalOpen : 0;
+  const pastDuePenalty = Math.round(pastDueRatio * 40);
+  const driftPenalty =
+    driftDays == null
+      ? 0
+      : Math.round(Math.max(0, Math.min(driftDays, 14)) * (30 / 14));
+  const noShowPenalty =
+    noShowCount == null
+      ? 0
+      : Math.round(Math.min(noShowCount, 10) * (30 / 10));
+  const ratingScore = Math.max(
+    0,
+    100 - pastDuePenalty - driftPenalty - noShowPenalty
+  );
+  const ratingHasData =
+    totalOpen + (driftSamples.length ?? 0) + (noShowCount ?? 0) > 0;
+  const ratingGrade = !ratingHasData
+    ? "—"
+    : ratingScore >= 90
+      ? "A"
+      : ratingScore >= 80
+        ? "B"
+        : ratingScore >= 70
+          ? "C"
+          : ratingScore >= 60
+            ? "D"
+            : "F";
+
+  // F1+F3: Specialties — auto (from daily logs) merged with manual.
+  // Auto: tag, days, jobs. Manual rows have days/jobs from auto if present,
+  // otherwise zero — they're declarations not yet observed.
+  type ManualSpec = { specialty: string; source: string };
+  const manualSpecs = (manualSpecRes.data ?? []) as ManualSpec[];
+  const manualNames = new Set(manualSpecs.map((m) => m.specialty));
+
+  // avg duration per specialty: for each tag, find contiguous presence
+  // streaks per job, average their length. Approximate but cheap.
+  const streaksByTag: Record<string, number[]> = {};
+  {
+    // Group presentDays by (job_key, tag)
+    type Key = string;
+    const dateLists: Record<Key, string[]> = {};
+    for (const row of presentDays) {
+      if (!row.log_date) continue;
+      for (const tag of row.parent_group_activities ?? []) {
+        const key = `${row.job_key}|${tag}`;
+        if (!dateLists[key]) dateLists[key] = [];
+        dateLists[key].push(row.log_date);
+      }
+    }
+    for (const [key, dates] of Object.entries(dateLists)) {
+      const tag = key.split("|")[1];
+      const sorted = Array.from(new Set(dates)).sort();
+      // Walk sorted dates; emit a streak length whenever the gap > 7 days.
+      let streakStart = sorted[0];
+      let prev = sorted[0];
+      for (let i = 1; i <= sorted.length; i++) {
+        const cur = sorted[i];
+        if (
+          cur == null ||
+          daysBetween(prev, cur) > 7
+        ) {
+          const len = daysBetween(streakStart, prev) + 1;
+          if (!streaksByTag[tag]) streaksByTag[tag] = [];
+          streaksByTag[tag].push(len);
+          if (cur != null) {
+            streakStart = cur;
+          }
+        }
+        if (cur != null) prev = cur;
+      }
+    }
+  }
+
+  const allSpecNames = new Set<string>([
+    ...Array.from(activityCounts.keys()),
+    ...Array.from(manualNames),
+  ]);
+  const specialtyRows: SpecialtyRow[] = Array.from(allSpecNames)
+    .map((name) => {
+      const auto = activityCounts.get(name);
+      const streaks = streaksByTag[name] ?? [];
+      const avg =
+        streaks.length > 0
+          ? streaks.reduce((a, b) => a + b, 0) / streaks.length
+          : null;
+      const peerCounts = peers
+        .map((p) => ({
+          name: p.name,
+          days: p.byActivity.get(name) ?? 0,
+        }))
+        .filter((p) => p.days > 0)
+        .sort((a, b) => b.days - a.days)
+        .slice(0, 3);
+      return {
+        name,
+        source: manualNames.has(name)
+          ? ("manual" as const)
+          : ("auto" as const),
+        days: auto?.days ?? 0,
+        jobs: auto?.jobs.size ?? 0,
+        avgDurationDays: avg,
+        peers: peerCounts,
+      };
+    })
+    .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
-      {/* Header */}
-      <header className="px-5 pt-8 pb-6">
+      {/* Header — name + trade + composite rating tile */}
+      <header className="px-5 pt-8 pb-2">
         <Link
           href="/subs"
           className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink"
         >
           ← Subs
         </Link>
-        <h1 className="mt-4 font-head text-[28px] leading-none tracking-tight text-foreground">
-          {sub.name}
-        </h1>
-        {sub.trade && (
-          <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
+              {sub.name}
+            </h1>
+            {sub.trade && (
+              <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
+            )}
+          </div>
+          <RatingTile grade={ratingGrade} score={ratingScore} hasData={ratingHasData} />
+        </div>
+        {ratingHasData && (
+          <p className="mt-3 font-mono text-[10px] text-ink-3 tabular-nums">
+            score breakdown: −{pastDuePenalty} past-due · −{driftPenalty} drift
+            · −{noShowPenalty} no-shows
+          </p>
         )}
       </header>
 
-      {/* Headline metrics — four numbers, no decoration */}
-      <section className="px-5 pt-2">
+      {/* Four-metric tiles */}
+      <section className="px-5 pt-6">
         <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4">
           <Metric label="Open" value={openTodos.length} />
           <Metric
@@ -223,6 +352,17 @@ export default async function SubPage({
             }
           />
         </div>
+      </section>
+
+      {/* Specialties — auto + manual */}
+      <section className="px-5 pt-10">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+          Specialties · {specialtyRows.length}
+        </h2>
+        <SpecialtiesEditor subId={sub.id} rows={specialtyRows} />
+        <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+          auto entries come from daily logs · manual entries are declared
+        </p>
       </section>
 
       {/* Open items */}
@@ -269,56 +409,6 @@ export default async function SubPage({
           </ul>
         )}
       </section>
-
-      {/* Activity breakdown — what this sub does, by BT parent_group tag */}
-      {activityCounts.size > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            Does · {activityCounts.size} activit
-            {activityCounts.size === 1 ? "y" : "ies"}
-          </h2>
-          <ul className="space-y-1.5">
-            {Array.from(activityCounts.entries())
-              .sort((a, b) => b[1].days - a[1].days)
-              .map(([tag, rec]) => {
-                // Compare against peers
-                const peerCounts = peers
-                  .map((p) => ({
-                    name: p.name,
-                    days: p.byActivity.get(tag) ?? 0,
-                  }))
-                  .filter((p) => p.days > 0)
-                  .sort((a, b) => b.days - a.days)
-                  .slice(0, 3);
-                return (
-                  <li
-                    key={tag}
-                    className="py-1.5 border-b border-rule-soft last:border-b-0"
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm text-foreground">{tag}</span>
-                      <span className="font-mono text-xs text-ink-2 tabular-nums">
-                        {rec.days}d · {rec.jobs.size} job
-                        {rec.jobs.size === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                    {peerCounts.length > 0 && (
-                      <p className="mt-1 font-mono text-[10px] text-ink-3 tabular-nums">
-                        peers:{" "}
-                        {peerCounts
-                          .map((p) => `${p.name.split(" ")[0]} ${p.days}d`)
-                          .join(" · ")}
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-          </ul>
-          <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-            from daily logs · last 120 entries
-          </p>
-        </section>
-      )}
 
       {/* Activity timeline — chronological list of on-site days */}
       {presentDays.length > 0 && (
@@ -405,6 +495,40 @@ function Metric({
           {sub}
         </span>
       )}
+    </div>
+  );
+}
+
+function RatingTile({
+  grade,
+  score,
+  hasData,
+}: {
+  grade: string;
+  score: number;
+  hasData: boolean;
+}) {
+  const tone =
+    grade === "A"
+      ? "text-success border-success"
+      : grade === "B"
+        ? "text-ink border-ink"
+        : grade === "C"
+          ? "text-high border-high"
+          : grade === "D" || grade === "F"
+            ? "text-urgent border-urgent"
+            : "text-ink-3 border-rule";
+  return (
+    <div
+      className={`shrink-0 flex flex-col items-center justify-center w-16 h-16 border-2 ${tone}`}
+      title={hasData ? `Score ${score}/100` : "No data yet"}
+    >
+      <span className="font-head text-3xl font-bold leading-none tabular-nums">
+        {grade}
+      </span>
+      <span className="mt-0.5 font-mono text-[9px] tracking-[0.12em] uppercase opacity-70">
+        {hasData ? score : "—"}
+      </span>
     </div>
   );
 }
