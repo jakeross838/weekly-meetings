@@ -11,11 +11,14 @@ export interface SpecialtyRow {
   source: "auto" | "manual";
   days: number;
   jobs: number;
-  // Auto-computed from contiguous presence streaks in daily logs.
+  // Simple average: total on-site days summed across jobs, divided by job
+  // count. Easier to explain than the streak-mean we used previously.
   avgDurationDays: number | null;
   // Operator-entered duration; takes precedence over avgDurationDays when set.
   manualDurationDays: number | null;
   peers: { name: string; days: number }[];
+  // Per-job breakdown that powers the citation line under each row.
+  jobBreakdown: { jobKey: string; jobName: string; days: number }[];
 }
 
 export function SpecialtiesEditor({
@@ -191,7 +194,7 @@ export function SpecialtiesEditor({
         }
       >
         {display == null
-          ? "— set"
+          ? "no data"
           : `${display.toFixed(1)}d/job`}
         {isManual && "*"}
       </button>
@@ -202,8 +205,8 @@ export function SpecialtiesEditor({
     <div>
       {rows.length === 0 ? (
         <p className="text-ink-3 text-sm py-2">
-          No specialties tracked yet. Add one below, or click "Seed default
-          specialties" on /subs.
+          No specialties tracked yet. Specialties auto-populate from daily
+          logs (Buildertrend), or add one manually below.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -243,8 +246,16 @@ export function SpecialtiesEditor({
                   )}
                 </div>
               </div>
-              {r.peers.length > 0 && (
+              {r.jobBreakdown.length > 0 && (
                 <p className="mt-1 font-mono text-[10px] text-ink-3 tabular-nums">
+                  sources:{" "}
+                  {r.jobBreakdown
+                    .map((j) => `${j.jobName} ${j.days}d`)
+                    .join(" · ")}
+                </p>
+              )}
+              {r.peers.length > 0 && (
+                <p className="mt-0.5 font-mono text-[10px] text-ink-3 tabular-nums opacity-70">
                   peers:{" "}
                   {r.peers
                     .map((p) => `${p.name.split(" ")[0]} ${p.days}d`)

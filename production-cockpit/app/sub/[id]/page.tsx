@@ -34,7 +34,7 @@ export default async function SubPage({
   const catFilter = searchParams.cat ?? null;
   const supabase = supabaseServer();
 
-  const [subRes, openRes, doneRes, manualSpecRes] = await Promise.all([
+  const [subRes, openRes, doneRes, manualSpecRes, jobsRes] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("todos")
@@ -53,7 +53,12 @@ export default async function SubPage({
       .from("sub_specialties")
       .select("specialty, source, duration_days_manual_override")
       .eq("sub_id", params.id),
+    supabase.from("jobs").select("id, name"),
   ]);
+  const jobNameById: Record<string, string> = {};
+  for (const j of ((jobsRes.data ?? []) as { id: string; name: string }[])) {
+    jobNameById[j.id] = j.name;
+  }
 
   const sub = subRes.data as Sub | null;
   if (!sub) notFound();
@@ -234,13 +239,13 @@ export default async function SubPage({
     manualSpecs.map((m) => [m.specialty, m.duration_days_manual_override])
   );
 
-  // avg duration per specialty: for each tag, find contiguous presence
-  // streaks per job, average their length. Approximate but cheap.
-  const streaksByTag: Record<string, number[]> = {};
+  // Per-tag breakdown of contiguous presence streaks, retaining which
+  // job each streak belongs to so the UI can cite sources (e.g.
+  // "Krauss 5d · Pou 7d · Ruthven 6d"). A streak is a run of on-site
+  // days for this sub on a given job, broken by gaps > 7 days.
+  const streaksByTag: Record<string, { jobKey: string; days: number }[]> = {};
   {
-    // Group presentDays by (job_key, tag)
-    type Key = string;
-    const dateLists: Record<Key, string[]> = {};
+    const dateLists: Record<string, string[]> = {};
     for (const row of presentDays) {
       if (!row.log_date) continue;
       for (const tag of row.parent_group_activities ?? []) {
@@ -250,23 +255,17 @@ export default async function SubPage({
       }
     }
     for (const [key, dates] of Object.entries(dateLists)) {
-      const tag = key.split("|")[1];
+      const [jobKey, tag] = key.split("|");
       const sorted = Array.from(new Set(dates)).sort();
-      // Walk sorted dates; emit a streak length whenever the gap > 7 days.
       let streakStart = sorted[0];
       let prev = sorted[0];
       for (let i = 1; i <= sorted.length; i++) {
         const cur = sorted[i];
-        if (
-          cur == null ||
-          daysBetween(prev, cur) > 7
-        ) {
+        if (cur == null || daysBetween(prev, cur) > 7) {
           const len = daysBetween(streakStart, prev) + 1;
           if (!streaksByTag[tag]) streaksByTag[tag] = [];
-          streaksByTag[tag].push(len);
-          if (cur != null) {
-            streakStart = cur;
-          }
+          streaksByTag[tag].push({ jobKey, days: len });
+          if (cur != null) streakStart = cur;
         }
         if (cur != null) prev = cur;
       }
@@ -281,10 +280,25 @@ export default async function SubPage({
     .map((name) => {
       const auto = activityCounts.get(name);
       const streaks = streaksByTag[name] ?? [];
-      const avg =
-        streaks.length > 0
-          ? streaks.reduce((a, b) => a + b, 0) / streaks.length
-          : null;
+      // Roll streaks up per job — one job can have several visits, sum
+      // their days so the citation shows total time on that job.
+      const perJob = new Map<string, number>();
+      for (const s of streaks) {
+        perJob.set(s.jobKey, (perJob.get(s.jobKey) ?? 0) + s.days);
+      }
+      const jobBreakdown = Array.from(perJob.entries())
+        .map(([jobKey, days]) => ({
+          jobKey,
+          jobName: jobNameById[jobKey] ?? jobKey,
+          days,
+        }))
+        .sort((a, b) => b.days - a.days);
+      // Simple average: total days across all jobs / number of jobs.
+      // Easier to explain than the streak-mean used previously.
+      const totalDays = jobBreakdown.reduce((s, j) => s + j.days, 0);
+      const avg = jobBreakdown.length > 0
+        ? totalDays / jobBreakdown.length
+        : null;
       const peerCounts = peers
         .map((p) => ({
           name: p.name,
@@ -303,6 +317,7 @@ export default async function SubPage({
         avgDurationDays: avg,
         manualDurationDays: manualDurations.get(name) ?? null,
         peers: peerCounts,
+        jobBreakdown,
       };
     })
     .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
