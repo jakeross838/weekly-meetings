@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { CATEGORIES, styleFor } from "@/lib/categories";
 
 interface PMOpt {
   id: string;
@@ -496,6 +497,28 @@ export function ImportForm({
                                     extractor said: {row.sub_name}
                                   </span>
                                 )}
+                                <select
+                                  value={row.category ?? ""}
+                                  onChange={(e) =>
+                                    updateRow(key, {
+                                      category: e.target.value || "",
+                                    })
+                                  }
+                                  className={`border border-rule px-2 py-1 text-xs focus:outline-none focus:border-ink font-mono tracking-[0.12em] ${styleFor(row.category)}`}
+                                  aria-label="Category"
+                                  title={
+                                    row.category
+                                      ? `AI picked ${row.category} — change if needed`
+                                      : "Pick a category"
+                                  }
+                                >
+                                  <option value="">— category —</option>
+                                  {CATEGORIES.map((c) => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               {row.source_excerpt && (
                                 <p className="pt-1 font-mono text-[10px] text-ink-3 italic leading-snug">
