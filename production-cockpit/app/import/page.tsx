@@ -8,6 +8,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { PM } from "@/lib/types";
 import { Header } from "@/components/header";
 import { ImportForm } from "@/components/import-form";
+import { BtSyncButton } from "@/components/bt-sync-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -70,14 +71,29 @@ export default async function ImportPage() {
           Daily logs
         </h2>
         <p className="text-xs text-ink-3 mb-4">
-          Buildertrend scraper JSON — contains the full week (or however far
-          back the scraper ran) for every job. Powers the no-show metric on{" "}
-          <Link href="/subs" className="text-accent hover:underline">
-            /subs
-          </Link>
-          .
+          One-click button below logs into Buildertrend, downloads daily
+          logs + photos, writes to Supabase, and runs Claude vision over
+          the photos. Or drop a scraper JSON manually further down.
         </p>
-        <DailyLogUploadForm />
+        <div className="mb-6">
+          <BtSyncButton />
+        </div>
+        <details className="mb-6">
+          <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
+            Manual upload (advanced)
+          </summary>
+          <div className="mt-3">
+            <p className="text-xs text-ink-3 mb-4">
+              Drop a Buildertrend scraper JSON — full week for every job.
+              Powers the no-show metric on{" "}
+              <Link href="/subs" className="text-accent hover:underline">
+                /subs
+              </Link>
+              .
+            </p>
+            <DailyLogUploadForm />
+          </div>
+        </details>
       </section>
     </main>
   );
