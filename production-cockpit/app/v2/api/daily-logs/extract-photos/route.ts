@@ -17,12 +17,64 @@
 //    bounded per click.
 
 import { NextRequest, NextResponse } from "next/server";
+import { promises as fs } from "fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+// Photos in daily_logs.photo_urls may be either remote URLs (presigned BT,
+// public hosts, etc.) or absolute local file paths written by the
+// buildertrend-scraper (e.g. C:\Users\Greg\buildertrend-scraper\photos\...).
+// We detect path-vs-URL and base64-encode local files for the Claude call
+// so the scraper-driven flow works without a public host.
+function isLocalPath(s: string): boolean {
+  if (s.startsWith("file://")) return true;
+  if (/^https?:\/\//i.test(s)) return false;
+  // Windows: "C:\..." or "C:/..."
+  if (/^[A-Za-z]:[\\/]/.test(s)) return true;
+  // POSIX absolute
+  if (s.startsWith("/")) return true;
+  return false;
+}
+
+function mediaTypeFor(path: string): "image/jpeg" | "image/png" | "image/webp" | "image/gif" {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+async function buildImageBlock(
+  src: string
+): Promise<Anthropic.Messages.ContentBlockParam | null> {
+  if (!isLocalPath(src)) {
+    return {
+      type: "image",
+      source: { type: "url", url: src },
+    } as Anthropic.Messages.ContentBlockParam;
+  }
+  const filePath = src.startsWith("file://")
+    ? decodeURI(src.slice("file://".length).replace(/^\/(?=[A-Za-z]:)/, ""))
+    : src;
+  try {
+    const bytes = await fs.readFile(filePath);
+    return {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mediaTypeFor(filePath),
+        data: bytes.toString("base64"),
+      },
+    } as Anthropic.Messages.ContentBlockParam;
+  } catch {
+    // Caller treats null as "skip this photo".
+    return null;
+  }
+}
 
 const MAX_PHOTOS_PER_LOG = 6;
 const DEFAULT_BATCH_LIMIT = 10;
@@ -144,11 +196,28 @@ export async function POST(req: NextRequest) {
     if (photos.length === 0) continue;
 
     const content: Anthropic.Messages.ContentBlockParam[] = [];
-    for (const url of photos) {
-      content.push({
-        type: "image",
-        source: { type: "url", url },
+    let skipped = 0;
+    for (const src of photos) {
+      const block = await buildImageBlock(src);
+      if (block) content.push(block);
+      else skipped += 1;
+    }
+    if (content.length === 0) {
+      results.push({
+        log_id: row.id,
+        job_key: row.job_key,
+        log_date: row.log_date,
+        ok: false,
+        photoCount: photos.length,
+        error: `All ${photos.length} photos unreadable (local files missing? URLs require auth?)`,
       });
+      continue;
+    }
+    if (skipped > 0) {
+      // Don't fail the whole log on a single missing file — just note it.
+      console.warn(
+        `[extract-photos] log ${row.id}: skipped ${skipped} unreadable photo(s)`
+      );
     }
     content.push({ type: "text", text: buildPrompt(row) });
 
