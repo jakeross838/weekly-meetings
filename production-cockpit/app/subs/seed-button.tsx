@@ -42,19 +42,33 @@ export function SeedSpecialtiesButton() {
   }
 
   return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={run}
-        disabled={busy}
-        className="font-mono text-[10px] tracking-[0.18em] uppercase text-accent hover:underline disabled:opacity-50"
-      >
-        {busy ? "Seeding…" : "Seed default specialties"}
-      </button>
+    <div className="mt-4 border border-rule bg-paper px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+            Seed sub specialties
+          </p>
+          <p className="mt-1 text-xs text-ink-2 leading-snug">
+            Auto-populate every sub with sensible default work types based on
+            their trade (Tile → Prep, Lay, Grout; Paint → Prep, Exterior,
+            Interior; etc.)
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          className="shrink-0 bg-accent text-paper px-4 py-2 text-xs font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          {busy ? "Seeding…" : "Seed"}
+        </button>
+      </div>
       {msg && (
         <p className="mt-2 font-mono text-[10px] text-success/80">{msg}</p>
       )}
-      {err && <p className="mt-2 text-xs text-urgent">{err}</p>}
+      {err && (
+        <p className="mt-2 text-xs text-urgent break-words">{err}</p>
+      )}
     </div>
   );
 }
