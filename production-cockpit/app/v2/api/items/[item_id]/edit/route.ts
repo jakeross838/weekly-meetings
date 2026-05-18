@@ -1,15 +1,23 @@
 // POST /v2/api/items/[item_id]/edit
-// Body: { title?: string, detail?: string, target_date?: string, target_date_text?: string }
+// Body: { title?, detail?, target_date?, target_date_text?, sub_id?, category? }
 //
 // Mutates the item and appends edited field names to manually_edited_fields
 // (Decision 11 clobber protection — future Reconciler runs will preserve these).
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED = new Set(["title", "detail", "target_date", "target_date_text"]);
+const ALLOWED = new Set([
+  "title",
+  "detail",
+  "target_date",
+  "target_date_text",
+  "sub_id",
+  "category",
+]);
 
 export async function POST(
   req: NextRequest,
@@ -59,5 +67,10 @@ export async function POST(
     .select()
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const jobId = (data?.job_id as string | undefined) ?? undefined;
+  if (jobId) revalidatePath(`/v2/job/${jobId}`);
+  revalidatePath("/");
+
   return NextResponse.json({ item: data });
 }

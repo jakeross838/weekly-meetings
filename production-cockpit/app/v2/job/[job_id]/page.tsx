@@ -11,6 +11,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
+import { RowClient } from "./row-client";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,11 @@ interface RowData {
   id: string;
   source: "item" | "todo";
   title: string;
+  sub_id: string | null;
   sub_name: string | null;
   owner: string | null;
   target_date: string | null; // ISO yyyy-mm-dd
+  category: string | null;
   carryover_count: number;
   created_at: string;
   completed_at: string | null;
@@ -90,19 +93,19 @@ export default async function V2JobPage({
     pm_id: string | null;
   };
 
-  const [itemsRes, todosRes, completedItemsRes, completedTodosRes, pendingEventsRes] =
+  const [itemsRes, todosRes, completedItemsRes, completedTodosRes, pendingEventsRes, subsRes] =
     await Promise.all([
       supabase
         .from("items")
         .select(
-          "id, title, sub_id, owner, target_date, status, actionability, carryover_count, created_at, completed_at, sub:subs(id, name)"
+          "id, title, sub_id, owner, target_date, status, actionability, category, carryover_count, created_at, completed_at, sub:subs(id, name)"
         )
         .eq("job_id", job_id)
         .in("status", ["open", "in_progress", "blocked"]),
       supabase
         .from("todos")
         .select(
-          "id, title, edited_title, due_date, status, sub_id, created_at, completed_at, sub:subs(id, name)"
+          "id, title, edited_title, due_date, status, sub_id, category, created_at, completed_at, sub:subs(id, name)"
         )
         .eq("job", job.name)
         .in("status", OPEN_STATUSES as Status[]),
@@ -127,6 +130,7 @@ export default async function V2JobPage({
         .select("id, proposed_count")
         .eq("job_id", job_id)
         .in("review_state", ["pending", "in_review"]),
+      supabase.from("subs").select("id, name").order("name"),
     ]);
 
   const pendingEvents = (pendingEventsRes.data ?? []) as {
@@ -141,6 +145,7 @@ export default async function V2JobPage({
     owner: string | null;
     target_date: string | null;
     actionability: "actionable" | "signal" | null;
+    category: string | null;
     carryover_count: number | null;
     created_at: string;
     completed_at: string | null;
@@ -152,10 +157,13 @@ export default async function V2JobPage({
     edited_title: string | null;
     due_date: string | null;
     sub_id: string | null;
+    category: string | null;
     created_at: string;
     completed_at: string | null;
     sub: { id: string; name: string } | null;
   };
+
+  const subs = (subsRes.data ?? []) as { id: string; name: string }[];
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -176,9 +184,11 @@ export default async function V2JobPage({
     id: i.id,
     source: "item",
     title: i.title,
+    sub_id: i.sub_id,
     sub_name: i.sub?.name ?? null,
     owner: i.owner,
     target_date: i.target_date,
+    category: i.category,
     carryover_count: i.carryover_count ?? 0,
     created_at: i.created_at,
     completed_at: i.completed_at,
@@ -188,9 +198,11 @@ export default async function V2JobPage({
     id: t.id,
     source: "todo",
     title: t.edited_title ?? t.title,
+    sub_id: t.sub_id,
     sub_name: t.sub?.name ?? null,
     owner: null,
     target_date: t.due_date,
+    category: t.category,
     carryover_count: 0,
     created_at: t.created_at,
     completed_at: t.completed_at,
@@ -285,9 +297,9 @@ export default async function V2JobPage({
         <p className="px-5 pt-8 text-ink-3 text-sm">All clear.</p>
       )}
 
-      <Section title="Today" rows={todayRows} today={today} highlight />
-      <Section title="Soon" rows={soonRows} today={today} />
-      <Section title="Open" rows={openRows} today={today} hideRightSlot />
+      <Section title="Today" rows={todayRows} today={today} subs={subs} highlight />
+      <Section title="Soon" rows={soonRows} today={today} subs={subs} />
+      <Section title="Open" rows={openRows} today={today} subs={subs} hideRightSlot />
 
       {completedRows.length > 0 && (
         <section className="px-5 pt-10">
@@ -319,12 +331,14 @@ function Section({
   title,
   rows,
   today,
+  subs,
   highlight,
   hideRightSlot,
 }: {
   title: string;
   rows: RowData[];
   today: string;
+  subs: { id: string; name: string }[];
   highlight?: boolean;
   hideRightSlot?: boolean;
 }) {
@@ -336,55 +350,25 @@ function Section({
       </h2>
       <ul className="space-y-2">
         {rows.map((r) => (
-          <Row
+          <RowClient
             key={`${r.source}:${r.id}`}
-            row={r}
+            id={r.id}
+            source={r.source}
+            title={r.title}
+            sub_id={r.sub_id}
+            sub_name={r.sub_name}
+            owner={r.owner}
+            target_date={r.target_date}
+            category={r.category}
             today={today}
             highlight={
               highlight && r.target_date != null && r.target_date < today
             }
             hideRightSlot={hideRightSlot}
+            subs={subs}
           />
         ))}
       </ul>
     </section>
-  );
-}
-
-function Row({
-  row,
-  today,
-  highlight,
-  hideRightSlot,
-}: {
-  row: RowData;
-  today: string;
-  highlight?: boolean;
-  hideRightSlot?: boolean;
-}) {
-  const subLabel = row.sub_name ?? row.owner ?? null;
-  return (
-    <li
-      className={`py-1.5 min-h-[40px] ${
-        highlight ? "border-l-2 border-urgent pl-2 -ml-2" : ""
-      }`}
-    >
-      <div className="flex gap-3 items-baseline">
-        <CheckOffButton itemId={row.id} source={row.source} />
-        <p className="flex-1 min-w-0 text-foreground text-sm leading-snug">
-          {row.title}
-          {subLabel && <span className="text-ink-3"> · {subLabel}</span>}
-        </p>
-        {!hideRightSlot && row.target_date && (
-          <span
-            className={`shrink-0 text-xs font-mono ${
-              highlight ? "text-urgent" : "text-ink-3"
-            }`}
-          >
-            {dayLabel(row.target_date, today)}
-          </span>
-        )}
-      </div>
-    </li>
   );
 }
