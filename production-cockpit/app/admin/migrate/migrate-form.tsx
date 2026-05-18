@@ -82,7 +82,7 @@ export function MigrateForm() {
               href="/subs"
               className="inline-block bg-accent text-paper px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
             >
-              Go to /subs → click "Seed"
+              Go to /subs → click &quot;Seed&quot;
             </a>
           </div>
         )}

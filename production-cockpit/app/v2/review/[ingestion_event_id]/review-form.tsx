@@ -88,7 +88,6 @@ export function ReviewForm({
   changes,
   claimById,
   subs,
-  jobs,
   alreadyClosed,
 }: {
   ingestionEventId: string;

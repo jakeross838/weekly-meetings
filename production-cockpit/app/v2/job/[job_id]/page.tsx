@@ -40,26 +40,6 @@ function inDaysIso(days: number): string {
   return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-function dayLabel(iso: string, today: string): string {
-  if (iso < today) {
-    const days = Math.floor(
-      (new Date(today).getTime() - new Date(iso).getTime()) / 86_400_000
-    );
-    return `-${days}d`;
-  }
-  if (iso === today) return "today";
-  const days = Math.floor(
-    (new Date(iso).getTime() - new Date(today).getTime()) / 86_400_000
-  );
-  if (days <= 7) {
-    return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
-      weekday: "short",
-      timeZone: "UTC",
-    });
-  }
-  return `${days}d`;
-}
-
 export default async function V2JobPage({
   params,
   searchParams,
