@@ -1,0 +1,246 @@
+// POST /v2/api/daily-logs/extract-photos
+// Body: { log_ids?: string[], limit?: number }
+//
+// Walks daily_logs rows that have photo_urls but no photo_summary yet,
+// calls Claude (vision) for up to `limit` of them, and writes a structured
+// JSON summary back into daily_logs.photo_summary. One log == one Claude
+// call so a single failure doesn't poison the batch.
+//
+// The summary schema is:
+//   { headline, work_stage, subs_visible, work_observed, hazards, weather_notes, confidence }
+//
+// Notes:
+//  - Only URL-fetchable photos work. BT-internal URLs that require auth
+//    will fail; the route returns the per-log error in the response so the
+//    operator can investigate.
+//  - This is rate-limited by `limit` (default 10) to keep Claude bills
+//    bounded per click.
+
+import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { revalidatePath } from "next/cache";
+import { supabaseServer } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
+const MAX_PHOTOS_PER_LOG = 6;
+const DEFAULT_BATCH_LIMIT = 10;
+
+interface ExtractedSummary {
+  headline: string;
+  work_stage: string | null;
+  subs_visible: string[];
+  work_observed: string[];
+  hazards: string[];
+  weather_notes: string | null;
+  confidence: "high" | "medium" | "low";
+}
+
+type LogRow = {
+  id: string;
+  job_key: string;
+  log_date: string | null;
+  photo_urls: string[] | null;
+  notes: string | null;
+  parent_group_activities: string[] | null;
+  crews_present: string[] | null;
+};
+
+function buildPrompt(row: LogRow): string {
+  const ctx: string[] = [];
+  if (row.log_date) ctx.push(`Date: ${row.log_date}`);
+  if (row.job_key) ctx.push(`Job: ${row.job_key}`);
+  if (row.crews_present?.length)
+    ctx.push(`Crews on site (per BT): ${row.crews_present.join(", ")}`);
+  if (row.parent_group_activities?.length)
+    ctx.push(`Activities tagged: ${row.parent_group_activities.join(", ")}`);
+  if (row.notes) ctx.push(`PM notes: ${row.notes.slice(0, 600)}`);
+  const ctxBlock = ctx.length > 0 ? ctx.join("\n") + "\n\n" : "";
+  return `${ctxBlock}You are summarizing the photos from a single Buildertrend daily log on a Ross Built custom-home job. Look at every photo and return ONE JSON object with this exact shape:
+
+{
+  "headline": "<≤80 chars — one-sentence what's happening overall>",
+  "work_stage": "<one of: site prep, foundation, framing, dry-in, rough-in, drywall, finish, exterior, punch, or null if mixed/unclear>",
+  "subs_visible": ["<branded trade names visible on shirts/vehicles, else trade nouns like 'electrician', 'framer'>"],
+  "work_observed": ["<concrete observation 1>", "<observation 2>", "..."],
+  "hazards": ["<safety concern — open trenches, missing fall protection, exposed wire, etc. EMPTY array if none>"],
+  "weather_notes": "<conditions visible in photos (sun, rain, mud, standing water) or null>",
+  "confidence": "high|medium|low"
+}
+
+Rules:
+- If the photos do not actually show construction (e.g. blank office photos, screenshots), return confidence "low" and put a note in headline.
+- Do NOT invent subs or work that isn't visible.
+- The "work_observed" array is the main payload — 3-7 specific items is ideal.
+- Return ONLY the JSON, no prose, no fences.`;
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = supabaseServer();
+
+  let body: { log_ids?: string[]; limit?: number } = {};
+  try {
+    body = await req.json();
+  } catch {
+    // empty body is fine — defaults
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return NextResponse.json(
+      { ok: false, error: "Server missing ANTHROPIC_API_KEY" },
+      { status: 500 }
+    );
+  }
+  const client = new Anthropic({ apiKey: anthropicKey });
+
+  const limit = Math.max(
+    1,
+    Math.min(50, body.limit ?? DEFAULT_BATCH_LIMIT)
+  );
+
+  // Pull candidate rows. If log_ids passed, use those; otherwise grab the
+  // most recent N logs that have photos but no summary yet.
+  let query = supabase
+    .from("daily_logs")
+    .select(
+      "id, job_key, log_date, photo_urls, notes, parent_group_activities, crews_present, photo_summary"
+    )
+    .not("photo_urls", "is", null)
+    .limit(limit);
+  if (Array.isArray(body.log_ids) && body.log_ids.length > 0) {
+    query = query.in("id", body.log_ids);
+  } else {
+    query = query.is("photo_summary", null).order("log_date", {
+      ascending: false,
+    });
+  }
+  const { data: rows, error } = await query;
+  if (error) {
+    return NextResponse.json(
+      { ok: false, error: `daily_logs query failed: ${error.message}` },
+      { status: 500 }
+    );
+  }
+  const candidates = (rows ?? []) as (LogRow & { photo_summary: unknown })[];
+  const work = candidates.filter(
+    (r) => Array.isArray(r.photo_urls) && r.photo_urls.length > 0
+  );
+
+  type PerLog = {
+    log_id: string;
+    job_key: string;
+    log_date: string | null;
+    ok: boolean;
+    photoCount: number;
+    summary?: ExtractedSummary;
+    error?: string;
+  };
+  const results: PerLog[] = [];
+
+  for (const row of work) {
+    const photos = (row.photo_urls ?? []).slice(0, MAX_PHOTOS_PER_LOG);
+    if (photos.length === 0) continue;
+
+    const content: Anthropic.Messages.ContentBlockParam[] = [];
+    for (const url of photos) {
+      content.push({
+        type: "image",
+        source: { type: "url", url },
+      });
+    }
+    content.push({ type: "text", text: buildPrompt(row) });
+
+    try {
+      const resp = await client.messages.create({
+        model: "claude-opus-4-7",
+        max_tokens: 1200,
+        messages: [{ role: "user", content }],
+      });
+      const raw = resp.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("");
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) {
+        results.push({
+          log_id: row.id,
+          job_key: row.job_key,
+          log_date: row.log_date,
+          ok: false,
+          photoCount: photos.length,
+          error: "No JSON in Claude response",
+        });
+        continue;
+      }
+      let parsed: ExtractedSummary;
+      try {
+        parsed = JSON.parse(m[0]) as ExtractedSummary;
+      } catch (e) {
+        results.push({
+          log_id: row.id,
+          job_key: row.job_key,
+          log_date: row.log_date,
+          ok: false,
+          photoCount: photos.length,
+          error: `JSON parse: ${(e as Error).message}`,
+        });
+        continue;
+      }
+
+      // Persist. The column is jsonb so we can write the object directly.
+      const { error: upErr } = await supabase
+        .from("daily_logs")
+        .update({
+          photo_summary: parsed,
+          photo_summary_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (upErr) {
+        results.push({
+          log_id: row.id,
+          job_key: row.job_key,
+          log_date: row.log_date,
+          ok: false,
+          photoCount: photos.length,
+          error: `update: ${upErr.message}`,
+        });
+        continue;
+      }
+
+      results.push({
+        log_id: row.id,
+        job_key: row.job_key,
+        log_date: row.log_date,
+        ok: true,
+        photoCount: photos.length,
+        summary: parsed,
+      });
+    } catch (e) {
+      // Vision call can fail if BT URLs require auth or if Claude rejects
+      // the image. Surface the message verbatim so the operator knows
+      // whether to switch to base64 / re-host.
+      results.push({
+        log_id: row.id,
+        job_key: row.job_key,
+        log_date: row.log_date,
+        ok: false,
+        photoCount: photos.length,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  // Invalidate sub profiles since they render photo_summary rows.
+  revalidatePath("/sub/[id]", "page");
+  revalidatePath("/subs");
+
+  return NextResponse.json({
+    ok: true,
+    considered: candidates.length,
+    processed: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  });
+}

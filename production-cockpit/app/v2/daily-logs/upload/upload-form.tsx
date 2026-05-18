@@ -9,6 +9,21 @@ type UploadResult = {
   per_job: Record<string, { total: number; inserted: number; skipped: number }>;
 };
 
+type ExtractResult = {
+  ok: true;
+  considered: number;
+  processed: number;
+  failed: number;
+  results: Array<{
+    log_id: string;
+    job_key: string;
+    log_date: string | null;
+    ok: boolean;
+    photoCount: number;
+    error?: string;
+  }>;
+};
+
 export function DailyLogUploadForm() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [filename, setFilename] = useState("");
@@ -20,6 +35,7 @@ export function DailyLogUploadForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [extract, setExtract] = useState<ExtractResult | null>(null);
 
   function onFile(file: File) {
     setError(null);
@@ -57,6 +73,84 @@ export function DailyLogUploadForm() {
     };
     reader.onerror = () => setError("Could not read file");
     reader.readAsText(file);
+  }
+
+  function PhotoExtractTrigger() {
+    const [busy2, setBusy2] = useState(false);
+    const [err2, setErr2] = useState<string | null>(null);
+    async function extractPhotos() {
+      setBusy2(true);
+      setErr2(null);
+      try {
+        const resp = await fetch("/v2/api/daily-logs/extract-photos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 10 }),
+        });
+        const data = (await resp.json()) as ExtractResult | { error: string };
+        if (!resp.ok || !("ok" in data)) {
+          setErr2(
+            "error" in data ? data.error : `HTTP ${resp.status}`
+          );
+          setBusy2(false);
+          return;
+        }
+        setExtract(data);
+        setBusy2(false);
+      } catch (e) {
+        setErr2((e as Error).message);
+        setBusy2(false);
+      }
+    }
+    if (extract) {
+      const failedRows = extract.results.filter((r) => !r.ok);
+      return (
+        <div className="mt-2 space-y-2">
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-success/80">
+            Photo extract · {extract.processed} processed
+            {extract.failed > 0 && (
+              <span className="text-urgent">
+                {" "}
+                · {extract.failed} failed
+              </span>
+            )}
+          </p>
+          {failedRows.length > 0 && (
+            <details>
+              <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+                show {failedRows.length} failure
+                {failedRows.length === 1 ? "" : "s"}
+              </summary>
+              <ul className="mt-1 space-y-1">
+                {failedRows.map((r) => (
+                  <li
+                    key={r.log_id}
+                    className="font-mono text-[11px] text-urgent/90"
+                  >
+                    {r.job_key} {r.log_date ?? ""}: {r.error}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={extractPhotos}
+          disabled={busy2}
+          className="text-xs px-3 py-1.5 border border-accent text-accent hover:bg-accent hover:text-paper transition-colors disabled:opacity-50"
+        >
+          {busy2
+            ? "Extracting photo context…"
+            : "✨ Extract photo context (10 most recent)"}
+        </button>
+        {err2 && <p className="mt-2 text-xs text-urgent">{err2}</p>}
+      </div>
+    );
   }
 
   async function submit() {
@@ -109,6 +203,12 @@ export function DailyLogUploadForm() {
             </li>
           ))}
         </ul>
+
+        {/* F8 — kick off photo vision pass for any newly-uploaded logs that
+            have photos but no summary yet. Processes up to 10 per click to
+            keep Claude usage bounded. */}
+        <PhotoExtractTrigger />
+
         <button
           type="button"
           onClick={() => {
@@ -118,6 +218,7 @@ export function DailyLogUploadForm() {
             setBytes(0);
             setJobCount(0);
             setRecordCount(0);
+            setExtract(null);
           }}
           className="mt-2 text-xs underline text-accent"
         >
