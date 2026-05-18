@@ -8,35 +8,44 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const pmsRes = await supabase
-    .from("pms")
-    .select("id, full_name, active")
-    .eq("active", true)
-    .order("full_name");
+  const [pmsRes, jobsRes, assignRes] = await Promise.all([
+    supabase
+      .from("pms")
+      .select("id, full_name, active")
+      .eq("active", true)
+      .order("full_name"),
+    supabase.from("jobs").select("id, name").order("name"),
+    supabase
+      .from("job_pm_assignments")
+      .select("job_id, pm_id")
+      .is("ended_at", null),
+  ]);
   const pms = (pmsRes.data ?? []) as PM[];
+  const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
+  const assignments = (assignRes.data ?? []) as {
+    job_id: string;
+    pm_id: string;
+  }[];
 
   return (
-    <main className="max-w-[480px] lg:max-w-[960px] mx-auto min-h-screen bg-background">
+    <main className="max-w-[560px] mx-auto min-h-screen bg-background">
       <Header />
-      <div className="px-6 lg:px-10 py-4 border-b border-rule flex items-center justify-between">
+      <div className="px-5 pt-8">
         <Link
           href="/"
-          className="text-[12px] tracking-[0.16em] uppercase font-medium text-ink-2 hover:text-accent"
+          className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink"
         >
           ← Back
         </Link>
-      </div>
-      <div className="px-6 lg:px-10 pt-8 pb-6 border-b border-rule">
-        <h1 className="font-head text-4xl lg:text-5xl font-semibold leading-tight text-ink">
-          Import Transcript
+        <h1 className="mt-4 font-head text-[28px] leading-none tracking-tight text-foreground">
+          Import transcript
         </h1>
-        <p className="mt-3 text-[15px] text-ink-2 max-w-prose leading-relaxed">
-          Drop a Plaud transcript and Claude will extract action items, group
-          them by sub, and queue them for review before writing to the cockpit.
-          Existing binders/*.json pipeline is untouched.
+        <p className="mt-2 text-ink-3 text-sm">
+          Drop a Plaud .txt — PM, job, date, and meeting type auto-fill from the
+          filename.
         </p>
       </div>
-      <ImportForm pms={pms} />
+      <ImportForm pms={pms} jobs={jobs} assignments={assignments} />
     </main>
   );
 }

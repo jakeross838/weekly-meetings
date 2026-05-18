@@ -8,8 +8,72 @@ interface PMOpt {
   full_name: string;
 }
 
+interface JobOpt {
+  id: string;
+  name: string;
+}
+
+interface Assignment {
+  job_id: string;
+  pm_id: string;
+}
+
 interface ImportFormProps {
   pms: PMOpt[];
+  jobs?: JobOpt[];
+  assignments?: Assignment[];
+}
+
+// Parse Plaud filenames like:
+//   "04-15 Fish Site Production Meeting-transcript (1).txt"
+//   "04-09 Lee W Office Production Meeting-transcript.txt"
+// Returns the date (MM-DD assumed current year), meeting type, and the middle
+// token(s) (job name or PM first-name).
+function parsePlaudFilename(name: string): {
+  date: string | null;
+  meetingType: "SITE" | "OFFICE" | null;
+  candidate: string | null;
+} {
+  const base = name.replace(/\.txt$/i, "");
+  const dateMatch = base.match(/^(\d{2})-(\d{2})\s+(.+)$/);
+  if (!dateMatch) return { date: null, meetingType: null, candidate: null };
+  const yyyy = new Date().getFullYear();
+  const date = `${yyyy}-${dateMatch[1]}-${dateMatch[2]}`;
+  const rest = dateMatch[3];
+  const lower = rest.toLowerCase();
+  let meetingType: "SITE" | "OFFICE" | null = null;
+  let candidate: string | null = null;
+  const m = lower.match(/^(.+?)\s+(site|office)\s+production meeting/);
+  if (m) {
+    candidate = m[1].trim();
+    meetingType = m[2] === "site" ? "SITE" : "OFFICE";
+  }
+  return { date, meetingType, candidate };
+}
+
+function matchJob(candidate: string, jobs: JobOpt[]): JobOpt | null {
+  const c = candidate.toLowerCase().trim();
+  // Exact id or name match first, then startsWith
+  let hit = jobs.find(
+    (j) => j.id.toLowerCase() === c || j.name.toLowerCase() === c
+  );
+  if (hit) return hit;
+  hit = jobs.find(
+    (j) =>
+      j.name.toLowerCase().startsWith(c) || j.id.toLowerCase().startsWith(c)
+  );
+  return hit ?? null;
+}
+
+function matchPm(candidate: string, pms: PMOpt[]): PMOpt | null {
+  const c = candidate.toLowerCase().trim();
+  // First-name match, then startsWith on full name
+  let hit = pms.find(
+    (p) => p.full_name.split(" ")[0].toLowerCase() === c
+  );
+  if (hit) return hit;
+  hit = pms.find((p) => p.full_name.toLowerCase().startsWith(c));
+  return hit ?? null;
 }
 
 interface ExtractedItem {
@@ -36,13 +100,19 @@ interface ExtractResp {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-export function ImportForm({ pms }: ImportFormProps) {
+export function ImportForm({
+  pms,
+  jobs = [],
+  assignments = [],
+}: ImportFormProps) {
   const router = useRouter();
   const [pmId, setPmId] = useState(pms[0]?.id ?? "");
+  const [jobId, setJobId] = useState<string>("");
   const [meetingDate, setMeetingDate] = useState(todayIso());
   const [meetingType, setMeetingType] = useState<"SITE" | "OFFICE">("SITE");
   const [transcript, setTranscript] = useState("");
   const [filename, setFilename] = useState("");
+  const [autoDetected, setAutoDetected] = useState<string | null>(null);
   const [isDragging, setDragging] = useState(false);
   const [step, setStep] = useState<"upload" | "review">("upload");
   const [extract, setExtract] = useState<ExtractResp | null>(null);
@@ -66,6 +136,38 @@ export function ImportForm({ pms }: ImportFormProps) {
     reader.onload = () => setTranscript(String(reader.result || ""));
     reader.onerror = () => setError("Could not read file");
     reader.readAsText(file);
+
+    // Auto-detect from filename
+    const parsed = parsePlaudFilename(file.name);
+    const hits: string[] = [];
+    if (parsed.date) {
+      setMeetingDate(parsed.date);
+      hits.push(`date: ${parsed.date}`);
+    }
+    if (parsed.meetingType) {
+      setMeetingType(parsed.meetingType);
+      hits.push(`type: ${parsed.meetingType}`);
+    }
+    if (parsed.candidate) {
+      const job = matchJob(parsed.candidate, jobs);
+      if (job) {
+        setJobId(job.id);
+        hits.push(`job: ${job.name}`);
+        const a = assignments.find((x) => x.job_id === job.id);
+        if (a) {
+          setPmId(a.pm_id);
+          const pm = pms.find((p) => p.id === a.pm_id);
+          if (pm) hits.push(`pm: ${pm.full_name}`);
+        }
+      } else {
+        const pm = matchPm(parsed.candidate, pms);
+        if (pm) {
+          setPmId(pm.id);
+          hits.push(`pm: ${pm.full_name}`);
+        }
+      }
+    }
+    setAutoDetected(hits.length > 0 ? hits.join(" · ") : null);
   }
 
   async function process() {
@@ -254,21 +356,17 @@ export function ImportForm({ pms }: ImportFormProps) {
   }
 
   return (
-    <div className="px-6 lg:px-10 py-8 space-y-6">
-      <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3">
-        Step 1 of 2 · Upload &amp; meta
-      </p>
-
+    <div className="px-5 lg:px-10 py-8 space-y-5">
       {/* Meta */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
-          <label className="block font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3 mb-1.5">
+          <label className="block font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1.5">
             PM
           </label>
           <select
             value={pmId}
             onChange={(e) => setPmId(e.target.value)}
-            className="w-full bg-paper border border-rule px-3 py-2.5 text-[15px] text-ink focus:outline-none focus:border-ink"
+            className="w-full bg-paper border border-rule px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-ink"
           >
             {pms.map((p) => (
               <option key={p.id} value={p.id}>
@@ -278,18 +376,35 @@ export function ImportForm({ pms }: ImportFormProps) {
           </select>
         </div>
         <div>
-          <label className="block font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3 mb-1.5">
-            Meeting Date
+          <label className="block font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1.5">
+            Job
+          </label>
+          <select
+            value={jobId}
+            onChange={(e) => setJobId(e.target.value)}
+            className="w-full bg-paper border border-rule px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-ink"
+          >
+            <option value="">— (let extractor decide) —</option>
+            {jobs.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1.5">
+            Meeting date
           </label>
           <input
             type="date"
             value={meetingDate}
             onChange={(e) => setMeetingDate(e.target.value)}
-            className="w-full bg-paper border border-rule px-3 py-2.5 text-[15px] text-ink focus:outline-none focus:border-ink"
+            className="w-full bg-paper border border-rule px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-ink"
           />
         </div>
         <div>
-          <label className="block font-mono text-[11px] tracking-[0.18em] uppercase text-ink-3 mb-1.5">
+          <label className="block font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1.5">
             Type
           </label>
           <div className="flex gap-2">
@@ -299,7 +414,7 @@ export function ImportForm({ pms }: ImportFormProps) {
                 type="button"
                 onClick={() => setMeetingType(t)}
                 className={
-                  "flex-1 px-3 py-2.5 text-[14px] font-medium border transition-colors " +
+                  "flex-1 px-3 py-2.5 text-sm font-medium border transition-colors " +
                   (meetingType === t
                     ? "bg-ink text-paper border-ink"
                     : "bg-paper text-ink border-rule hover:border-ink")
@@ -311,6 +426,12 @@ export function ImportForm({ pms }: ImportFormProps) {
           </div>
         </div>
       </div>
+
+      {autoDetected && (
+        <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-success/80">
+          Auto-filled · {autoDetected}
+        </p>
+      )}
 
       {/* Drop zone */}
       <div>

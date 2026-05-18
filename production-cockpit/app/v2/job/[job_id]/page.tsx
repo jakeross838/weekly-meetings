@@ -198,8 +198,14 @@ export default async function V2JobPage({
             </summary>
             <ul className="mt-2 space-y-1.5">
               {completed.map((i) => (
-                <li key={i.id} className="text-ink-3 text-sm line-through">
-                  {i.title}
+                <li
+                  key={i.id}
+                  className="flex gap-3 items-baseline py-1 min-h-[32px]"
+                >
+                  <CheckOffButton itemId={i.id} completed />
+                  <span className="text-ink-3 text-sm line-through">
+                    {i.title}
+                  </span>
                 </li>
               ))}
             </ul>
