@@ -82,11 +82,6 @@ function ConfDot({ confidence }: { confidence: string }) {
   );
 }
 
-function jobLabel(jobId: string | null): string {
-  if (!jobId) return "—";
-  return jobId.charAt(0).toUpperCase() + jobId.slice(1);
-}
-
 export default async function V2JobPage({
   params,
 }: {

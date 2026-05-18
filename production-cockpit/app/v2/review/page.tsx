@@ -27,12 +27,6 @@ type MeetingRow = {
   job_id: string;
 };
 
-type ProposedTypeRow = {
-  ingestion_event_id: string;
-  change_type: string;
-  count: number;
-};
-
 function shortMeetingLabel(m: MeetingRow | null, sourceType: string): string {
   if (!m) return sourceType;
   const d = new Date(m.meeting_date + "T00:00:00Z");
@@ -81,7 +75,7 @@ export default async function ReviewQueuePage() {
 
   // Per-event counts by change_type
   const eventIds = events.map((e) => e.id);
-  let typeCountsByEvent = new Map<string, Record<string, number>>();
+  const typeCountsByEvent = new Map<string, Record<string, number>>();
   if (eventIds.length > 0) {
     const { data: changes } = await supabase
       .from("proposed_changes")
