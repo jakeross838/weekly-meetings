@@ -1,7 +1,9 @@
 // /sub/[id] — sub profile.
-// Header: composite Rating tile + 4 metric tiles (Open, Past due,
-// No-shows, Avg drift).
-// Specialties: auto-detected from daily logs + manually declared.
+// Header: name + trade (composite A-F rating removed per Jake 2026-05-18).
+// Tiles: Open, Past due, No-shows, Avg drift.
+// Specialties: auto from daily logs + manual, now with canonical schedule
+// item mapping (F5) + avg crew size (F3).
+// Inspections (F6), Checklist (F7), Photo summaries (F8).
 // Body: open items + collapsed timeline + collapsed Done.
 
 import Link from "next/link";
@@ -11,6 +13,7 @@ import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
 import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
+import { SubChecklistEditor, ChecklistItem } from "./checklist-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +37,15 @@ export default async function SubPage({
   const catFilter = searchParams.cat ?? null;
   const supabase = supabaseServer();
 
-  const [subRes, openRes, doneRes, manualSpecRes, jobsRes] = await Promise.all([
+  const [
+    subRes,
+    openRes,
+    doneRes,
+    manualSpecRes,
+    jobsRes,
+    scheduleItemsRes,
+    checklistRes,
+  ] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("todos")
@@ -54,6 +65,19 @@ export default async function SubPage({
       .select("specialty, source, duration_days_manual_override")
       .eq("sub_id", params.id),
     supabase.from("jobs").select("id, name"),
+    // F5 — canonical schedule items; tolerates table-missing so first-deploy
+    // doesn't 500 the sub profile.
+    supabase
+      .from("schedule_items")
+      .select("id, name, trade, typical_duration_days, aliases"),
+    // F7 — per-sub checklist; tolerates table-missing for same reason.
+    supabase
+      .from("sub_checklist_items")
+      .select(
+        "id, lens, item_text, is_done, done_at, done_by, notes, position"
+      )
+      .eq("sub_id", params.id)
+      .order("position", { ascending: true }),
   ]);
   const jobNameById: Record<string, string> = {};
   for (const j of ((jobsRes.data ?? []) as { id: string; name: string }[])) {
@@ -85,20 +109,47 @@ export default async function SubPage({
   // Phase C: activity timeline. Pull daily-log days where this sub appears
   // in crews_present + items scheduled for this sub. Tolerates the table /
   // columns not existing (returns empty array on PGRST205 / missing column).
+  //
+  // F3 / F6 / F8 — also try to pull crew_counts, inspections, photo_summary.
+  // We attempt the rich SELECT first; on PGRST204 ("column missing") or any
+  // 400 mentioning one of the new fields, we retry with the legacy column set
+  // so a pre-migration deployment still renders correctly.
   type LogRow = {
+    id?: string;
     log_date: string | null;
     job_key: string;
     parent_group_activities: string[] | null;
+    crew_counts?: Record<string, number> | null;
+    inspections?: unknown[] | null;
+    photo_summary?: unknown | null;
+    photo_urls?: string[] | null;
   };
   let presentDays: LogRow[] = [];
   if (candidateNames.length > 0) {
-    const r = await supabase
+    const RICH = "id, log_date, job_key, parent_group_activities, crew_counts, inspections, photo_summary, photo_urls";
+    const LEGACY = "log_date, job_key, parent_group_activities";
+    const richRes = await supabase
       .from("daily_logs")
-      .select("log_date, job_key, parent_group_activities")
+      .select(RICH)
       .overlaps("crews_present", candidateNames)
       .order("log_date", { ascending: false })
       .limit(120);
-    if (!r.error) presentDays = (r.data ?? []) as LogRow[];
+    if (
+      richRes.error &&
+      /crew_counts|inspections|photo_summary|photo_urls|column .* does not exist/i.test(
+        richRes.error.message
+      )
+    ) {
+      const legacyRes = await supabase
+        .from("daily_logs")
+        .select(LEGACY)
+        .overlaps("crews_present", candidateNames)
+        .order("log_date", { ascending: false })
+        .limit(120);
+      if (!legacyRes.error) presentDays = (legacyRes.data ?? []) as LogRow[];
+    } else if (!richRes.error) {
+      presentDays = (richRes.data ?? []) as unknown as LogRow[];
+    }
   }
 
   // Phase D: aggregate parent_group_activities across this sub's presence,
@@ -193,38 +244,6 @@ export default async function SubPage({
         ) / driftSamples.length
       : null;
 
-  // F2: Composite rating. Transparent score 0-100 with simple weights.
-  // Inputs: past-due ratio (×40), drift days (×30 capped at 14), no-shows
-  // (×30 capped at 10). Lower score = worse. Grade letter from bands.
-  const totalOpen = openTodos.length;
-  const pastDueRatio = totalOpen > 0 ? pastDue.length / totalOpen : 0;
-  const pastDuePenalty = Math.round(pastDueRatio * 40);
-  const driftPenalty =
-    driftDays == null
-      ? 0
-      : Math.round(Math.max(0, Math.min(driftDays, 14)) * (30 / 14));
-  const noShowPenalty =
-    noShowCount == null
-      ? 0
-      : Math.round(Math.min(noShowCount, 10) * (30 / 10));
-  const ratingScore = Math.max(
-    0,
-    100 - pastDuePenalty - driftPenalty - noShowPenalty
-  );
-  const ratingHasData =
-    totalOpen + (driftSamples.length ?? 0) + (noShowCount ?? 0) > 0;
-  const ratingGrade = !ratingHasData
-    ? "—"
-    : ratingScore >= 90
-      ? "A"
-      : ratingScore >= 80
-        ? "B"
-        : ratingScore >= 70
-          ? "C"
-          : ratingScore >= 60
-            ? "D"
-            : "F";
-
   // F1+F3+I2: Specialties — auto (from daily logs) merged with manual.
   // Auto: tag, days, jobs. Manual rows carry an optional duration override
   // that wins over the daily-log streak estimate when present.
@@ -272,6 +291,57 @@ export default async function SubPage({
     }
   }
 
+  // F3 — avg crew size per activity tag for this sub. Walk presentDays,
+  // and where crew_counts has a key for one of this sub's candidateNames,
+  // attribute that headcount to every parent_group_activity tag on the same
+  // log row. Skips rows pre-migration (crew_counts will be null/undefined).
+  const crewCountsByTag = new Map<string, { sum: number; n: number }>();
+  for (const row of presentDays) {
+    const cc = row.crew_counts;
+    if (!cc || typeof cc !== "object") continue;
+    let headcount: number | null = null;
+    for (const cand of candidateNames) {
+      const v = (cc as Record<string, unknown>)[cand];
+      if (typeof v === "number" && v > 0) {
+        headcount = v;
+        break;
+      }
+    }
+    if (headcount == null) continue;
+    for (const tag of row.parent_group_activities ?? []) {
+      const rec = crewCountsByTag.get(tag) ?? { sum: 0, n: 0 };
+      rec.sum += headcount;
+      rec.n += 1;
+      crewCountsByTag.set(tag, rec);
+    }
+  }
+
+  // F5 — canonical schedule_items lookup. Build a name+alias → canonical
+  // name map (lowercased keys) so we can render the canonical label next to
+  // whatever the BT scraper happened to emit.
+  type ScheduleItemRow = {
+    id: string;
+    name: string;
+    trade: string | null;
+    typical_duration_days: number | null;
+    aliases: unknown;
+  };
+  const scheduleItems = (scheduleItemsRes.data ?? []) as ScheduleItemRow[];
+  const canonicalByLower = new Map<string, string>();
+  for (const si of scheduleItems) {
+    canonicalByLower.set(si.name.toLowerCase(), si.name);
+    if (Array.isArray(si.aliases)) {
+      for (const a of si.aliases) {
+        if (typeof a === "string" && a.trim()) {
+          canonicalByLower.set(a.toLowerCase().trim(), si.name);
+        }
+      }
+    }
+  }
+  function canonicalFor(tag: string): string | null {
+    return canonicalByLower.get(tag.toLowerCase().trim()) ?? null;
+  }
+
   const allSpecNames = new Set<string>([
     ...Array.from(activityCounts.keys()),
     ...Array.from(manualNames),
@@ -307,6 +377,9 @@ export default async function SubPage({
         .filter((p) => p.days > 0)
         .sort((a, b) => b.days - a.days)
         .slice(0, 3);
+      const crew = crewCountsByTag.get(name);
+      const avgCrewSize =
+        crew && crew.n > 0 ? crew.sum / crew.n : null;
       return {
         name,
         source: manualNames.has(name)
@@ -318,15 +391,82 @@ export default async function SubPage({
         manualDurationDays: manualDurations.get(name) ?? null,
         peers: peerCounts,
         jobBreakdown,
+        avgCrewSize,
+        canonicalName: canonicalFor(name),
       };
     })
     .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+
+  // F6 — aggregate inspections for this sub. We attribute every inspection
+  // entry on a presentDay to this sub (best-effort: BT doesn't link
+  // inspections to a specific crew). Dedupe by raw text + date so multi-day
+  // inspection runs collapse to a single row.
+  type InspectionRow = { text: string; date: string | null; job: string };
+  const inspectionRows: InspectionRow[] = [];
+  const inspSeen = new Set<string>();
+  for (const row of presentDays) {
+    const arr = Array.isArray(row.inspections) ? row.inspections : [];
+    for (const insp of arr) {
+      let text = "";
+      let when: string | null = row.log_date ?? null;
+      if (typeof insp === "string") {
+        text = insp.trim();
+      } else if (insp && typeof insp === "object") {
+        const o = insp as Record<string, unknown>;
+        text = (
+          (o.type as string) ??
+          (o.raw as string) ??
+          (o.description as string) ??
+          ""
+        ).toString();
+        if (typeof o.date === "string") when = o.date;
+        if (o.result) text = text ? `${text} — ${o.result}` : String(o.result);
+      }
+      text = text.trim();
+      if (!text) continue;
+      const key = `${text}|${when ?? ""}|${row.job_key}`;
+      if (inspSeen.has(key)) continue;
+      inspSeen.add(key);
+      inspectionRows.push({
+        text,
+        date: when,
+        job: jobNameById[row.job_key] ?? row.job_key,
+      });
+    }
+  }
+  inspectionRows.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+
+  // F8 — surface any vision-extracted photo summaries from the same logs.
+  // Each summary is a structured jsonb the extract-photos route writes.
+  type PhotoSummaryRow = {
+    date: string | null;
+    job: string;
+    summary: Record<string, unknown>;
+    photoCount: number;
+  };
+  const photoSummaries: PhotoSummaryRow[] = [];
+  for (const row of presentDays) {
+    const s = row.photo_summary as Record<string, unknown> | null | undefined;
+    if (!s || typeof s !== "object") continue;
+    photoSummaries.push({
+      date: row.log_date,
+      job: jobNameById[row.job_key] ?? row.job_key,
+      summary: s,
+      photoCount: Array.isArray(row.photo_urls) ? row.photo_urls.length : 0,
+    });
+  }
+
+  // F7 — split checklist into the two lenses for the editor.
+  const checklist = (checklistRes.data ?? []) as ChecklistItem[];
+  const safetyItems = checklist.filter((c) => c.lens === "SAFETY");
+  const scheduleItemsCk = checklist.filter((c) => c.lens === "SCHEDULE");
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
-      {/* Header — name + trade + composite rating tile */}
+      {/* Header — name + trade. Composite A-F rating removed per Jake's
+          request 2026-05-18 — facts in the metric tiles below are enough. */}
       <header className="px-5 pt-8 pb-2">
         <Link
           href="/subs"
@@ -334,23 +474,14 @@ export default async function SubPage({
         >
           ← Subs
         </Link>
-        <div className="mt-4 flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
-              {sub.name}
-            </h1>
-            {sub.trade && (
-              <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
-            )}
-          </div>
-          <RatingTile grade={ratingGrade} score={ratingScore} hasData={ratingHasData} />
+        <div className="mt-4">
+          <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
+            {sub.name}
+          </h1>
+          {sub.trade && (
+            <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
+          )}
         </div>
-        {ratingHasData && (
-          <p className="mt-3 font-mono text-[10px] text-ink-3 tabular-nums">
-            score breakdown: −{pastDuePenalty} past-due · −{driftPenalty} drift
-            · −{noShowPenalty} no-shows
-          </p>
-        )}
       </header>
 
       {/* Four-metric tiles */}
@@ -394,9 +525,104 @@ export default async function SubPage({
         </h2>
         <SpecialtiesEditor subId={sub.id} rows={specialtyRows} />
         <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-          auto entries come from daily logs · manual entries are declared
+          auto entries come from daily logs · manual entries are declared ·{" "}
+          <span className="text-accent">≈</span> shows canonical schedule item
         </p>
       </section>
+
+      {/* F6 — Inspections (collapsed unless we have rows). Best-effort: BT
+          doesn't tie inspections to a single crew, so we surface every
+          inspection from days this sub was on site. */}
+      {inspectionRows.length > 0 && (
+        <section className="px-5 pt-10">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+            Inspections · {inspectionRows.length}
+          </h2>
+          <ul className="space-y-1.5">
+            {inspectionRows.slice(0, 20).map((r, i) => (
+              <li
+                key={i}
+                className="flex items-baseline justify-between gap-3 py-1 border-b border-rule-soft last:border-b-0"
+              >
+                <span className="text-sm text-foreground leading-snug flex-1 min-w-0">
+                  {r.text}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                  {r.date ?? "—"} · {r.job}
+                </span>
+              </li>
+            ))}
+            {inspectionRows.length > 20 && (
+              <li className="text-center font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 pt-2">
+                + {inspectionRows.length - 20} more
+              </li>
+            )}
+          </ul>
+          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+            sourced from BT daily logs on days this sub was on site
+          </p>
+        </section>
+      )}
+
+      {/* F7 — Running checklist editor (safety + schedule). */}
+      <section className="px-5 pt-10">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+          Checklist
+        </h2>
+        <SubChecklistEditor
+          subId={sub.id}
+          safetyItems={safetyItems}
+          scheduleItems={scheduleItemsCk}
+        />
+      </section>
+
+      {/* F8 — vision-extracted photo summaries. Only shown if at least one
+          present-day log has been processed by /v2/api/daily-logs/extract-photos. */}
+      {photoSummaries.length > 0 && (
+        <section className="px-5 pt-10">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+            Photo context · {photoSummaries.length} day
+            {photoSummaries.length === 1 ? "" : "s"}
+          </h2>
+          <ul className="space-y-3">
+            {photoSummaries.slice(0, 10).map((p, i) => {
+              const s = p.summary;
+              const headline =
+                (typeof s.headline === "string" && s.headline) ||
+                (typeof s.summary === "string" && s.summary) ||
+                "Photos processed";
+              const stage =
+                typeof s.work_stage === "string" ? s.work_stage : null;
+              const hazards = Array.isArray(s.hazards)
+                ? (s.hazards as unknown[]).filter(
+                    (x): x is string => typeof x === "string"
+                  )
+                : [];
+              return (
+                <li key={i} className="border border-rule px-3 py-2 bg-paper">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-sm text-foreground leading-snug">
+                      {String(headline)}
+                    </p>
+                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                      {p.date ?? "—"} · {p.job}
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-[10px] text-ink-3 tabular-nums">
+                    {p.photoCount} photo{p.photoCount === 1 ? "" : "s"}
+                    {stage && <> · stage: {stage}</>}
+                    {hazards.length > 0 && (
+                      <span className="text-urgent">
+                        {" "}· hazards: {hazards.join(", ")}
+                      </span>
+                    )}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Open items */}
       <CategoryFilterPills
@@ -542,36 +768,3 @@ function Metric({
   );
 }
 
-function RatingTile({
-  grade,
-  score,
-  hasData,
-}: {
-  grade: string;
-  score: number;
-  hasData: boolean;
-}) {
-  const tone =
-    grade === "A"
-      ? "text-success border-success"
-      : grade === "B"
-        ? "text-ink border-ink"
-        : grade === "C"
-          ? "text-high border-high"
-          : grade === "D" || grade === "F"
-            ? "text-urgent border-urgent"
-            : "text-ink-3 border-rule";
-  return (
-    <div
-      className={`shrink-0 flex flex-col items-center justify-center w-16 h-16 border-2 ${tone}`}
-      title={hasData ? `Score ${score}/100` : "No data yet"}
-    >
-      <span className="font-head text-3xl font-bold leading-none tabular-nums">
-        {grade}
-      </span>
-      <span className="mt-0.5 font-mono text-[9px] tracking-[0.12em] uppercase opacity-70">
-        {hasData ? score : "—"}
-      </span>
-    </div>
-  );
-}

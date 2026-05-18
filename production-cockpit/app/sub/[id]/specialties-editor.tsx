@@ -19,6 +19,13 @@ export interface SpecialtyRow {
   peers: { name: string; days: number }[];
   // Per-job breakdown that powers the citation line under each row.
   jobBreakdown: { jobKey: string; jobName: string; days: number }[];
+  // F3 — avg crew size when this sub was on site on logs tagged with this
+  // activity. Null = no per-crew headcount available (pre-migration data).
+  avgCrewSize: number | null;
+  // F5 — canonical schedule_items.name when this activity tag maps to one.
+  // Renders alongside the raw tag so the operator sees both the BT label
+  // and the comparable cross-sub label.
+  canonicalName: string | null;
 }
 
 export function SpecialtiesEditor({
@@ -220,6 +227,14 @@ export function SpecialtiesEditor({
                   <span className="text-sm text-foreground truncate">
                     {r.name}
                   </span>
+                  {r.canonicalName && r.canonicalName !== r.name && (
+                    <span
+                      className="font-mono text-[9px] tracking-[0.12em] uppercase text-accent"
+                      title={`Canonical schedule item: ${r.canonicalName}`}
+                    >
+                      ≈ {r.canonicalName}
+                    </span>
+                  )}
                   {r.source === "manual" && r.days === 0 && (
                     <span className="font-mono text-[9px] tracking-[0.12em] uppercase text-ink-3">
                       declared
@@ -230,6 +245,14 @@ export function SpecialtiesEditor({
                   {r.days > 0 && (
                     <span>
                       {r.days}d · {r.jobs} job{r.jobs === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {r.avgCrewSize != null && (
+                    <span
+                      className="text-ink-3"
+                      title="Avg crew size per BT daily log on this activity"
+                    >
+                      ~{r.avgCrewSize.toFixed(1)} crew
                     </span>
                   )}
                   {renderDuration(r)}
