@@ -47,7 +47,7 @@ export default async function SubPage({
       .limit(20),
     supabase
       .from("sub_specialties")
-      .select("specialty, source")
+      .select("specialty, source, duration_days_manual_override")
       .eq("sub_id", params.id),
   ]);
 
@@ -210,12 +210,19 @@ export default async function SubPage({
             ? "D"
             : "F";
 
-  // F1+F3: Specialties — auto (from daily logs) merged with manual.
-  // Auto: tag, days, jobs. Manual rows have days/jobs from auto if present,
-  // otherwise zero — they're declarations not yet observed.
-  type ManualSpec = { specialty: string; source: string };
+  // F1+F3+I2: Specialties — auto (from daily logs) merged with manual.
+  // Auto: tag, days, jobs. Manual rows carry an optional duration override
+  // that wins over the daily-log streak estimate when present.
+  type ManualSpec = {
+    specialty: string;
+    source: string;
+    duration_days_manual_override: number | null;
+  };
   const manualSpecs = (manualSpecRes.data ?? []) as ManualSpec[];
   const manualNames = new Set(manualSpecs.map((m) => m.specialty));
+  const manualDurations = new Map<string, number | null>(
+    manualSpecs.map((m) => [m.specialty, m.duration_days_manual_override])
+  );
 
   // avg duration per specialty: for each tag, find contiguous presence
   // streaks per job, average their length. Approximate but cheap.
@@ -284,6 +291,7 @@ export default async function SubPage({
         days: auto?.days ?? 0,
         jobs: auto?.jobs.size ?? 0,
         avgDurationDays: avg,
+        manualDurationDays: manualDurations.get(name) ?? null,
         peers: peerCounts,
       };
     })
