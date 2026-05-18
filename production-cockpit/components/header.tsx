@@ -44,12 +44,6 @@ export function Header() {
             Schedule
           </Link>
           <Link
-            href="/pace"
-            className="text-ink-2 hover:text-accent transition-colors"
-          >
-            Pace
-          </Link>
-          <Link
             href="/import"
             className="text-accent hover:text-ink transition-colors"
           >

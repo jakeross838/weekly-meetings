@@ -8,7 +8,7 @@ interface FiltersProps {
   jobs: string[];
   selectedPm: string;
   selectedJob: string;
-  view: "open" | "done" | "selections";
+  view: "open" | "done";
 }
 
 export function Filters({
@@ -33,18 +33,12 @@ export function Filters({
 
   return (
     <div className="border-b border-rule">
-      {/* Open / Selections / Done segmented toggle */}
-      <div className="grid grid-cols-3 border-b border-rule">
+      {/* Open / Done segmented toggle */}
+      <div className="grid grid-cols-2 border-b border-rule">
         <ToggleBtn
           active={view === "open"}
           onClick={() => update({ view: null })}
           label="Open"
-        />
-        <ToggleBtn
-          active={view === "selections"}
-          onClick={() => update({ view: "selections" })}
-          label="Selections"
-          divider
         />
         <ToggleBtn
           active={view === "done"}

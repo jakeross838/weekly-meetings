@@ -31,12 +31,7 @@ export default async function Page({
   const supabase = supabaseServer();
   const selectedPm = searchParams.pm ?? "";
   const selectedJob = searchParams.job ?? "";
-  const view: "open" | "done" | "selections" =
-    searchParams.view === "done"
-      ? "done"
-      : searchParams.view === "selections"
-        ? "selections"
-        : "open";
+  const view: "open" | "done" = searchParams.view === "done" ? "done" : "open";
 
   const monday = isoMondayUtc();
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -87,9 +82,7 @@ export default async function Page({
       return q;
     })(),
     // Distinct (pm_id, job) pairs across ALL open todos — populates the Job
-    // pill row consistently regardless of which view (open/done/selections)
-    // is active. Otherwise picking Selections would hide jobs that have no
-    // current selection items, even though those jobs DO exist.
+    // pill row consistently regardless of which view (open/done) is active.
     supabase
       .from("todos")
       .select("pm_id, job")
@@ -106,7 +99,7 @@ export default async function Page({
   );
 
   // Job filter list — pulled from ALL open todos (not view-scoped) so the
-  // job pills are stable across Open/Selections/Done.
+  // job pills are stable across Open/Done.
   const jobsForFilter = Array.from(
     new Set(
       (selectedPm
@@ -175,11 +168,7 @@ export default async function Page({
           {todos.length === 0 && (
             <div className="px-5 py-20 text-center">
               <p className="font-head text-xl text-ink-3">
-                {view === "open"
-                  ? "Nothing open"
-                  : view === "selections"
-                    ? "No outstanding selections"
-                    : "Nothing closed this week"}
+                {view === "open" ? "Nothing open" : "Nothing closed this week"}
               </p>
             </div>
           )}
@@ -203,7 +192,7 @@ export default async function Page({
 
 function buildTodoQuery(
   supabase: ReturnType<typeof supabaseServer>,
-  view: "open" | "done" | "selections",
+  view: "open" | "done",
   pm: string,
   job: string
 ) {
@@ -212,9 +201,6 @@ function buildTodoQuery(
     .select("*, sub:subs(id, name, trade, rating, reliability_pct)");
   if (view === "open") {
     q = q.in("status", OPEN_STATUSES as Status[]);
-  } else if (view === "selections") {
-    // Same status filter as Open, but narrowed to category=SELECTION.
-    q = q.in("status", OPEN_STATUSES as Status[]).eq("category", "SELECTION");
   } else {
     q = q.eq("status", "COMPLETE").gte("completed_at", isoMondayUtc());
   }
