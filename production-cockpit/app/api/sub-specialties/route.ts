@@ -41,6 +41,13 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
   const actor = getActor(req);
 
+  function explain(err: { message: string; code?: string }): string {
+    if (/PGRST205|does not exist/i.test(err.message)) {
+      return "sub_specialties table missing — apply migration 012_create_sub_specialties_table.sql in Supabase Studio";
+    }
+    return err.message;
+  }
+
   if (action === "add") {
     const { error } = await supabase
       .from("sub_specialties")
@@ -49,7 +56,7 @@ export async function POST(req: NextRequest) {
         { onConflict: "sub_id,specialty" }
       );
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: explain(error) }, { status: 500 });
     }
   } else {
     const { error } = await supabase
@@ -59,7 +66,7 @@ export async function POST(req: NextRequest) {
       .eq("specialty", specialty)
       .eq("source", "manual");
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: explain(error) }, { status: 500 });
     }
   }
 
