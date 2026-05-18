@@ -28,6 +28,26 @@ type BTRecord = {
   notes_full?: string;
   notes?: string;
   enriched_at?: string;
+  // F3 — optional shapes the scraper may emit for per-crew headcount. We
+  // accept whichever lands first; missing or malformed = empty object.
+  crew_counts?: Record<string, number | string | null>;
+  crews_with_count?: Array<{ name?: string; count?: number | string | null }>;
+  // F6 — optional inspections shapes. Either a JSON array of objects or a
+  // free-text string captured directly from BT's "Inspections?" field.
+  inspections?:
+    | string
+    | Array<{
+        type?: string;
+        inspector?: string;
+        result?: string;
+        date?: string;
+        notes?: string;
+      }>;
+  inspections_text?: string;
+  // F8 — photos as a URL list from the scraper. URLs may be presigned or
+  // BT-internal; the vision route handles fetching.
+  photo_urls?: string[];
+  photos?: Array<{ url?: string } | string>;
 };
 
 type Body = {
@@ -59,6 +79,83 @@ function pickCrews(rec: BTRecord): string[] {
     return rec.crews_clean.map((s) => (s ?? "").trim()).filter(Boolean);
   }
   return parseCrews(rec.crews);
+}
+
+// F3 — derive a {sub_name: int} map from whichever shape the scraper sent.
+// Order of preference:
+//   1) explicit `crew_counts` map
+//   2) `crews_with_count` array of {name, count}
+//   3) regex sniff on `crews` for "Name (4)" patterns
+// Returns {} when nothing parses — never throws.
+function parseCrewCounts(rec: BTRecord): Record<string, number> {
+  const out: Record<string, number> = {};
+  const add = (rawName: unknown, rawCount: unknown) => {
+    const name =
+      typeof rawName === "string" ? rawName.trim() : String(rawName ?? "").trim();
+    if (!name || CREW_LABELS_TO_STRIP.has(name)) return;
+    const n =
+      typeof rawCount === "number"
+        ? rawCount
+        : rawCount == null || rawCount === ""
+          ? NaN
+          : Number(rawCount);
+    if (!isFinite(n) || n <= 0) return;
+    out[name] = Math.round(n);
+  };
+  if (rec.crew_counts && typeof rec.crew_counts === "object") {
+    for (const [name, count] of Object.entries(rec.crew_counts)) {
+      add(name, count);
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  if (Array.isArray(rec.crews_with_count)) {
+    for (const row of rec.crews_with_count) {
+      add(row?.name, row?.count);
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  if (typeof rec.crews === "string" && rec.crews.length > 0) {
+    // "Drywall Co (4); Watts Stucco (3)" → {Drywall Co: 4, Watts Stucco: 3}
+    const parts = rec.crews.split(";");
+    for (const part of parts) {
+      const m = part.trim().match(/^(.+?)\s*\((\d+)\)\s*$/);
+      if (m) add(m[1], m[2]);
+    }
+  }
+  return out;
+}
+
+// F6 — normalize the inspections field to a jsonb-friendly array shape.
+// Accepts string, object array, or missing.
+function parseInspections(rec: BTRecord): unknown[] {
+  if (Array.isArray(rec.inspections)) {
+    return rec.inspections.filter(Boolean);
+  }
+  const text =
+    (typeof rec.inspections === "string" ? rec.inspections : null) ??
+    rec.inspections_text ??
+    null;
+  if (text && text.trim() && text.trim().toUpperCase() !== "NONE") {
+    return [{ raw: text.trim() }];
+  }
+  return [];
+}
+
+// F8 — normalize photos to a string-URL array regardless of input shape.
+function parsePhotoUrls(rec: BTRecord): string[] {
+  if (Array.isArray(rec.photo_urls)) {
+    return rec.photo_urls.filter(
+      (u): u is string => typeof u === "string" && u.length > 0
+    );
+  }
+  if (Array.isArray(rec.photos)) {
+    return rec.photos
+      .map((p) =>
+        typeof p === "string" ? p : typeof p?.url === "string" ? p.url : null
+      )
+      .filter((u): u is string => !!u && u.length > 0);
+  }
+  return [];
 }
 
 function parseLogDate(raw: string | undefined): string | null {
@@ -140,6 +237,13 @@ export async function POST(req: NextRequest) {
           notes: r.notes_full || r.notes || null,
           enriched_at: r.enriched_at ?? null,
           source,
+          // F3 / F6 / F8 — defensive: pass through whatever the scraper sent.
+          // The DB columns default to '{}' / '[]' so omitting still works
+          // pre-migration deployments; the upsert just won't see these keys
+          // until the new columns exist.
+          crew_counts: parseCrewCounts(r),
+          inspections: parseInspections(r),
+          photo_urls: parsePhotoUrls(r),
         };
       })
       .filter((row) => row.log_id != null); // rows without a logId can't be deduped, skip
