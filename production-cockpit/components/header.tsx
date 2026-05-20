@@ -17,6 +17,9 @@ export function Header() {
           <RossBuiltLogo size={22} />
         </Link>
         <nav className="flex items-center gap-4 text-xs text-ink-2">
+          <Link href="/meeting" className="hover:text-ink transition-colors">
+            Meeting
+          </Link>
           <Link href="/" className="hover:text-ink transition-colors">
             Jobs
           </Link>
