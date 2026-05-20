@@ -10,6 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
+import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
 import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
@@ -252,6 +253,15 @@ export default async function SubPage({
   const pastDue = openTodos.filter(
     (t) => t.due_date != null && t.due_date < today
   );
+  const in7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const dueSoon = openTodos.filter(
+    (t) => t.due_date != null && t.due_date >= today && t.due_date <= in7
+  ).length;
+  const health = subHealth({
+    pastDue: pastDue.length,
+    dueSoon,
+    flagged: sub.flagged_for_pm_binder,
+  });
 
   // Drift signal: of completed items that had a due_date, avg days late.
   // Negative = early, positive = late. Skip items missing either date.
@@ -505,6 +515,15 @@ export default async function SubPage({
           {sub.trade && (
             <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
           )}
+          <div className="mt-3 inline-flex items-center gap-2">
+            <span
+              className={`h-2 w-2 rounded-full ${health.dotClass}`}
+              aria-hidden
+            />
+            <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2">
+              {health.label}
+            </span>
+          </div>
         </div>
       </header>
 

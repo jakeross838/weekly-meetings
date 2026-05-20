@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, OPEN_STATUSES, Status } from "@/lib/types";
+import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +37,20 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
     due_date: string | null;
   }[];
 
-  const openBySub: Record<string, { open: number; past_due: number }> = {};
+  const in7Iso = new Date(Date.now() + 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const openBySub: Record<
+    string,
+    { open: number; past_due: number; due_soon: number }
+  > = {};
   for (const t of openTodos) {
     if (!t.sub_id) continue;
-    const rec = openBySub[t.sub_id] ?? { open: 0, past_due: 0 };
+    const rec = openBySub[t.sub_id] ?? { open: 0, past_due: 0, due_soon: 0 };
     rec.open += 1;
     if (t.due_date && t.due_date < todayIso) rec.past_due += 1;
+    else if (t.due_date && t.due_date >= todayIso && t.due_date <= in7Iso)
+      rec.due_soon += 1;
     openBySub[t.sub_id] = rec;
   }
 
@@ -56,8 +65,8 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   if (tradeFilter) rows = rows.filter((s) => s.trade === tradeFilter);
   // Sort: past-due desc, then open desc, then name
   rows = [...rows].sort((a, b) => {
-    const ao = openBySub[a.id] ?? { open: 0, past_due: 0 };
-    const bo = openBySub[b.id] ?? { open: 0, past_due: 0 };
+    const ao = openBySub[a.id] ?? { open: 0, past_due: 0, due_soon: 0 };
+    const bo = openBySub[b.id] ?? { open: 0, past_due: 0, due_soon: 0 };
     if (bo.past_due !== ao.past_due) return bo.past_due - ao.past_due;
     if (bo.open !== ao.open) return bo.open - ao.open;
     return a.name.localeCompare(b.name);
@@ -112,6 +121,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
               sub={s}
               open={openBySub[s.id]?.open ?? 0}
               pastDue={openBySub[s.id]?.past_due ?? 0}
+              dueSoon={openBySub[s.id]?.due_soon ?? 0}
               showReason={flaggedFilter}
             />
           ))
@@ -149,13 +159,28 @@ function SubRow({
   sub,
   open,
   pastDue,
+  dueSoon,
   showReason,
 }: {
   sub: Sub;
   open: number;
   pastDue: number;
+  dueSoon: number;
   showReason?: boolean;
 }) {
+  const health = subHealth({
+    pastDue,
+    dueSoon,
+    flagged: sub.flagged_for_pm_binder,
+  });
+  const healthTitle =
+    pastDue > 0
+      ? `${health.label} — ${pastDue} past due`
+      : sub.flagged_for_pm_binder
+        ? `${health.label} — flagged for PM binder`
+        : dueSoon > 0
+          ? `${health.label} — ${dueSoon} due within 7 days`
+          : health.label;
   return (
     <li>
       <Link
@@ -164,6 +189,11 @@ function SubRow({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 min-w-0">
+            <span
+              className={`shrink-0 self-center h-2 w-2 rounded-full ${health.dotClass}`}
+              title={healthTitle}
+              aria-label={healthTitle}
+            />
             {sub.flagged_for_pm_binder && (
               <span className="shrink-0 text-gold" title="Flagged for PM binder">
                 ⚑
