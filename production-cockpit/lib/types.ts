@@ -18,6 +18,8 @@ export interface Sub extends SubEmbedded {
   rating_basis: string[] | null;
   notes: string | null;
   updated_at: string;
+  // "manual" = human-curated catalog; "auto" = created from a logged BT crew.
+  source: string | null;
 }
 
 export interface Todo {

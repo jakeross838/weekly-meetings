@@ -186,6 +186,63 @@ function safeInt(v: unknown): number | null {
   return isNaN(n) ? null : Math.round(n);
 }
 
+function slugifySub(name: string): string {
+  const s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s || "sub";
+}
+
+// Auto-create a sub profile for any crew BT logged that we don't already have,
+// so its trade performance has somewhere to show. Rules honored:
+//  - crew names are BT ground-truth (a human picked them in BT), not AI guesses
+//  - existing/human-curated subs are NEVER modified (match by name + aliases,
+//    insert-only, ignoreDuplicates), so manual data always wins
+//  - new rows are marked source='auto' (mirrors sub_specialties.source) so the
+//    auto vs. human distinction stays visible
+async function ensureSubsForCrews(
+  supabase: ReturnType<typeof supabaseServer>,
+  crewNames: Set<string>
+): Promise<number> {
+  if (crewNames.size === 0) return 0;
+  const { data: existing, error } = await supabase
+    .from("subs")
+    .select("id, name, aliases");
+  if (error) return 0; // never block the daily-log upload on a subs hiccup
+  const known = new Set<string>();
+  const ids = new Set<string>();
+  for (const s of (existing ?? []) as {
+    id: string;
+    name: string;
+    aliases: string[] | null;
+  }[]) {
+    ids.add(s.id);
+    known.add(s.name.trim().toLowerCase());
+    for (const a of s.aliases ?? []) known.add(String(a).trim().toLowerCase());
+  }
+  const toCreate: {
+    id: string;
+    name: string;
+    source: string;
+    flagged_for_pm_binder: boolean;
+  }[] = [];
+  for (const raw of Array.from(crewNames)) {
+    const name = raw.trim();
+    const lc = name.toLowerCase();
+    if (!lc || CREW_LABELS_TO_STRIP.has(name) || known.has(lc)) continue;
+    let id = slugifySub(name);
+    const base = id;
+    let i = 2;
+    while (ids.has(id)) id = `${base}-${i++}`;
+    ids.add(id);
+    known.add(lc);
+    toCreate.push({ id, name, source: "auto", flagged_for_pm_binder: false });
+  }
+  if (toCreate.length === 0) return 0;
+  const { error: insErr } = await supabase
+    .from("subs")
+    .upsert(toCreate, { onConflict: "id", ignoreDuplicates: true });
+  return insErr ? 0 : toCreate.length;
+}
+
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
 
@@ -211,6 +268,7 @@ export async function POST(req: NextRequest) {
   const perJob: Record<string, { total: number; inserted: number; skipped: number }> = {};
   let totalInserted = 0;
   let totalSkipped = 0;
+  const allCrews = new Set<string>();
 
   for (const [jobKey, records] of Object.entries(byJob)) {
     if (!Array.isArray(records)) continue;
@@ -252,6 +310,11 @@ export async function POST(req: NextRequest) {
       })
       .filter((row) => row.log_id != null); // rows without a logId can't be deduped, skip
 
+    for (const row of rows) {
+      for (const c of row.crews_present) allCrews.add(c);
+      for (const c of row.absent_crews) allCrews.add(c);
+    }
+
     perJob[jobKey].skipped = records.length - rows.length;
     totalSkipped += perJob[jobKey].skipped;
 
@@ -274,6 +337,10 @@ export async function POST(req: NextRequest) {
     totalInserted += count ?? rows.length;
   }
 
+  // Auto-create profiles for any newly-seen crews (insert-only; never touches
+  // existing/human subs). Done once per upload after all jobs are processed.
+  const autoSubsCreated = await ensureSubsForCrews(supabase, allCrews);
+
   revalidatePath("/subs");
   revalidatePath("/sub/[id]", "page");
 
@@ -281,6 +348,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     inserted: totalInserted,
     skipped: totalSkipped,
+    auto_subs_created: autoSubsCreated,
     per_job: perJob,
   });
 }

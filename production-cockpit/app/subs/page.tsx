@@ -144,9 +144,19 @@ function SubRow({
         className="flex items-baseline gap-3 px-5 py-3 border-b border-rule hover:bg-sand-2/40 transition-colors"
       >
         <div className="flex-1 min-w-0">
-          <p className="text-foreground text-sm leading-snug truncate">
-            {sub.name}
-          </p>
+          <div className="flex items-baseline gap-2 min-w-0">
+            <p className="text-foreground text-sm leading-snug truncate">
+              {sub.name}
+            </p>
+            {sub.source === "auto" && (
+              <span
+                className="shrink-0 font-mono text-[9px] tracking-[0.12em] uppercase text-ink-3"
+                title="Auto-added from a Buildertrend daily log"
+              >
+                auto
+              </span>
+            )}
+          </div>
           {sub.trade && (
             <p className="mt-0.5 text-ink-3 text-xs">{sub.trade}</p>
           )}

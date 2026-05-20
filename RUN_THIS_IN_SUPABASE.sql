@@ -55,6 +55,10 @@ CREATE INDEX IF NOT EXISTS sub_specialties_sub_idx
 CREATE INDEX IF NOT EXISTS sub_specialties_specialty_idx
     ON public.sub_specialties (specialty);
 
+-- subs.source — distinguishes the human-curated catalog ("manual") from subs
+-- auto-created from logged BT crews ("auto"). Mirrors sub_specialties.source.
+ALTER TABLE public.subs ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual';
+
 -- F3,F6,F8: extend daily_logs to hold per-sub crew sizes, inspections,
 -- and photo data + vision summaries. All jsonb so they tolerate scraper
 -- shape evolution without further migrations.
