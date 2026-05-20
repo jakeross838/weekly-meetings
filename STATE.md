@@ -110,16 +110,22 @@ Shipped 2026-05-20 (built, verified live, deployed to prod):
   on flagged rows (reason inline in the lane); `/sub/[id]` shows a flag banner
   with all `flag_reasons`. Framed as an auto-derived signal ("confirm in
   person before acting"), not a verdict — honors manual-wins / human-review.
+- ✅ **Sub health pill (RED/YELLOW/GREEN)** — factual triage, not a grade
+  (A–F stays removed): RED = past-due open todos, YELLOW = flagged OR a todo
+  due within 7d, GREEN = clear (the auto-flag tops out at yellow, never red).
+  Tested helper `lib/sub-health.ts` (7 cases in `npm test`); a status dot leads
+  every `/subs` row (beside the ⚑), labeled pill on `/sub/[id]`. Verified:
+  30 red / 14 yellow / 62 green across 106 subs.
 
 Still open — larger, need your editorial calls (don't build blind):
 
 1. **The 3-call brain in-app** — Extractor/Reconciler/Auditor still run offline
    in Python; `/v2/review` shows pending transcripts awaiting approval. Biggest
    remaining lever; touches the core pipeline — wants a scoped design pass.
-2. **Full RED/YELLOW/GREEN sub pills + meeting structure** — specced in
-   `.planning/.../12-integrated-redesign/PLAN.md` (Parts A/B/C). The Flags lane
-   delivers the data-backed slice; the per-sub health *pill* needs a health
-   formula you trust (you removed A–F grading, so this is your call).
+2. **Meeting structure / run-of-show** — specced in
+   `.planning/.../12-integrated-redesign/PLAN.md` (Parts A/B/C). The data-backed
+   signals now exist (flags lane + health pills); what's missing is a guided
+   meeting flow (job-by-job / sub-by-sub run-of-show). Needs your call on format.
 3. **Whole-company view** polish on home (partial today).
 
 Confirmed-skip:
