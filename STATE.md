@@ -116,16 +116,24 @@ Shipped 2026-05-20 (built, verified live, deployed to prod):
   Tested helper `lib/sub-health.ts` (7 cases in `npm test`); a status dot leads
   every `/subs` row (beside the ⚑), labeled pill on `/sub/[id]`. Verified:
   30 red / 14 yellow / 62 green across 106 subs.
+- ✅ **Meeting run-of-show** (`/meeting`, in Header nav) — guided job-by-job
+  Monday-meeting agenda from live signals: per job Past due / This week (≤7d) /
+  Subs to watch (health pill + flag reason, routed from subs working that job),
+  + contract % + transcripts-to-approve. PM scope pills, urgency sort, sticky
+  progress bar with a per-job "mark covered" walk-through (ephemeral client
+  state). NO fabricated PPC%/predictions — only data the cockpit has. NOTE: it
+  exposes a large real backlog (≈186 past-due todos) — accurate, not a bug;
+  many are stale historical items worth a closeout pass.
 
 Still open — larger, need your editorial calls (don't build blind):
 
 1. **The 3-call brain in-app** — Extractor/Reconciler/Auditor still run offline
    in Python; `/v2/review` shows pending transcripts awaiting approval. Biggest
    remaining lever; touches the core pipeline — wants a scoped design pass.
-2. **Meeting structure / run-of-show** — specced in
-   `.planning/.../12-integrated-redesign/PLAN.md` (Parts A/B/C). The data-backed
-   signals now exist (flags lane + health pills); what's missing is a guided
-   meeting flow (job-by-job / sub-by-sub run-of-show). Needs your call on format.
+2. **Meeting prediction / preflight** (Phase 13 in the spec) — the run-of-show
+   renders today's state; it does NOT yet forecast (PPC% reliability, 2/4/8-wk
+   look-ahead from a schedule/taxonomy, Office-vs-Site scope). Those need data
+   not in the cockpit (commitment history, phase taxonomy, on-site-this-week).
 3. **Whole-company view** polish on home (partial today).
 
 Confirmed-skip:
