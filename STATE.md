@@ -49,24 +49,18 @@ These were the reasons the features looked "built" but did nothing:
 
 ---
 
-## 4. THE ONE BLOCKER — Buildertrend login (your single step)
+## 4. Buildertrend scrape — REBUILT & WORKING (2026-05-20)
 
-Real daily logs + photos (item 8, and real data for 3/5/6) need a working BT scrape. The scraper at `C:\Users\Greg\buildertrend-scraper` has **no credentials on file** and its last login failed. I can't supply your BT password — that's the one boundary that's yours.
+This *was* the blocker. Root cause: **BT replaced its old HTML UI with a modern SPA + JSON API**, so the DOM-walking `scrape.py` logged in but scraped **0 logs**. Rebuilt against BT's real API → **`buildertrend-scraper/scrape_api.py`**, and pointed the one-click button at it.
 
-**To unblock:**
-```powershell
-cd C:\Users\Greg\buildertrend-scraper
-.\.venv\Scripts\Activate.ps1
-python auth.py set        # enter BT email + password (stored in Windows Credential Manager)
-python scrape.py --headed --days 14   # --headed first time in case BT shows MFA
-```
-Then in the cockpit, the data flows automatically (or use the button — see §5).
+How it works now (`scrape_api.py`):
+1. `POST /api/jobpicker/GetJobPickerData {templatesOnly:false}` → active jobs (name→internal id; names match `jobs.py` JOB_NAME_MAP).
+2. `GET /api/Filters/31?jobID=` → crew id→name map.
+3. `POST /apix/v2/DailyLogs/grid` (paged) → full log rows: date, crews, absent crews, weather (max/min temp), daily workforce, notes, **photos (direct URLs, downloaded locally)**.
 
-**Two credential paths (this trips people up):**
-- **Terminal** `python scrape.py` → reads Windows Credential Manager (`auth.py set`).
-- **"Pull from Buildertrend" button** → uses the email+password you type **into the modal** (not the keyring).
+**Verified end-to-end 2026-05-20:** pulled **150 real logs across all 11 jobs** (74 distinct subs) → Supabase → sub profiles show real on-site timelines/crews. Photos confirmed downloading (Krauss: 20 photos).
 
-If login still lands on the login page with a correct password, BT changed its Auth0 form and the selectors in `bt_session.py` need updating (re-run `--headed`, inspect, patch).
+**To run it:** just use the **"✨ Pull from Buildertrend"** button on `/import` (local cockpit) — type your BT email + password in the modal. It reuses the saved session when valid, re-logs in when not. (Terminal equivalent: `python auth.py set` once, then `python scrape_api.py --days 14`.) MFA: tick "Show browser window" the first time. **Don't paste the BT password in chat — only into the modal/terminal.**
 
 ---
 
