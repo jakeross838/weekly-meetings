@@ -95,7 +95,9 @@ export async function POST(req: NextRequest) {
 
   const scraperDir = process.env.BT_SCRAPER_DIR || DEFAULT_SCRAPER_DIR;
   const pythonExe = path.join(scraperDir, ".venv", "Scripts", "python.exe");
-  const scriptPath = path.join(scraperDir, "scrape.py");
+  // scrape_api.py = API-based scraper (BT rebuilt their UI into a SPA + JSON
+  // API; the old DOM-walking scrape.py finds nothing). Same CLI + output shape.
+  const scriptPath = path.join(scraperDir, "scrape_api.py");
   const outputPath = path.join(scraperDir, "data", "daily-logs.json");
 
   // Sanity-check the scraper install up-front so we don't waste a
