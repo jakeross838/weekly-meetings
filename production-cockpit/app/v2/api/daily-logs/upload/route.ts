@@ -76,7 +76,9 @@ function parseCrews(raw: string | undefined): string[] {
 
 function pickCrews(rec: BTRecord): string[] {
   if (Array.isArray(rec.crews_clean) && rec.crews_clean.length > 0) {
-    return rec.crews_clean.map((s) => (s ?? "").trim()).filter(Boolean);
+    return rec.crews_clean
+      .map((s) => (s ?? "").trim())
+      .filter((s) => s && !CREW_LABELS_TO_STRIP.has(s));
   }
   return parseCrews(rec.crews);
 }
@@ -225,7 +227,9 @@ export async function POST(req: NextRequest) {
           log_date,
           crews_present: pickCrews(r),
           absent_crews: Array.isArray(r.absent_crews)
-            ? r.absent_crews.map((s) => (s ?? "").trim()).filter(Boolean)
+            ? r.absent_crews
+                .map((s) => (s ?? "").trim())
+                .filter((s) => s && !CREW_LABELS_TO_STRIP.has(s))
             : [],
           parent_group_activities: Array.isArray(r.parent_group_activities)
             ? r.parent_group_activities.map((s) => (s ?? "").trim()).filter(Boolean)
