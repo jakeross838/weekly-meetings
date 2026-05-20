@@ -94,6 +94,7 @@ export default async function V2JobPage({
     subsRes,
     summaryRes,
     photoLogsRes,
+    payAppRes,
   ] = await Promise.all([
       supabase
         .from("items")
@@ -149,6 +150,12 @@ export default async function V2JobPage({
         .ilike("job_key", `${job.name}%`)
         .not("photo_urls", "is", null)
         .limit(500),
+      // Pay-app backbone — the schedule of values gives a real contract
+      // % complete. Only ~5 jobs have a pay app loaded; tolerate absence.
+      supabase
+        .from("pay_app_line_items")
+        .select("description, scheduled_value, total_completed")
+        .eq("job_id", job_id),
     ]);
 
   const pendingEvents = (pendingEventsRes.data ?? []) as {
@@ -228,6 +235,37 @@ export default async function V2JobPage({
     totalPhotos += urls.length;
     if (l.photo_summary == null) initialPendingPhotos += urls.length;
   }
+
+  // Pay-app contract progress (graceful: empty when no pay app loaded).
+  const payAppLines =
+    payAppRes && !payAppRes.error
+      ? ((payAppRes.data ?? []) as {
+          description: string | null;
+          scheduled_value: number | null;
+          total_completed: number | null;
+        }[])
+      : [];
+  let payScheduled = 0;
+  let payCompleted = 0;
+  for (const l of payAppLines) {
+    payScheduled += Number(l.scheduled_value) || 0;
+    payCompleted += Number(l.total_completed) || 0;
+  }
+  const payPct = payScheduled > 0 ? (payCompleted / payScheduled) * 100 : null;
+  // Contract lines (scheduled > 0), biggest first — the breakdown rows.
+  const payContractLines = payAppLines
+    .map((l) => {
+      const sched = Number(l.scheduled_value) || 0;
+      const comp = Number(l.total_completed) || 0;
+      return {
+        description: l.description ?? "—",
+        sched,
+        comp,
+        pct: sched > 0 ? (comp / sched) * 100 : 0,
+      };
+    })
+    .filter((l) => l.sched > 0)
+    .sort((a, b) => b.sched - a.sched);
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -373,6 +411,13 @@ export default async function V2JobPage({
         totalPhotos={totalPhotos}
       />
 
+      <PayAppProgress
+        pct={payPct}
+        scheduled={payScheduled}
+        completed={payCompleted}
+        lines={payContractLines}
+      />
+
       <CategoryFilterPills
         basePath={`/v2/job/${job_id}`}
         activeCategory={catFilter}
@@ -412,6 +457,80 @@ export default async function V2JobPage({
         </section>
       )}
     </main>
+  );
+}
+
+function fmtMoney(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n)}`;
+}
+
+// Contract progress from the latest pay app (schedule of values). Renders
+// nothing when the job has no pay app loaded, so it's safe on every job.
+function PayAppProgress({
+  pct,
+  scheduled,
+  completed,
+  lines,
+}: {
+  pct: number | null;
+  scheduled: number;
+  completed: number;
+  lines: { description: string; sched: number; comp: number; pct: number }[];
+}) {
+  if (pct === null || scheduled <= 0) return null;
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <section className="px-5 pt-2">
+      <div className="border border-rule p-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+            Contract progress
+          </h2>
+          <span className="font-mono text-sm text-foreground tabular-nums">
+            {pct.toFixed(0)}%
+          </span>
+        </div>
+        <div className="mt-3 h-2 w-full bg-sand-2 overflow-hidden">
+          <div className="h-full bg-ink" style={{ width: `${clamped}%` }} />
+        </div>
+        <p className="mt-2 text-ink-3 text-xs">
+          {fmtMoney(completed)} of {fmtMoney(scheduled)} billed to date
+        </p>
+
+        {lines.length > 0 && (
+          <details className="mt-3 border-t border-rule pt-2">
+            <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-1">
+              Cost breakdown · {lines.length}
+            </summary>
+            <ul className="mt-3 space-y-3">
+              {lines.map((l, i) => {
+                const w = Math.max(0, Math.min(100, l.pct));
+                return (
+                  <li key={i}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-foreground text-xs truncate">
+                        {l.description}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-ink-2 tabular-nums">
+                        {l.pct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1 w-full bg-sand-2 overflow-hidden">
+                      <div className="h-full bg-accent" style={{ width: `${w}%` }} />
+                    </div>
+                    <p className="mt-1 font-mono text-[10px] text-ink-3 tabular-nums">
+                      {fmtMoney(l.comp)} / {fmtMoney(l.sched)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        )}
+      </div>
+    </section>
   );
 }
 
