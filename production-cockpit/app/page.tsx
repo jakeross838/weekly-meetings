@@ -16,8 +16,13 @@ type JobRow = {
   pm_id: string | null;
 };
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: { pm?: string };
+}) {
   const supabase = supabaseServer();
+  const pmFilter = searchParams.pm ?? "";
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [jobsRes, openTodosRes, pmsRes, assignRes, pendingRes] = await Promise.all([
@@ -74,8 +79,22 @@ export default async function Page() {
   const countsFor = (j: JobRow) =>
     openByJob.get(j.name) ?? { open: 0, past_due: 0 };
 
+  // Which PM "owns" a job: active assignment wins, else the legacy jobs.pm_id.
+  const pmForJob = (j: JobRow) => activePmByJob.get(j.id) ?? j.pm_id ?? null;
+
+  // PMs that actually have at least one job — drives the filter pills so we
+  // never render a pill that would land on an empty list.
+  const pmIdsWithJobs = new Set<string>();
+  for (const j of jobs) {
+    const pid = pmForJob(j);
+    if (pid) pmIdsWithJobs.add(pid);
+  }
+  const pmPills = Array.from(pmIdsWithJobs)
+    .map((id) => ({ id, name: pmNameById.get(id) ?? id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   // Sort: past-due desc → open desc → name
-  const rows = [...jobs].sort((a, b) => {
+  const sorted = [...jobs].sort((a, b) => {
     const ao = countsFor(a);
     const bo = countsFor(b);
     if (bo.past_due !== ao.past_due) return bo.past_due - ao.past_due;
@@ -83,10 +102,18 @@ export default async function Page() {
     return a.name.localeCompare(b.name);
   });
 
-  const totalOpen = todos.length;
-  const totalPastDue = todos.filter(
-    (t) => t.due_date != null && t.due_date < todayIso
-  ).length;
+  const rows = pmFilter
+    ? sorted.filter((j) => pmForJob(j) === pmFilter)
+    : sorted;
+
+  // Header counts reflect the visible (filtered) jobs.
+  let totalOpen = 0;
+  let totalPastDue = 0;
+  for (const j of rows) {
+    const c = countsFor(j);
+    totalOpen += c.open;
+    totalPastDue += c.past_due;
+  }
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -107,10 +134,26 @@ export default async function Page() {
         </p>
       </header>
 
+      {pmPills.length > 0 && (
+        <div className="px-5 pt-2 pb-1">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
+            <FilterPill href="/" active={!pmFilter} label="All PMs" />
+            {pmPills.map((p) => (
+              <FilterPill
+                key={p.id}
+                href={`/?pm=${encodeURIComponent(p.id)}`}
+                active={pmFilter === p.id}
+                label={p.name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <ul className="mt-4">
         {rows.length === 0 ? (
           <li className="px-5 py-16 text-center text-ink-3 text-sm">
-            No jobs.
+            {pmFilter ? "No jobs for this PM." : "No jobs."}
           </li>
         ) : (
           rows.map((j) => {
@@ -163,5 +206,29 @@ export default async function Page() {
         )}
       </ul>
     </main>
+  );
+}
+
+function FilterPill({
+  href,
+  active,
+  label,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={
+        "shrink-0 px-3 py-1.5 text-xs font-medium border transition-colors " +
+        (active
+          ? "bg-ink text-paper border-ink"
+          : "bg-transparent text-ink-2 border-rule hover:border-ink hover:text-ink")
+      }
+    >
+      {label}
+    </Link>
   );
 }
