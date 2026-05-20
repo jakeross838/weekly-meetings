@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
+import { scrubRelativeDates } from "@/lib/scrub-relative-dates";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,11 @@ export async function POST(req: NextRequest) {
       id: `${jobPrefix}-${suffix}`,
       pm_id: pmId,
       job: item.job || "Unknown",
-      title: item.title,
+      // Hard guarantee: no broad timeframe survives onto the active to-do
+      // list. Resolve "tomorrow"/"by Friday"/etc. to an exact date (or strip
+      // vague spans) against the meeting date — even if the operator hand-typed
+      // it in the review screen. See lib/scrub-relative-dates.ts.
+      title: scrubRelativeDates(item.title, meetingDate),
       due_date: item.due_date || null,
       priority: item.priority || "NORMAL",
       status: "NOT_STARTED",

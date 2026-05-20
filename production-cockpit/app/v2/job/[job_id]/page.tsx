@@ -343,7 +343,7 @@ export default async function V2JobPage({
         >
           ← Jobs
         </Link>
-        <div className="mt-4 flex items-start justify-between gap-3">
+        <div className="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
               {job.name}
@@ -355,7 +355,7 @@ export default async function V2JobPage({
           {pendingEvents.length > 0 && (
             <Link
               href={`/v2/review`}
-              className="shrink-0 text-[10px] font-mono uppercase tracking-[0.12em] text-urgent border border-urgent/60 px-2 py-1 hover:bg-urgent hover:text-paper transition-colors"
+              className="self-start shrink-0 text-[10px] font-mono uppercase tracking-[0.12em] text-urgent border border-urgent/60 px-2 py-1 hover:bg-urgent hover:text-paper transition-colors"
             >
               {pendingEvents.length} plaud transcript{pendingEvents.length === 1 ? "" : "s"} to approve
             </Link>

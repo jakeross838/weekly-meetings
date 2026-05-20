@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "tsc lib/scrub-relative-dates.ts lib/scrub-relative-dates.test.ts --outDir .tmp-tdd --module commonjs --target ES2020 --skipLibCheck --moduleResolution node --esModuleInterop && node .tmp-tdd/scrub-relative-dates.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

@@ -97,3 +97,9 @@ production-cockpit/.env.local
 production-cockpit/.env*.local
 
 .vercel
+
+# playwright mcp tooling cache
+.playwright-mcp/
+
+# dev screenshots (contain client data) — keep out of the public repo
+/*.png

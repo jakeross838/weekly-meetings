@@ -209,10 +209,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const password = (body.db_password ?? "").trim();
+  const password = (body.db_password ?? process.env.SUPABASE_DB_PASSWORD ?? "").trim();
   if (!password) {
     return NextResponse.json(
-      { error: "db_password is required" },
+      { error: "db_password is required (or set SUPABASE_DB_PASSWORD in the server env)" },
       { status: 400 }
     );
   }
@@ -232,20 +232,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Direct connection. If it fails (firewall / IPv6), we'll try the pooler.
-  const direct = {
-    host: `db.${projectRef}.supabase.co`,
-    user: "postgres",
-    password,
-    database: "postgres",
-    port: 5432,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 8000,
-  };
-  const poolerHosts = [
-    `aws-0-us-east-1.pooler.supabase.com`,
-    `aws-0-us-west-1.pooler.supabase.com`,
-    `aws-0-us-east-2.pooler.supabase.com`,
+  // Supabase Supavisor pooler. The region prefix MUST match the project's
+  // region — takewvlqgwpdbkvcwpvi lives in us-west-2, so the working host is
+  // aws-1-us-west-2.pooler.supabase.com (verified 2026-05-20; the old
+  // us-east-1/us-west-1 guesses never connected, which is why this button
+  // appeared to "succeed" but never applied anything). The legacy direct host
+  // db.<ref>.supabase.co no longer resolves for newer projects, so it's only a
+  // last-ditch fallback. Other regions kept in case the project ever moves.
+  const poolerUser = `postgres.${projectRef}`;
+  const candidates: Array<{ host: string; port: number; user: string }> = [
+    { host: "aws-1-us-west-2.pooler.supabase.com", port: 5432, user: poolerUser },
+    { host: "aws-1-us-west-2.pooler.supabase.com", port: 6543, user: poolerUser },
+    { host: "aws-0-us-west-1.pooler.supabase.com", port: 6543, user: poolerUser },
+    { host: "aws-0-us-east-1.pooler.supabase.com", port: 6543, user: poolerUser },
+    { host: "aws-0-us-east-2.pooler.supabase.com", port: 6543, user: poolerUser },
+    { host: `db.${projectRef}.supabase.co`, port: 5432, user: "postgres" },
   ];
 
   const errors: string[] = [];
@@ -268,20 +269,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let client: Client | null = await tryConnect(direct);
-  if (!client) {
-    for (const host of poolerHosts) {
-      client = await tryConnect({
-        host,
-        user: `postgres.${projectRef}`,
-        password,
-        database: "postgres",
-        port: 6543,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 8000,
-      });
-      if (client) break;
-    }
+  let client: Client | null = null;
+  for (const c of candidates) {
+    client = await tryConnect({
+      host: c.host,
+      user: c.user,
+      password,
+      database: "postgres",
+      port: c.port,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 8000,
+    });
+    if (client) break;
   }
 
   if (!client) {

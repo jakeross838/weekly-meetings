@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/.tmp-tdd
 
 # next.js
 /.next/

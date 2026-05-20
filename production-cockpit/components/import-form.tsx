@@ -612,7 +612,7 @@ export function ImportForm({
             type="button"
             onClick={save}
             disabled={saving || totalEnabled === 0}
-            className="bg-success text-paper px-5 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
+            className="bg-ink text-paper px-5 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50 transition-colors shadow-sm"
           >
             {saving
               ? "Pushing…"

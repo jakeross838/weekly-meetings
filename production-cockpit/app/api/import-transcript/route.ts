@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "@/lib/supabase";
+import { scrubRelativeDates } from "@/lib/scrub-relative-dates";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow up to 60s for Claude call
@@ -269,33 +270,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Defence-in-depth scrub: even with the prompt rule above, Claude
-  // occasionally slips a relative-time phrase into the title. Strip the
-  // common ones and substitute the resolved ISO date so the title that
-  // lands on the to-do list is always self-explanatory at a glance.
-  const md = new Date(meetingDate + "T00:00:00Z");
-  const isoOffset = (days: number) =>
-    new Date(md.getTime() + days * 86_400_000).toISOString().slice(0, 10);
-  const tomorrowIso = isoOffset(1);
-  const yesterdayIso = isoOffset(-1);
-  const todayIso = meetingDate;
-  const RELATIVE_REPLACEMENTS: Array<[RegExp, string]> = [
-    [/\btomorrow\b/gi, tomorrowIso],
-    [/\btonight\b/gi, todayIso],
-    [/\btoday\b/gi, todayIso],
-    [/\byesterday\b/gi, yesterdayIso],
-    [/\bthis morning\b/gi, todayIso],
-    [/\bthis afternoon\b/gi, todayIso],
-    [/\bthis evening\b/gi, todayIso],
-  ];
-  function scrubTitle(t: string | null | undefined): string {
-    if (!t) return "";
-    let out = t;
-    for (const [re, rep] of RELATIVE_REPLACEMENTS) out = out.replace(re, rep);
-    return out;
-  }
+  // Defence-in-depth scrub: even with the strict prompt rule above, Claude
+  // occasionally slips a relative-time phrase into the title. scrubRelativeDates
+  // resolves every supported phrase ("tomorrow", "by Friday", "next week",
+  // "end of month", "in 3 days", …) to an exact YYYY-MM-DD against the meeting
+  // date, and strips genuinely vague spans ("ASAP", "soon", "this week"). The
+  // same util runs again at the save boundary so manual edits can't reintroduce
+  // a relative phrase. See lib/scrub-relative-dates.ts.
   for (const item of parsed.items ?? []) {
-    item.title = scrubTitle(item.title);
+    item.title = scrubRelativeDates(item.title ?? "", meetingDate);
   }
 
   // Canonicalize sub_name → sub_id, group items per sub

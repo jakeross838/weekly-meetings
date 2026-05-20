@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 import { getActor } from "@/lib/actor";
+import { scrubRelativeDates } from "@/lib/scrub-relative-dates";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,10 @@ export async function POST(req: NextRequest) {
   const update: Record<string, unknown> = {};
 
   if (typeof body.title === "string" && body.title.trim().length > 0) {
-    update.edited_title = body.title.trim();
+    // Same no-broad-timeframe rule as the import path. A hand-edit happens
+    // "now", so resolve relative phrases against today's date.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    update.edited_title = scrubRelativeDates(body.title.trim(), todayIso);
     update.edited_at = new Date().toISOString();
   }
 

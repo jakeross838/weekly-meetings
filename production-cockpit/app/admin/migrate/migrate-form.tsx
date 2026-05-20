@@ -116,7 +116,7 @@ export function MigrateForm() {
         type="button"
         onClick={run}
         disabled={busy || !password.trim()}
-        className="w-full bg-success text-paper px-5 py-3 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
+        className="w-full bg-ink text-paper px-5 py-3 text-sm font-medium hover:bg-accent disabled:opacity-50 transition-colors shadow-sm"
       >
         {busy ? "Running migrations…" : "Run migrations →"}
       </button>

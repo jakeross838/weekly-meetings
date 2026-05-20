@@ -27,6 +27,45 @@ function daysBetween(a: string, b: string): number {
   );
 }
 
+// crews_present / absent_crews are jsonb arrays. PostgREST's array-overlaps
+// operator (&&) does NOT work on jsonb ("operator does not exist: jsonb &&"),
+// so "row's array shares ANY name with `names`" is emulated with one jsonb
+// containment query (@>, the `cs` operator) per name, merged + de-duped by id.
+// `names` is just a sub's name + aliases, so the fan-out is tiny. Each select
+// MUST include `id` for the de-dupe to work.
+async function logsContainingAny(
+  supabase: ReturnType<typeof supabaseServer>,
+  column: "crews_present" | "absent_crews",
+  names: string[],
+  select: string,
+  opts?: { limit?: number; orderDesc?: boolean }
+): Promise<Record<string, unknown>[]> {
+  if (names.length === 0) return [];
+  const results = await Promise.all(
+    names.map((n) => {
+      let q = supabase
+        .from("daily_logs")
+        .select(select)
+        // .filter(...,"cs",json) emits `column=cs.["name"]` — the jsonb-correct
+        // containment form (verified against PostgREST). Using .contains() here
+        // would emit the Postgres array literal `{...}` and 400 on jsonb.
+        .filter(column, "cs", JSON.stringify([n]));
+      if (opts?.orderDesc) q = q.order("log_date", { ascending: false });
+      if (opts?.limit) q = q.limit(opts.limit);
+      return q;
+    })
+  );
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const r of results) {
+    if (r.error) continue;
+    for (const row of (r.data ?? []) as unknown as Record<string, unknown>[]) {
+      const key = (row.id as string) ?? JSON.stringify(row);
+      byId.set(key, row);
+    }
+  }
+  return Array.from(byId.values());
+}
+
 export default async function SubPage({
   params,
   searchParams,
@@ -95,15 +134,13 @@ export default async function SubPage({
   ).filter(Boolean);
   let noShowCount: number | null = null;
   if (candidateNames.length > 0) {
-    const { count, error } = await supabase
-      .from("daily_logs")
-      .select("id", { count: "exact", head: true })
-      .overlaps("absent_crews", candidateNames);
-    if (!error) {
-      noShowCount = count ?? 0;
-    } else if (!/PGRST205|does not exist/i.test(error.message)) {
-      console.error("daily_logs no-show query failed:", error);
-    }
+    const absentRows = await logsContainingAny(
+      supabase,
+      "absent_crews",
+      candidateNames,
+      "id"
+    );
+    noShowCount = absentRows.length;
   }
 
   // Phase C: activity timeline. Pull daily-log days where this sub appears
@@ -126,30 +163,19 @@ export default async function SubPage({
   };
   let presentDays: LogRow[] = [];
   if (candidateNames.length > 0) {
-    const RICH = "id, log_date, job_key, parent_group_activities, crew_counts, inspections, photo_summary, photo_urls";
-    const LEGACY = "log_date, job_key, parent_group_activities";
-    const richRes = await supabase
-      .from("daily_logs")
-      .select(RICH)
-      .overlaps("crews_present", candidateNames)
-      .order("log_date", { ascending: false })
-      .limit(120);
-    if (
-      richRes.error &&
-      /crew_counts|inspections|photo_summary|photo_urls|column .* does not exist/i.test(
-        richRes.error.message
-      )
-    ) {
-      const legacyRes = await supabase
-        .from("daily_logs")
-        .select(LEGACY)
-        .overlaps("crews_present", candidateNames)
-        .order("log_date", { ascending: false })
-        .limit(120);
-      if (!legacyRes.error) presentDays = (legacyRes.data ?? []) as LogRow[];
-    } else if (!richRes.error) {
-      presentDays = (richRes.data ?? []) as unknown as LogRow[];
-    }
+    const RICH =
+      "id, log_date, job_key, parent_group_activities, crew_counts, inspections, photo_summary, photo_urls";
+    const merged = (await logsContainingAny(
+      supabase,
+      "crews_present",
+      candidateNames,
+      RICH,
+      { limit: 120, orderDesc: true }
+    )) as unknown as LogRow[];
+    // Per-name queries can return the same log under name + alias; they're
+    // de-duped by id in the helper. Re-sort the merged set and cap it.
+    merged.sort((a, b) => (b.log_date ?? "").localeCompare(a.log_date ?? ""));
+    presentDays = merged.slice(0, 120);
   }
 
   // Phase D: aggregate parent_group_activities across this sub's presence,
@@ -195,19 +221,17 @@ export default async function SubPage({
         ).filter(Boolean);
         if (names.length === 0)
           return { id: p.id, name: p.name, byActivity: new Map() };
-        const r = await supabase
-          .from("daily_logs")
-          .select("parent_group_activities")
-          .overlaps("crews_present", names)
-          .limit(500);
+        const rows = (await logsContainingAny(
+          supabase,
+          "crews_present",
+          names,
+          "id, parent_group_activities",
+          { limit: 500 }
+        )) as { parent_group_activities: string[] | null }[];
         const byA = new Map<string, number>();
-        if (!r.error) {
-          for (const row of (r.data ?? []) as {
-            parent_group_activities: string[] | null;
-          }[]) {
-            for (const tag of row.parent_group_activities ?? []) {
-              byA.set(tag, (byA.get(tag) ?? 0) + 1);
-            }
+        for (const row of rows) {
+          for (const tag of row.parent_group_activities ?? []) {
+            byA.set(tag, (byA.get(tag) ?? 0) + 1);
           }
         }
         return { id: p.id, name: p.name, byActivity: byA };
