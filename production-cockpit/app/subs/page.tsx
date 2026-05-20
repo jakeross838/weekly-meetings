@@ -11,11 +11,13 @@ export const dynamic = "force-dynamic";
 
 interface SP {
   trade?: string;
+  flagged?: string;
 }
 
 export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   const supabase = supabaseServer();
   const tradeFilter = searchParams.trade ?? "";
+  const flaggedFilter = searchParams.flagged === "1";
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -47,7 +49,10 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
     new Set(subs.map((s) => s.trade).filter(Boolean) as string[])
   ).sort();
 
+  const flaggedCount = subs.filter((s) => s.flagged_for_pm_binder).length;
+
   let rows = subs;
+  if (flaggedFilter) rows = rows.filter((s) => s.flagged_for_pm_binder);
   if (tradeFilter) rows = rows.filter((s) => s.trade === tradeFilter);
   // Sort: past-due desc, then open desc, then name
   rows = [...rows].sort((a, b) => {
@@ -72,7 +77,18 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
       {/* Trade filter — single horizontal pill row */}
       <div className="px-5 pt-4 pb-2">
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
-          <FilterPill href="/subs" active={!tradeFilter} label="All" />
+          <FilterPill
+            href="/subs"
+            active={!tradeFilter && !flaggedFilter}
+            label="All"
+          />
+          {flaggedCount > 0 && (
+            <FilterPill
+              href="/subs?flagged=1"
+              active={flaggedFilter}
+              label={`⚑ Flagged · ${flaggedCount}`}
+            />
+          )}
           {trades.map((t) => (
             <FilterPill
               key={t}
@@ -96,6 +112,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
               sub={s}
               open={openBySub[s.id]?.open ?? 0}
               pastDue={openBySub[s.id]?.past_due ?? 0}
+              showReason={flaggedFilter}
             />
           ))
         )}
@@ -132,10 +149,12 @@ function SubRow({
   sub,
   open,
   pastDue,
+  showReason,
 }: {
   sub: Sub;
   open: number;
   pastDue: number;
+  showReason?: boolean;
 }) {
   return (
     <li>
@@ -145,6 +164,11 @@ function SubRow({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 min-w-0">
+            {sub.flagged_for_pm_binder && (
+              <span className="shrink-0 text-gold" title="Flagged for PM binder">
+                ⚑
+              </span>
+            )}
             <p className="text-foreground text-sm leading-snug truncate">
               {sub.name}
             </p>
@@ -157,8 +181,14 @@ function SubRow({
               </span>
             )}
           </div>
-          {sub.trade && (
-            <p className="mt-0.5 text-ink-3 text-xs">{sub.trade}</p>
+          {showReason && sub.flag_reasons?.[0] ? (
+            <p className="mt-0.5 text-ink-3 text-xs leading-snug">
+              {sub.flag_reasons[0]}
+            </p>
+          ) : (
+            sub.trade && (
+              <p className="mt-0.5 text-ink-3 text-xs">{sub.trade}</p>
+            )
           )}
         </div>
         <div className="shrink-0 flex items-baseline gap-2 font-mono text-xs">

@@ -508,6 +508,31 @@ export default async function SubPage({
         </div>
       </header>
 
+      {/* Flag banner — surfaces flagged_for_pm_binder + reasons. Framed as an
+          auto-derived signal, not a verdict: manual judgment wins (per the
+          project rules), so the copy nudges the PM to confirm in person. */}
+      {sub.flagged_for_pm_binder && (
+        <section className="px-5 pt-5">
+          <div className="border border-gold p-3">
+            <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-gold">
+              ⚑ Flagged for PM binder
+            </p>
+            {Array.isArray(sub.flag_reasons) && sub.flag_reasons.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {sub.flag_reasons.map((r, i) => (
+                  <li key={i} className="text-sm text-ink-2 leading-snug">
+                    • {r}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 font-mono text-[9px] tracking-[0.12em] uppercase text-ink-3">
+              auto-derived from log analysis · confirm in person before acting
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Four-metric tiles */}
       <section className="px-5 pt-6">
         <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4">
