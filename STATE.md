@@ -96,14 +96,40 @@ If anything looks off after deploy, Vercel's dashboard can instant-rollback to t
 
 ## 7. Remaining roadmap toward the full vision (prioritized)
 
-Not done — these are larger and need your editorial calls (don't build blind):
+Shipped 2026-05-20 (built, verified live, deployed to prod):
 
-1. **Pay-app backbone** — the v2-plan's load-bearing idea (`pay_app_line_items` as the master list everything attaches to). Schema exists; not surfaced in the cockpit UI. Biggest lever.
-2. **Three views** — by-job (have it) + **by-PM** (missing) + whole-company (home, partial). A `/pm/[id]` view is squarely in the vision.
-3. **The 3-call brain in-app** — currently the Extractor/Reconciler/Auditor run offline in Python; `/v2/review` shows 4 pending transcripts (208 proposals) awaiting your approval.
-4. **RED/YELLOW/GREEN sub pills + real meeting structure** — fully specced in `.planning/.../12-integrated-redesign/PLAN.md` (Parts A/B/C), never built. Read that doc; it's the next big build.
-5. **Flags lane** (slipped commitments, drift) on the job document.
-6. **Date-rule backfill** over the 268 existing todos — deliberately skipped (many old titles pair a weekday with a real date, so a blind rewrite would corrupt them; needs a careful, reviewed pass).
+- ✅ **Pay-app backbone** — `/v2/job/[id]` shows a Contract Progress card
+  (Σ total_completed / Σ scheduled_value) + collapsible cost breakdown by line
+  description (biggest contract first). Data on 5 jobs (krauss/pou/dewberry/
+  fish/drummond), one pay app each; renders nothing on jobs without one.
+  Verified: Krauss 48% ($2.03M / $4.26M).
+- ✅ **By-PM view** — home (`/`) has "All PMs" + per-PM filter pills
+  (`/?pm=<id>`, from `job_pm_assignments` → `jobs.pm_id` fallback); the
+  open/past-due header counts reflect the filtered PM.
+- ✅ **Flags lane** — `/subs` has a "⚑ Flagged · N" filter pill + gold marker
+  on flagged rows (reason inline in the lane); `/sub/[id]` shows a flag banner
+  with all `flag_reasons`. Framed as an auto-derived signal ("confirm in
+  person before acting"), not a verdict — honors manual-wins / human-review.
+
+Still open — larger, need your editorial calls (don't build blind):
+
+1. **The 3-call brain in-app** — Extractor/Reconciler/Auditor still run offline
+   in Python; `/v2/review` shows pending transcripts awaiting approval. Biggest
+   remaining lever; touches the core pipeline — wants a scoped design pass.
+2. **Full RED/YELLOW/GREEN sub pills + meeting structure** — specced in
+   `.planning/.../12-integrated-redesign/PLAN.md` (Parts A/B/C). The Flags lane
+   delivers the data-backed slice; the per-sub health *pill* needs a health
+   formula you trust (you removed A–F grading, so this is your call).
+3. **Whole-company view** polish on home (partial today).
+
+Confirmed-skip:
+
+- **Date-rule backfill** over existing todos — empirically re-verified
+  2026-05-20: of 211 open todos, 12 would change and ALL misfire (double-dates
+  like "2026-05-11 5/11"; wrong anchors — "Monday 4/27" → 2026-04-20 because
+  the anchor is the import date, not the spoken date; rewrites *inside* quotes).
+  The forward-only scrub at the write boundary is correct; do NOT rewrite
+  history.
 
 ---
 
@@ -114,6 +140,6 @@ Not done — these are larger and need your editorial calls (don't build blind):
 - **Re-seed a demo (no BT needed):** `cd C:\Users\Greg\buildertrend-scraper; python scrape.py --mock` then upload `data/daily-logs.json` via the import page's manual upload. (Purge after: delete `daily_logs` rows.)
 - **DB password** is in `.env` as `SUPABASE_DB_PASSWORD` — **rotate it** (it was shared in chat). Migrations apply via `/admin/migrate` or `node` + `pg` against `aws-1-us-west-2.pooler.supabase.com:6543`.
 - **jsonb columns** (`crews_present`, `absent_crews`): never use `.overlaps()` — use per-name `.filter(col,"cs",json)` containment.
-- **Screenshots** `verify-walter-drywall-*.png` are committed proof the features render with data.
+- **Screenshots** (`verify-*.png`, `m-*.png`) are local-only proof shots — gitignored via `/*.png` (this repo is public; client data must never be committed). They render the features with real data but are not in git.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
