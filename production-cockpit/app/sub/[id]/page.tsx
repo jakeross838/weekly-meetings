@@ -1,6 +1,6 @@
 // /sub/[id] — sub profile.
 // Header: name + trade (composite A-F rating removed per Jake 2026-05-18).
-// Tiles: Open, Past due, No-shows, Avg drift.
+// Tiles: Open, Past due, No-shows.
 // Specialties: auto from daily logs + manual, now with canonical schedule
 // item mapping (F5) + avg crew size (F3).
 // Inspections (F6), Checklist (F7), Photo summaries (F8).
@@ -265,21 +265,6 @@ export default async function SubPage({
     dueSoon,
     flagged: sub.flagged_for_pm_binder,
   });
-
-  // Drift signal: of completed items that had a due_date, avg days late.
-  // Negative = early, positive = late. Skip items missing either date.
-  const driftSamples = doneTodos.filter(
-    (t) => t.due_date != null && t.completed_at != null
-  );
-  const driftDays =
-    driftSamples.length > 0
-      ? driftSamples.reduce(
-          (sum, t) =>
-            sum +
-            daysBetween(t.due_date as string, (t.completed_at as string).slice(0, 10)),
-          0
-        ) / driftSamples.length
-      : null;
 
   // F1+F3+I2: Specialties — auto (from daily logs) merged with manual.
   // Auto: tag, days, jobs. Manual rows carry an optional duration override
@@ -612,7 +597,7 @@ export default async function SubPage({
 
       {/* Four-metric tiles */}
       <section className="px-5 pt-6">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-x-3 gap-y-6">
           <Metric label="Open" value={openTodos.length} />
           <Metric
             label="Past due"
@@ -626,20 +611,6 @@ export default async function SubPage({
               noShowCount != null && noShowCount > 0 ? "urgent" : undefined
             }
             sub={noShowCount == null ? "no log data" : "from daily logs"}
-          />
-          <Metric
-            label="Avg drift"
-            value={
-              driftDays == null
-                ? "—"
-                : `${driftDays > 0 ? "+" : ""}${driftDays.toFixed(1)}d`
-            }
-            accent={driftDays != null && driftDays > 1 ? "urgent" : undefined}
-            sub={
-              driftSamples.length > 0
-                ? `n=${driftSamples.length}`
-                : "no data"
-            }
           />
         </div>
       </section>
