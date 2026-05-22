@@ -29,6 +29,7 @@ interface ImportFormProps {
   jobs?: JobOpt[];
   assignments?: Assignment[];
   subs?: SubOpt[];
+  priorImports?: { name: string; date: string }[];
 }
 
 // The extractor writes a job name string per item (e.g. "Krauss") rather than
@@ -47,7 +48,7 @@ function jobNameMatchesOption(rowJob: string, opt: JobOpt): boolean {
 // token(s) (job name or PM first-name).
 function parsePlaudFilename(name: string): {
   date: string | null;
-  meetingType: "SITE" | "OFFICE" | null;
+  meetingType: "SITE" | "OFFICE" | "OTHER" | null;
   candidate: string | null;
 } {
   const base = name.replace(/\.txt$/i, "");
@@ -57,12 +58,12 @@ function parsePlaudFilename(name: string): {
   const date = `${yyyy}-${dateMatch[1]}-${dateMatch[2]}`;
   const rest = dateMatch[3];
   const lower = rest.toLowerCase();
-  let meetingType: "SITE" | "OFFICE" | null = null;
+  let meetingType: "SITE" | "OFFICE" | "OTHER" | null = null;
   let candidate: string | null = null;
-  const m = lower.match(/^(.+?)\s+(site|office)\s+production meeting/);
+  const m = lower.match(/^(.+?)\s+(site|office|other)\s+production meeting/);
   if (m) {
     candidate = m[1].trim();
-    meetingType = m[2] === "site" ? "SITE" : "OFFICE";
+    meetingType = m[2] === "site" ? "SITE" : m[2] === "office" ? "OFFICE" : "OTHER";
   }
   return { date, meetingType, candidate };
 }
@@ -140,15 +141,17 @@ export function ImportForm({
   jobs = [],
   assignments = [],
   subs = [],
+  priorImports = [],
 }: ImportFormProps) {
   const router = useRouter();
   const [pmId, setPmId] = useState(pms[0]?.id ?? "");
   const [jobId, setJobId] = useState<string>("");
   const [meetingDate, setMeetingDate] = useState(todayIso());
-  const [meetingType, setMeetingType] = useState<"SITE" | "OFFICE">("SITE");
+  const [meetingType, setMeetingType] = useState<"SITE" | "OFFICE" | "OTHER">("SITE");
   const [transcript, setTranscript] = useState("");
   const [filename, setFilename] = useState("");
   const [autoDetected, setAutoDetected] = useState<string | null>(null);
+  const [dupImport, setDupImport] = useState<{ name: string; date: string } | null>(null);
   const [isDragging, setDragging] = useState(false);
   const [step, setStep] = useState<"upload" | "review">("upload");
   const [extract, setExtract] = useState<ExtractResp | null>(null);
@@ -169,6 +172,8 @@ export function ImportForm({
       return;
     }
     setFilename(file.name);
+    const prior = priorImports.find((p) => p.name === file.name);
+    setDupImport(prior ?? null);
     const reader = new FileReader();
     reader.onload = () => setTranscript(String(reader.result || ""));
     reader.onerror = () => setError("Could not read file");
@@ -676,7 +681,7 @@ export function ImportForm({
             Type
           </label>
           <div className="flex gap-2">
-            {(["SITE", "OFFICE"] as const).map((t) => (
+            {(["SITE", "OFFICE", "OTHER"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -699,6 +704,15 @@ export function ImportForm({
         <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-success/80">
           Auto-filled · {autoDetected}
         </p>
+      )}
+
+      {dupImport && (
+        <div className="border border-urgent bg-urgent/5 px-3 py-2">
+          <p className="text-xs text-urgent leading-snug">
+            ⚠ &ldquo;{dupImport.name}&rdquo; was already imported on{" "}
+            {dupImport.date}. Re-importing will create duplicate to-dos.
+          </p>
+        </div>
       )}
 
       {/* Drop zone */}

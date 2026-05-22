@@ -59,7 +59,7 @@ function buildPrompt(
   transcript: string,
   pmName: string,
   meetingDate: string,
-  meetingType: "SITE" | "OFFICE",
+  meetingType: "SITE" | "OFFICE" | "OTHER",
   subCatalog: { id: string; name: string; aliases: string[] | null }[]
 ): string {
   const catalog = subCatalog
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
     pm_id?: string;
     pm_name?: string;
     meeting_date?: string;
-    meeting_type?: "SITE" | "OFFICE";
+    meeting_type?: "SITE" | "OFFICE" | "OTHER";
   };
   try {
     body = await req.json();
@@ -184,7 +184,12 @@ export async function POST(req: NextRequest) {
   const pmId = body.pm_id?.trim();
   const pmName = body.pm_name?.trim();
   const meetingDate = body.meeting_date?.trim();
-  const meetingType = body.meeting_type === "OFFICE" ? "OFFICE" : "SITE";
+  const meetingType =
+    body.meeting_type === "OFFICE"
+      ? "OFFICE"
+      : body.meeting_type === "OTHER"
+        ? "OTHER"
+        : "SITE";
 
   if (!transcript || transcript.length < 100) {
     return NextResponse.json(

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const [pmsRes, jobsRes, assignRes, subsRes] = await Promise.all([
+  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes] = await Promise.all([
     supabase
       .from("pms")
       .select("id, full_name, active")
@@ -28,6 +28,19 @@ export default async function ImportPage() {
       .select("job_id, pm_id")
       .is("ended_at", null),
     supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
+    // Transcript import history (derived from todos.source_transcript).
+    supabase
+      .from("todos")
+      .select("source_transcript, created_at")
+      .not("source_transcript", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    // Daily-log recency + total. daily_logs has no created_at — use log_date.
+    supabase
+      .from("daily_logs")
+      .select("log_date", { count: "exact" })
+      .order("log_date", { ascending: false, nullsFirst: false })
+      .limit(1),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
   const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
@@ -36,6 +49,29 @@ export default async function ImportPage() {
     pm_id: string;
   }[];
   const subs = (subsRes.data ?? []) as { id: string; name: string }[];
+
+  // Group todos by source file into a transcript-import history; the same set
+  // (name + date) is handed to the form so it can flag a re-upload.
+  const txTodos = (txRes.data ?? []) as {
+    source_transcript: string | null;
+    created_at: string;
+  }[];
+  const importMap = new Map<string, { name: string; date: string; count: number }>();
+  for (const t of txTodos) {
+    const name = t.source_transcript;
+    if (!name || name === "cockpit-import") continue;
+    const date = (t.created_at ?? "").slice(0, 10);
+    const ex = importMap.get(name);
+    if (ex) ex.count += 1;
+    else importMap.set(name, { name, date, count: 1 });
+  }
+  const transcriptImports = Array.from(importMap.values()).sort((a, b) =>
+    b.date.localeCompare(a.date)
+  );
+  const priorImports = transcriptImports.map((i) => ({ name: i.name, date: i.date }));
+  const dlRows = (dlRes.data ?? []) as { log_date: string | null }[];
+  const dailyCount = dlRes.count ?? null;
+  const latestLog = dlRows[0]?.log_date ?? null;
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -63,7 +99,40 @@ export default async function ImportPage() {
             v2 review pipeline →
           </Link>
         </p>
-        <ImportForm pms={pms} jobs={jobs} assignments={assignments} subs={subs} />
+        <ImportForm
+          pms={pms}
+          jobs={jobs}
+          assignments={assignments}
+          subs={subs}
+          priorImports={priorImports}
+        />
+
+        <p className="mt-4 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
+          Naming · MM-DD &lt;Job&gt; &lt;Site|Office|Other&gt; Production
+          Meeting-transcript.txt
+        </p>
+        {transcriptImports.length > 0 && (
+          <details className="mt-2">
+            <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
+              Import history · {transcriptImports.length}
+            </summary>
+            <ul className="mt-1">
+              {transcriptImports.slice(0, 20).map((imp) => (
+                <li
+                  key={imp.name}
+                  className="flex items-baseline justify-between gap-3 border-b border-rule-soft py-1.5 last:border-b-0"
+                >
+                  <span className="min-w-0 flex-1 truncate text-ink-2 text-xs">
+                    {imp.name}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                    {imp.date} · {imp.count} item{imp.count === 1 ? "" : "s"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       {/* DAILY LOG SECTION */}
@@ -76,6 +145,12 @@ export default async function ImportPage() {
           logs + photos, writes to Supabase, and runs Claude vision over
           the photos. Or drop a scraper JSON manually further down.
         </p>
+        {(latestLog || dailyCount != null) && (
+          <p className="mb-4 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
+            {dailyCount ?? 0} daily logs
+            {latestLog ? ` · latest ${latestLog}` : ""}
+          </p>
+        )}
         <div className="mb-6">
           <BtSyncButton />
         </div>
