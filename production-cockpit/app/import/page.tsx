@@ -151,13 +151,18 @@ export default async function ImportPage() {
               {transcriptImports.slice(0, 20).map((imp) => (
                 <li
                   key={imp.name}
-                  className="flex items-baseline justify-between gap-3 border-b border-rule-soft py-1.5 last:border-b-0"
+                  className="flex items-baseline justify-between gap-3 border-b border-rule-soft py-2 last:border-b-0"
                 >
-                  <span className="min-w-0 flex-1 truncate text-ink-2 text-xs">
-                    {imp.name}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ink-2 text-sm">
+                      {prettyImport(imp.name)}
+                    </span>
+                    <span className="block truncate font-mono text-[10px] text-ink-3">
+                      {imp.name}
+                    </span>
                   </span>
                   <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
-                    {imp.date} · {imp.count} item{imp.count === 1 ? "" : "s"}
+                    {prettyDate(imp.date)} · {imp.count} item{imp.count === 1 ? "" : "s"}
                   </span>
                 </li>
               ))}
@@ -217,6 +222,41 @@ export default async function ImportPage() {
   );
 }
 
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// One readable date format everywhere in the history: "2026-05-18" → "May 18".
+function prettyDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+// Normalize a transcript filename into one consistent, easy-to-read label so
+// every history row looks the same regardless of how the file was named:
+//   "05-18 Krauss Site Production Meeting-transcript.txt" → "Krauss · Site meeting"
+function prettyImport(name: string): string {
+  const base = name
+    .replace(/\.(txt|md)$/i, "")
+    .replace(/-?transcript$/i, "")
+    .trim();
+  const typeMatch = base.match(/\b(site|office|other)\b/i);
+  const type = typeMatch ? typeMatch[1].toLowerCase() : "";
+  const job = base
+    .replace(/^\d{1,2}[-_/]\d{1,2}\s*/, "")
+    .replace(/\b(site|office|other)\b/i, "")
+    .replace(/production\s*meeting/i, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!job) return base || name;
+  const typeLabel = type ? type.charAt(0).toUpperCase() + type.slice(1) : "";
+  return typeLabel ? `${job} · ${typeLabel} meeting` : `${job} · Meeting`;
+}
+
 function HistoryRow({
   label,
   when,
@@ -232,7 +272,7 @@ function HistoryRow({
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-ink-2">{label}</span>
       <span className="font-mono text-xs tabular-nums text-ink-3">
-        {when ? `last ${when}` : "never"}
+        {when ? `last ${prettyDate(when)}` : "never"}
         {count != null ? ` · ${count} ${unit}` : ""}
       </span>
     </div>
