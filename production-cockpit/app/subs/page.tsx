@@ -183,7 +183,7 @@ function SubRow({
           ? `${health.label} — ${dueSoon} due within 7 days`
           : health.label;
   return (
-    <li className="flex items-stretch border-b border-rule hover:bg-sand-2/40 transition-colors">
+    <li className="flex items-stretch border-b border-rule hover:bg-oceanside/30 transition-colors">
       <Link
         href={`/sub/${sub.id}`}
         className="flex flex-1 items-baseline gap-3 px-5 py-3 min-w-0"
