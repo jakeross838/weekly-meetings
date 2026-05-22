@@ -191,6 +191,32 @@ export async function POST(req: NextRequest) {
   };
   const results: PerLog[] = [];
 
+  // Tool-use forces valid structured output (no regex / JSON.parse), matching
+  // the summary + extractor routes. Defined once, reused for every log.
+  const photoTool: Anthropic.Tool = {
+    name: "emit_photo_summary",
+    description: "Return the structured summary of this daily log's photos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        headline: { type: "string" },
+        work_stage: { type: ["string", "null"] },
+        subs_visible: { type: "array", items: { type: "string" } },
+        work_observed: { type: "array", items: { type: "string" } },
+        hazards: { type: "array", items: { type: "string" } },
+        weather_notes: { type: ["string", "null"] },
+        confidence: { type: "string", enum: ["high", "medium", "low"] },
+      },
+      required: [
+        "headline",
+        "subs_visible",
+        "work_observed",
+        "hazards",
+        "confidence",
+      ],
+    },
+  };
+
   for (const row of work) {
     const photos = (row.photo_urls ?? []).slice(0, MAX_PHOTOS_PER_LOG);
     if (photos.length === 0) continue;
@@ -225,38 +251,23 @@ export async function POST(req: NextRequest) {
       const resp = await client.messages.create({
         model: "claude-opus-4-7",
         max_tokens: 1200,
+        tools: [photoTool],
+        tool_choice: { type: "tool", name: "emit_photo_summary" },
         messages: [{ role: "user", content }],
       });
-      const raw = resp.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("");
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (!m) {
+      const toolUse = resp.content.find((b) => b.type === "tool_use");
+      if (!toolUse || toolUse.type !== "tool_use") {
         results.push({
           log_id: row.id,
           job_key: row.job_key,
           log_date: row.log_date,
           ok: false,
           photoCount: photos.length,
-          error: "No JSON in Claude response",
+          error: "Claude returned no tool_use block",
         });
         continue;
       }
-      let parsed: ExtractedSummary;
-      try {
-        parsed = JSON.parse(m[0]) as ExtractedSummary;
-      } catch (e) {
-        results.push({
-          log_id: row.id,
-          job_key: row.job_key,
-          log_date: row.log_date,
-          ok: false,
-          photoCount: photos.length,
-          error: `JSON parse: ${(e as Error).message}`,
-        });
-        continue;
-      }
+      const parsed = toolUse.input as ExtractedSummary;
 
       // Persist. The column is jsonb so we can write the object directly.
       const { error: upErr } = await supabase
