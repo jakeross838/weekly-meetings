@@ -14,6 +14,7 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-accent: var(--accent);
+  --color-oceanside: var(--oceanside);
   --color-gold: var(--gold);
   --color-urgent: var(--urgent);
   --color-high: var(--high);
@@ -25,26 +26,30 @@
   --font-mono: var(--font-mono), ui-monospace, Menlo, monospace;
 }
 
-/* Ross Built v3 palette — pulled from rossbuilt.com itself.
-   Cool off-white background (less sand-warm than v2). Stone blue is the
-   brand color. Gold is the metallic accent (hardware in their portfolio).
+/* Ross Built palette — the OFFICIAL brand kit colors (from the Ross Built
+   brand guide SVG assets): stoneBlue #5B8497 · slateTile #3B5864 ·
+   oceanside #C9D6D9 · whiteSand #F5F3EA · matteBlack #1C1C1C.
+   slateTile is the primary ink, stoneBlue the accent, whiteSand the surface.
    Whitespace-forward, no grid pattern. */
 :root {
-  /* Page surface */
+  /* Page surface — whiteSand neutrals (official brand) */
   --paper:    #FFFFFF;
-  --background: #FAFAF7;   /* cool off-white — primary surface */
-  --sand:     #F4F1EB;     /* warmer fill used sparingly */
-  --sand-2:   #EEE9DF;     /* faint inset */
+  --background: #F7F5EF;   /* warm off-white, whiteSand-derived — primary surface */
+  --sand:     #F5F3EA;     /* whiteSand — warmer fill */
+  --sand-2:   #ECE7DB;     /* deeper whiteSand inset */
 
-  /* Stone-blue ink (the brand color) */
-  --ink:      #3B5864;     /* primary text, brand */
+  /* slateTile — primary ink (official brand dark) */
+  --ink:      #3B5864;     /* primary text (slateTile) */
   --ink-2:    #5B7383;
   --ink-3:    #8A9AA5;
 
-  /* Stone accent for links/active states */
-  --accent:   #5B8699;
+  /* stoneBlue — the primary brand color (links / active / mark) */
+  --accent:   #5B8497;
 
-  /* Gold — Ross Built's metallic accent (kitchen hardware, pendant lights) */
+  /* oceanside — soft blue-grey for highlights, fills, hover washes */
+  --oceanside: #C9D6D9;
+
+  /* Gold — metallic accent retained for flags/warnings */
   --gold:     #B08D57;
 
   /* Hairlines — cooler, lighter than v2's drafting-tan */
@@ -119,6 +124,12 @@ button { border-radius: 0; }
 .bg-success        { background-color: var(--success); }
 .bg-ink            { background-color: var(--ink); }
 .bg-accent         { background-color: var(--accent); }
+.bg-accent\/5      { background-color: color-mix(in oklab, var(--accent) 5%, transparent); }
+.bg-accent\/10     { background-color: color-mix(in oklab, var(--accent) 10%, transparent); }
+.bg-oceanside      { background-color: var(--oceanside); }
+.bg-oceanside\/30  { background-color: color-mix(in oklab, var(--oceanside) 30%, transparent); }
+.bg-oceanside\/40  { background-color: color-mix(in oklab, var(--oceanside) 40%, transparent); }
+.bg-oceanside\/50  { background-color: color-mix(in oklab, var(--oceanside) 50%, transparent); }
 .text-paper        { color: var(--paper); }
 .text-paper\/70    { color: color-mix(in oklab, var(--paper) 70%, transparent); }
 .text-paper\/80    { color: color-mix(in oklab, var(--paper) 80%, transparent); }
@@ -126,9 +137,11 @@ button { border-radius: 0; }
 .text-rule         { color: var(--rule); }
 .text-gold         { color: var(--gold); }
 .text-accent       { color: var(--accent); }
+.text-oceanside    { color: var(--oceanside); }
 .border-ink        { border-color: var(--ink); }
 .border-gold       { border-color: var(--gold); }
 .border-accent     { border-color: var(--accent); }
+.border-oceanside  { border-color: var(--oceanside); }
 
 /* ─── Motion & feel ─────────────────────────────────────────────────────
    Smooth, intentional micro-interactions so the app reads alive, not stale.

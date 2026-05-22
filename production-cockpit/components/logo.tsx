@@ -1,40 +1,35 @@
 /**
- * Ross Built mark — a hand-drafted roofline pictogram (peak above a
- * baseline) paired with the wordmark. Uses currentColor so it inherits
- * whichever ink color it's dropped into.
+ * Ross Built logo — the official brand assets (copied into /public from the
+ * Ross Built brand kit): a stone-blue circular logomark + the "ROSS BUILT"
+ * wordmark. We render the real SVGs rather than a hand-drafted stand-in.
+ *
+ * Plain <img> (not next/image) so the SVG is served straight from /public with
+ * its baked-in brand colors — no optimizer, no dangerouslyAllowSVG config.
  */
+
+/** The circular logomark on its own (stone blue), e.g. favicons / loading. */
 export function RossBuiltMark({
   size = 28,
-  className,
+  className = "",
 }: {
   size?: number;
   className?: string;
 }) {
   return (
-    <svg
-      viewBox="0 0 36 36"
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/ross-built-mark.svg"
+      alt=""
+      aria-hidden
       width={size}
       height={size}
-      aria-hidden
+      style={{ width: size, height: size }}
       className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="square"
-      strokeLinejoin="miter"
-    >
-      {/* Roof peak */}
-      <path d="M5 20 L18 7 L31 20" />
-      {/* Right slope inner — gives the mark depth, like a section cut */}
-      <path d="M18 7 L18 20" opacity="0.4" />
-      {/* Ground line */}
-      <line x1="3" y1="29" x2="33" y2="29" />
-      {/* Center tick on ground */}
-      <line x1="18" y1="29" x2="18" y2="32" />
-    </svg>
+    />
   );
 }
 
+/** Text-only wordmark fallback (kept for non-image contexts). */
 export function RossBuiltWordmark({
   className = "",
 }: {
@@ -52,7 +47,10 @@ export function RossBuiltWordmark({
   );
 }
 
-/** Logo lockup: mark + wordmark side-by-side, sized for header use. */
+/**
+ * Logo lockup for header use — the official horizontal logo (mark + wordmark).
+ * `size` is the rendered height in px; width scales to keep the brand ratio.
+ */
 export function RossBuiltLogo({
   className = "",
   size = 24,
@@ -61,9 +59,13 @@ export function RossBuiltLogo({
   size?: number;
 }) {
   return (
-    <div className={"inline-flex items-center gap-2.5 text-ink " + className}>
-      <RossBuiltMark size={size} />
-      <RossBuiltWordmark className="text-[12px]" />
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/ross-built-logo.svg"
+      alt="Ross Built"
+      height={size}
+      style={{ height: size, width: "auto" }}
+      className={"select-none " + className}
+    />
   );
 }
