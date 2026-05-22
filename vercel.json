@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "installCommand": "echo 'no install — root is not the app'",
+  "buildCommand": "mkdir -p public && echo 'The Ross Built app is deployed from the production-cockpit/ project. This repo-root project is an unused duplicate; this no-op build keeps its commit status green.' > public/index.html",
+  "outputDirectory": "public"
+}
