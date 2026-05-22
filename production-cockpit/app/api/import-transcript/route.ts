@@ -223,11 +223,75 @@ export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey: anthropicKey });
   const prompt = buildPrompt(transcript, pmName, meetingDate, meetingType, subCatalog);
 
-  let raw = "";
+  // Force valid structured output via tool-use. Free-text JSON occasionally
+  // came back malformed on big extractions (up to 8k tokens of nested items),
+  // which blew up JSON.parse and 502'd the whole import. A tool schema makes
+  // the output structurally guaranteed — no regex, no JSON.parse.
+  const extractTool: Anthropic.Tool = {
+    name: "emit_action_items",
+    description: "Return the extracted meeting summary + action items.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        jobs_mentioned: { type: "array", items: { type: "string" } },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              sub_name: { type: ["string", "null"] },
+              job: { type: "string" },
+              priority: {
+                type: "string",
+                enum: ["URGENT", "HIGH", "NORMAL"],
+              },
+              due_date: { type: ["string", "null"] },
+              suggested_due_date: { type: ["string", "null"] },
+              suggested_due_date_reason: { type: ["string", "null"] },
+              category: {
+                type: "string",
+                enum: [
+                  "SELECTION",
+                  "SCHEDULE",
+                  "PROCUREMENT",
+                  "SUB-TRADE",
+                  "CLIENT",
+                  "QUALITY",
+                  "BUDGET",
+                  "ADMIN",
+                ],
+              },
+              type: {
+                type: "string",
+                enum: [
+                  "SELECTION",
+                  "CONFIRMATION",
+                  "PRICING",
+                  "SCHEDULE",
+                  "CO_INVOICE",
+                  "FIELD",
+                  "FOLLOWUP",
+                ],
+              },
+              source_excerpt: { type: ["string", "null"] },
+            },
+            required: ["title", "job", "priority", "category", "type"],
+          },
+        },
+      },
+      required: ["summary", "jobs_mentioned", "items"],
+    },
+  };
+
+  let parsed: ExtractionResult;
   try {
     const resp = await client.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 8000,
+      tools: [extractTool],
+      tool_choice: { type: "tool", name: "emit_action_items" },
       messages: [
         {
           role: "user",
@@ -235,36 +299,19 @@ export async function POST(req: NextRequest) {
         },
       ],
     });
-    raw = resp.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
+    const toolUse = resp.content.find((b) => b.type === "tool_use");
+    if (!toolUse || toolUse.type !== "tool_use") {
+      return NextResponse.json(
+        { ok: false, error: "Claude returned no tool_use block" },
+        { status: 502 }
+      );
+    }
+    parsed = toolUse.input as ExtractionResult;
   } catch (err) {
     return NextResponse.json(
       {
         ok: false,
         error: `Claude error: ${err instanceof Error ? err.message : String(err)}`,
-      },
-      { status: 502 }
-    );
-  }
-
-  // Parse JSON from response (Claude sometimes wraps in ```json)
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) {
-    return NextResponse.json(
-      { ok: false, error: "No JSON in Claude response", raw: raw.slice(0, 500) },
-      { status: 502 }
-    );
-  }
-  let parsed: ExtractionResult;
-  try {
-    parsed = JSON.parse(m[0]) as ExtractionResult;
-  } catch (e) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `JSON parse failed: ${e instanceof Error ? e.message : String(e)}`,
       },
       { status: 502 }
     );
