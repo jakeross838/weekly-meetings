@@ -15,6 +15,7 @@ import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
 import { EditableText } from "@/components/editable-text";
 import { DeleteButton } from "@/components/delete-button";
+import { CATEGORIES, styleFor } from "@/lib/categories";
 import {
   JobSummaryPanel,
   JobSummary,
@@ -41,10 +42,6 @@ interface RowData {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function inDaysIso(days: number): string {
-  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
 export default async function V2JobPage({
@@ -370,40 +367,35 @@ export default async function V2JobPage({
     : allActionable;
 
   const today = todayIso();
-  const in7 = inDaysIso(7);
-  const in60 = inDaysIso(60);
 
-  // 1. Today — past-due, carryover ≥2, or due in next 7 days
-  const todayRows = actionable.filter((r) => {
-    if (r.target_date && r.target_date < today) return true;
-    if (r.carryover_count >= 2) return true;
-    if (r.target_date && r.target_date >= today && r.target_date <= in7) return true;
-    return false;
+  // Group actionable rows by category (canonical CATEGORIES order; uncategorized
+  // last). Within a category, soonest / past-due first, then undated by age — so
+  // urgency still reads top-to-bottom inside each bundle.
+  const UNCATEGORIZED = "(uncategorized)";
+  const byCategory = new Map<string, RowData[]>();
+  for (const r of actionable) {
+    const key = r.category || UNCATEGORIZED;
+    const arr = byCategory.get(key) ?? [];
+    arr.push(r);
+    byCategory.set(key, arr);
+  }
+  for (const arr of Array.from(byCategory.values())) {
+    arr.sort((a, b) => {
+      const ad = a.target_date ?? "9999-99-99";
+      const bd = b.target_date ?? "9999-99-99";
+      if (ad !== bd) return ad.localeCompare(bd);
+      return a.created_at.localeCompare(b.created_at);
+    });
+  }
+  const catRank = (c: string) => {
+    const i = (CATEGORIES as readonly string[]).indexOf(c);
+    return i === -1 ? 900 : i;
+  };
+  const orderedCategories = Array.from(byCategory.keys()).sort((a, b) => {
+    const ra = a === UNCATEGORIZED ? 1000 : catRank(a);
+    const rb = b === UNCATEGORIZED ? 1000 : catRank(b);
+    return ra - rb || a.localeCompare(b);
   });
-  todayRows.sort((a, b) =>
-    (a.target_date ?? "9999").localeCompare(b.target_date ?? "9999")
-  );
-
-  const usedKeys = new Set(todayRows.map((r) => `${r.source}:${r.id}`));
-
-  // 2. Soon — due 8..60 days out
-  const soonRows = actionable.filter(
-    (r) =>
-      !usedKeys.has(`${r.source}:${r.id}`) &&
-      r.target_date &&
-      r.target_date > in7 &&
-      r.target_date <= in60
-  );
-  soonRows.sort((a, b) =>
-    (a.target_date ?? "").localeCompare(b.target_date ?? "")
-  );
-  soonRows.forEach((r) => usedKeys.add(`${r.source}:${r.id}`));
-
-  // 3. Open — no date (or >60d)
-  const openRows = actionable.filter(
-    (r) => !usedKeys.has(`${r.source}:${r.id}`)
-  );
-  openRows.sort((a, b) => a.created_at.localeCompare(b.created_at));
 
   // Done — merge completed items + todos within last 7 days
   const completedRows = [
@@ -486,9 +478,15 @@ export default async function V2JobPage({
         </p>
       )}
 
-      <Section title="Today" rows={todayRows} today={today} subs={subs} highlight />
-      <Section title="Soon" rows={soonRows} today={today} subs={subs} />
-      <Section title="Open" rows={openRows} today={today} subs={subs} hideRightSlot />
+      {orderedCategories.map((cat) => (
+        <CategorySection
+          key={cat}
+          category={cat}
+          rows={byCategory.get(cat)!}
+          today={today}
+          subs={subs}
+        />
+      ))}
 
       {completedRows.length > 0 && (
         <section className="px-5 pt-10">
@@ -799,26 +797,36 @@ function PayAppProgress({
   );
 }
 
-function Section({
-  title,
+// One category bundle on the job page: a colored category header + that
+// category's actionable rows (past-due first, highlighted). Categories render
+// in canonical order; uncategorized last.
+function CategorySection({
+  category,
   rows,
   today,
   subs,
-  highlight,
-  hideRightSlot,
 }: {
-  title: string;
+  category: string;
   rows: RowData[];
   today: string;
   subs: { id: string; name: string }[];
-  highlight?: boolean;
-  hideRightSlot?: boolean;
 }) {
   if (rows.length === 0) return null;
+  const isUncat = category === "(uncategorized)";
   return (
     <section className="px-5 pt-8">
-      <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-        {title} · {rows.length}
+      <h2 className="mb-3 flex items-center gap-2">
+        <span
+          className={
+            "font-mono text-[10px] tracking-[0.18em] uppercase px-2 py-0.5 " +
+            (isUncat ? "text-ink-3 bg-sand-2" : styleFor(category))
+          }
+        >
+          {isUncat ? "Uncategorized" : category}
+        </span>
+        <span className="font-mono text-[10px] tabular-nums text-ink-3">
+          {rows.length}
+        </span>
       </h2>
       <ul className="space-y-2">
         {rows.map((r) => (
@@ -833,10 +841,7 @@ function Section({
             target_date={r.target_date}
             category={r.category}
             today={today}
-            highlight={
-              highlight && r.target_date != null && r.target_date < today
-            }
-            hideRightSlot={hideRightSlot}
+            highlight={r.target_date != null && r.target_date < today}
             subs={subs}
           />
         ))}
