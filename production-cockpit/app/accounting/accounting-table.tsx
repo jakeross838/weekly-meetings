@@ -1,12 +1,17 @@
 "use client";
 
-// Portfolio purchase-order ledger. Dense, sortable, filterable table of every
-// job's POs with committed / paid / outstanding totals, expandable line items,
-// and CSV export (POs + line items). Read-only — PO# links to the job page
-// where inline edit/delete live (keeps this 1,200-row view fast to hydrate).
+// Portfolio purchase-order ledger. Dense, sortable, filterable, paginated table
+// of every job's POs with committed / paid / outstanding totals, expandable
+// line items, CSV export (POs + line items), and inline edit/delete per row.
+//
+// Pagination (100/page) keeps it fast: only the visible page's cells mount the
+// EditableText/DeleteButton client components, so the full 1,200-row dataset
+// stays snappy. Totals + filters + sort still operate on the whole set.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { EditableText } from "@/components/editable-text";
+import { DeleteButton } from "@/components/delete-button";
 
 export interface AcctPO {
   id: string;
@@ -37,6 +42,8 @@ export interface AcctLine {
 }
 
 type SortKey = "po" | "job" | "vendor" | "status" | "cost" | "paid" | "outstanding" | "pct";
+const PAGE_SIZE = 100;
+const COLS = 10; // chevron, PO#, job, vendor, status, cost, paid, outstanding, %, delete
 
 function money(n: number | null | undefined): string {
   return "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
@@ -68,6 +75,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   const [sortKey, setSortKey] = useState<SortKey>("cost");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
 
   const jobNames = useMemo(
     () => Array.from(new Set(pos.map((p) => p.jobName))).sort((a, b) => a.localeCompare(b)),
@@ -152,12 +160,23 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
     return { cost, paid, out };
   }, [filtered]);
 
+  // Reset to the first page whenever the result set changes.
+  useEffect(() => {
+    setPage(0);
+  }, [jobFilter, statusFilter, outstandingOnly, search, sortKey, sortDir]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(
+    () => sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [sorted, safePage]
+  );
+
   function setSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      // numbers default high→low, text default A→Z
       setSortDir(["cost", "paid", "outstanding", "pct"].includes(key) ? "desc" : "asc");
     }
   }
@@ -172,30 +191,14 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
 
   function exportPOs() {
     const header = [
-      "Job",
-      "PO #",
-      "Vendor",
-      "Approval",
-      "Paid status",
-      "Cost",
-      "Paid",
-      "Outstanding",
-      "% Billed",
-      "Date added",
+      "Job", "PO #", "Vendor", "Approval", "Paid status", "Cost", "Paid", "Outstanding", "% Billed", "Date added",
     ];
     const rows: (string | number | null)[][] = [header];
     for (const p of sorted) {
       rows.push([
-        p.jobName,
-        p.po_number,
-        p.vendor,
-        p.approval_status,
-        p.paid_status,
-        Number(p.cost) || 0,
-        Number(p.amount_paid) || 0,
-        Number(p.amount_remaining) || 0,
-        p.pct_billed,
-        p.date_added,
+        p.jobName, p.po_number, p.vendor, p.approval_status, p.paid_status,
+        Number(p.cost) || 0, Number(p.amount_paid) || 0, Number(p.amount_remaining) || 0,
+        p.pct_billed, p.date_added,
       ]);
     }
     downloadCsv("purchase-orders.csv", rows);
@@ -204,38 +207,23 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
     const ids = new Set(sorted.map((p) => p.id));
     const poById = new Map(sorted.map((p) => [p.id, p]));
     const header = [
-      "Job",
-      "PO #",
-      "Vendor",
-      "Cost code",
-      "Line item",
-      "Description",
-      "Qty",
-      "Unit cost",
-      "Amount",
-      "Amount paid",
+      "Job", "PO #", "Vendor", "Cost code", "Line item", "Description", "Qty", "Unit cost", "Amount", "Amount paid",
     ];
     const rows: (string | number | null)[][] = [header];
     for (const l of lines) {
       if (!ids.has(l.po_id)) continue;
       const p = poById.get(l.po_id)!;
       rows.push([
-        p.jobName,
-        p.po_number,
-        p.vendor,
-        l.cost_code,
-        l.title,
-        l.description,
-        l.quantity,
-        l.unit_cost,
-        Number(l.amount) || 0,
-        Number(l.amount_paid) || 0,
+        p.jobName, p.po_number, p.vendor, l.cost_code, l.title, l.description,
+        l.quantity, l.unit_cost, Number(l.amount) || 0, Number(l.amount_paid) || 0,
       ]);
     }
     downloadCsv("po-line-items.csv", rows);
   }
 
   const arrow = (key: SortKey) => (sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
+  const rangeStart = sorted.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((safePage + 1) * PAGE_SIZE, sorted.length);
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 pt-8">
@@ -262,9 +250,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
         >
           <option value="">All jobs</option>
           {jobNames.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
+            <option key={n} value={n}>{n}</option>
           ))}
         </select>
         <select
@@ -274,9 +260,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
         >
           <option value="">All statuses</option>
           {statuses.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
         <input
@@ -315,7 +299,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
 
       {/* Table */}
       <div className="overflow-x-auto border border-rule">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-rule bg-sand-2/40 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
               <th className="w-6 px-2 py-2" />
@@ -327,36 +311,59 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
               <Th onClick={() => setSort("paid")} label={`Paid${arrow("paid")}`} right />
               <Th onClick={() => setSort("outstanding")} label={`Outstanding${arrow("outstanding")}`} right />
               <Th onClick={() => setSort("pct")} label={`% Billed${arrow("pct")}`} right />
+              <th className="w-6 px-2 py-2" />
             </tr>
           </thead>
           <tbody>
-            {sorted.length === 0 && (
+            {pageRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-ink-3 text-sm">
+                <td colSpan={COLS} className="px-3 py-10 text-center text-ink-3 text-sm">
                   No purchase orders match.
                 </td>
               </tr>
             )}
-            {sorted.map((p) => {
-              const poLines = linesByPo.get(p.id) ?? [];
-              const isOpen = expanded.has(p.id);
-              const out = Number(p.amount_remaining) || 0;
-              return (
-                <PORow
-                  key={p.id}
-                  po={p}
-                  lines={poLines}
-                  isOpen={isOpen}
-                  out={out}
-                  onToggle={() => toggleExpand(p.id)}
-                />
-              );
-            })}
+            {pageRows.map((p) => (
+              <PORow
+                key={p.id}
+                po={p}
+                lines={linesByPo.get(p.id) ?? []}
+                isOpen={expanded.has(p.id)}
+                onToggle={() => toggleExpand(p.id)}
+              />
+            ))}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="font-mono text-[11px] tabular-nums text-ink-3">
+          {rangeStart}–{rangeEnd} of {sorted.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={safePage <= 0}
+            onClick={() => setPage(safePage - 1)}
+            className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
+          >
+            ← Prev
+          </button>
+          <span className="font-mono text-[11px] tabular-nums text-ink-2">
+            {safePage + 1}/{pageCount}
+          </span>
+          <button
+            type="button"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage(safePage + 1)}
+            className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
       <p className="mt-3 text-[10px] font-mono tracking-[0.14em] uppercase text-ink-3">
-        read-only ledger · click a row for line items · PO# opens the job page to edit/delete
+        click a row ▸ for line items · click any cell to edit · ✕ deletes · PO# opens the job page
       </p>
     </div>
   );
@@ -380,15 +387,17 @@ function PORow({
   po,
   lines,
   isOpen,
-  out,
   onToggle,
 }: {
   po: AcctPO;
   lines: AcctLine[];
   isOpen: boolean;
-  out: number;
   onToggle: () => void;
 }) {
+  const out = Number(po.amount_remaining) || 0;
+  const editEndpoint = `/v2/api/purchase-orders/${po.id}/edit`;
+  const moneyInput =
+    "bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-24 text-right";
   return (
     <>
       <tr className="border-b border-rule-soft hover:bg-sand-2/30">
@@ -416,15 +425,43 @@ function PORow({
           )}
         </td>
         <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2">{po.jobName}</td>
-        <td className="px-3 py-2 align-top text-foreground">{po.vendor ?? "—"}</td>
+        <td className="px-3 py-2 align-top text-foreground">
+          <EditableText
+            value={po.vendor}
+            field="vendor"
+            endpoint={editEndpoint}
+            placeholder="vendor"
+            display={po.vendor ?? "—"}
+          />
+        </td>
         <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2 text-xs">
-          {po.paid_status ?? "—"}
+          <EditableText
+            value={po.paid_status}
+            field="paid_status"
+            endpoint={editEndpoint}
+            placeholder="status"
+            display={po.paid_status ?? "—"}
+          />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-foreground whitespace-nowrap">
-          {money(po.cost)}
+          <EditableText
+            value={po.cost}
+            type="money"
+            field="cost"
+            endpoint={editEndpoint}
+            display={money(po.cost)}
+            inputClassName={moneyInput}
+          />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-ink-2 whitespace-nowrap">
-          {money(po.amount_paid)}
+          <EditableText
+            value={po.amount_paid}
+            type="money"
+            field="amount_paid"
+            endpoint={editEndpoint}
+            display={money(po.amount_paid)}
+            inputClassName={moneyInput}
+          />
         </td>
         <td
           className={
@@ -432,16 +469,30 @@ function PORow({
             (out > 0 ? "text-urgent" : "text-ink-3")
           }
         >
-          {money(po.amount_remaining)}
+          <EditableText
+            value={po.amount_remaining}
+            type="money"
+            field="amount_remaining"
+            endpoint={editEndpoint}
+            display={money(po.amount_remaining)}
+            inputClassName={moneyInput}
+          />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-ink-3 whitespace-nowrap">
           {po.pct_billed != null ? `${Math.round(Number(po.pct_billed))}%` : "—"}
+        </td>
+        <td className="px-2 py-2 align-top text-right">
+          <DeleteButton
+            endpoint={`/v2/api/purchase-orders/${po.id}/delete`}
+            label={`PO ${po.po_number ?? ""}`.trim()}
+            confirmLabel="Delete?"
+          />
         </td>
       </tr>
       {isOpen && lines.length > 0 && (
         <tr className="bg-sand-2/20">
           <td />
-          <td colSpan={8} className="px-3 py-2">
+          <td colSpan={COLS - 1} className="px-3 py-2">
             <ul className="space-y-1">
               {lines.map((l) => (
                 <li
@@ -453,14 +504,11 @@ function PORow({
                     {l.title || l.description || "—"}
                     {l.quantity != null && l.unit_cost != null && (
                       <span className="text-ink-3">
-                        {" "}
-                        ({l.quantity} × {money(l.unit_cost)})
+                        {" "}({l.quantity} × {money(l.unit_cost)})
                       </span>
                     )}
                   </span>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-2">
-                    {money(l.amount)}
-                  </span>
+                  <span className="shrink-0 font-mono tabular-nums text-ink-2">{money(l.amount)}</span>
                 </li>
               ))}
             </ul>
