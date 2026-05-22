@@ -150,7 +150,8 @@ button { border-radius: 0; }
 /* Smooth hover/focus on every interactive element — no instant color snaps. */
 a, button, summary, label, select {
   transition: background-color 150ms ease, color 150ms ease,
-    border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+    border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease,
+    transform 150ms ease;
 }
 
 /* Gentle page entrance on each navigation. */
