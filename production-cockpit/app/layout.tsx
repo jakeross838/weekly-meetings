@@ -36,7 +36,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={cn(head.variable, sans.variable, mono.variable)}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn(head.variable, sans.variable, mono.variable)}
+    >
       <head>
         {/* Apply the saved view mode before paint so there's no mobile→desktop
             flash. Pairs with components/view-toggle.tsx. */}
