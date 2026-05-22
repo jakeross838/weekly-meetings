@@ -21,7 +21,10 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // informational — route refuses on VERCEL=1
-const CHILD_TIMEOUT_SEC = 290;
+// Grid-only across all jobs is ~30s; this leaves headroom for line items on a
+// filtered job or two (one request per PO). All-jobs line items (~30 min) is
+// blocked below — it can't finish in a request.
+const CHILD_TIMEOUT_SEC = 900;
 
 const DEFAULT_SCRAPER_DIR = "C:\\Users\\Greg\\buildertrend-scraper";
 
@@ -66,6 +69,15 @@ export async function POST(req: NextRequest) {
 
   const jobs = body.jobs?.trim() || "";
   const includeLineItems = body.includeLineItems === true;
+
+  // Line items are one request per PO — pulling them for every job takes ~30 min
+  // and can't complete within a request. Require a jobs filter for line items.
+  if (includeLineItems && !jobs) {
+    return jsonError(
+      'Pulling line items for every job times out (~30 min). Add a Jobs filter (e.g. "Krauss") to refresh line items for specific jobs, or uncheck "Include line items" to refresh PO totals for all jobs (fast).',
+      400
+    );
+  }
 
   const scraperDir = process.env.BT_SCRAPER_DIR || DEFAULT_SCRAPER_DIR;
   const pythonExe = path.join(scraperDir, ".venv", "Scripts", "python.exe");

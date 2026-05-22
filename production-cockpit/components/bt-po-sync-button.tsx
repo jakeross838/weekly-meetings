@@ -195,9 +195,15 @@ export function BtPoSyncButton() {
                   Include line items (slow)
                 </label>
                 {includeLineItems && (
-                  <p className="font-mono text-[10px] text-ink-3 leading-snug pl-6">
-                    One request per PO — for all jobs this can exceed the
-                    timeout. Use a jobs filter for a full line-item refresh.
+                  <p
+                    className={
+                      "font-mono text-[10px] leading-snug pl-6 " +
+                      (jobs.trim() ? "text-ink-3" : "text-urgent")
+                    }
+                  >
+                    {jobs.trim()
+                      ? "One request per PO — pulls line items for the filtered job(s)."
+                      : "⚠ Add a Jobs filter above to include line items — pulling them for every job times out (~30 min)."}
                   </p>
                 )}
                 <label className="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
@@ -254,7 +260,12 @@ export function BtPoSyncButton() {
               <button
                 type="button"
                 onClick={submit}
-                disabled={busy || !username.trim() || !password}
+                disabled={
+                  busy ||
+                  !username.trim() ||
+                  !password ||
+                  (includeLineItems && !jobs.trim())
+                }
                 className="bg-ink text-paper px-5 py-2 text-sm font-medium disabled:opacity-50 hover:bg-accent transition-colors"
               >
                 {busy ? "Pulling…" : result ? "Run again" : "Pull POs"}
