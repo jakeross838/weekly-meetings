@@ -14,6 +14,7 @@ import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
 import { AccountingTable } from "@/components/accounting-table";
+import { ClientSummaryPanel } from "@/components/client-summary-panel";
 import { CATEGORIES, styleFor } from "@/lib/categories";
 import {
   JobSummaryPanel,
@@ -462,6 +463,8 @@ export default async function V2JobPage({
         openPoOutstanding={openPoOutstanding}
         openPoCount={openPoCount}
       />
+
+      <ClientSummaryPanel jobId={job.id} />
 
       {purchaseOrders.length > 0 && (
         <section className="px-5 pt-2">
