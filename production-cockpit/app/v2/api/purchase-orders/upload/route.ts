@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
   let body: {
     payload?: { byJob?: Record<string, PORecord[]> };
     byJob?: Record<string, PORecord[]>;
+    skipLineItems?: boolean;
   };
   try {
     body = await req.json();
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "invalid json" }, { status: 400 });
   }
   const byJob = body.payload?.byJob ?? body.byJob ?? {};
+  // Grid-only pulls omit line items; skip all line-item reconciliation so a
+  // PO-totals refresh never deletes the line items a full pull loaded earlier.
+  const skipLineItems = body.skipLineItems === true;
   const allPOs: PORecord[] = [];
   for (const pos of Object.values(byJob)) {
     if (Array.isArray(pos)) allPOs.push(...pos);
@@ -162,6 +166,9 @@ export async function POST(req: NextRequest) {
     for (const r of (data ?? []) as { id: string; bt_po_id: number }[]) idByBtId.set(r.bt_po_id, r.id);
   }
 
+  // --- line items: reconcile only on a full (line-item) pull ---
+  let lineItems = 0;
+  if (!skipLineItems) {
   // --- existing line-item manual state, keyed `${po_id}|${bt_line_item_id}` ---
   const poIds = Array.from(idByBtId.values());
   const lineEdited = new Map<string, string[]>();
@@ -218,7 +225,6 @@ export async function POST(req: NextRequest) {
       }
     }
   }
-  let lineItems = 0;
   for (const c of chunk(cleanLines, 500)) {
     const { error } = await supabase
       .from("po_line_items")
@@ -232,6 +238,7 @@ export async function POST(req: NextRequest) {
       .upsert([row], { onConflict: "po_id,bt_line_item_id" });
     if (error) errors.push(`line upsert(edited): ${error.message}`);
     else lineItems += 1;
+  }
   }
 
   return NextResponse.json({

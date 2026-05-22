@@ -9,6 +9,7 @@ import { PM } from "@/lib/types";
 import { Header } from "@/components/header";
 import { ImportForm } from "@/components/import-form";
 import { BtSyncButton } from "@/components/bt-sync-button";
+import { BtPoSyncButton } from "@/components/bt-po-sync-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +95,23 @@ export default async function ImportPage() {
             <DailyLogUploadForm />
           </div>
         </details>
+      </section>
+
+      {/* PURCHASE ORDERS SECTION */}
+      <section className="px-5 pt-16 pb-10">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+          Purchase orders
+        </h2>
+        <p className="text-xs text-ink-3 mb-4">
+          One-click button logs into Buildertrend and refreshes every
+          job&apos;s purchase orders (cost, paid, outstanding, status) into
+          Supabase — they show on each job page. Fast grid pull by default;
+          tick &ldquo;include line items&rdquo; (slower) for the full
+          line-item breakdown.
+        </p>
+        <div className="mb-6">
+          <BtPoSyncButton />
+        </div>
       </section>
     </main>
   );
