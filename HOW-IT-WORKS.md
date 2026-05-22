@@ -46,11 +46,13 @@ There's a **smart robot** inside. It can:
 
 Like rooms in a house — each one has a job:
 
-- 🏠 **Front page / Jobs** (`/`) — a list of *every house we're building*. The most-worried-about one (most late to-dos) sits at the top. Each row shows the boss, the address, and how many to-dos are open / late. Tap a house to go in.
+- 🏠 **Front page / Jobs** (`/`) — a list of *every house we're building*. The most-worried-about one (most late to-dos) sits at the top. Each row shows the boss, the address, and how many to-dos are open / late. Tap a **boss's name chip** to see just that boss's houses. Tap a house to go in.
 
-- 📋 **A house's page / Job** (`/v2/job/[id]`) — this is the **"one paper" for the Monday meeting**. At the top, a **robot-written summary** of the job. Below it, the to-dos split into **Today · Soon · Open · Done**. Tap the circle to check something off.
+- 🗓️ **Monday Meeting** (`/meeting`) — the **run-of-show** for the meeting. It walks the houses one at a time (most urgent first); each one shows what's **past due**, what's **due this week**, and which **subs to watch**. Tap **"mark covered"** as you finish a house — a bar up top tracks how far you've gotten. Chips filter to one boss.
 
-- 👷 **Subs** (`/subs`) — a list of all the helper companies (subs).
+- 📋 **A house's page / Job** (`/v2/job/[id]`) — this is the **"one paper" for the Monday meeting**. At the top, a **robot-written summary** of the job, **how far along the money is** (Contract Progress — e.g. "48% billed, $2.0M of $4.3M") with a tap-open cost breakdown, and **how many photos the robot analyzed**. Below it, the to-dos split into **Today · Soon · Open · Done**. Tap the circle to check something off.
+
+- 👷 **Subs** (`/subs`) — a list of all the helper companies (subs). Each has a **colored dot**: 🔴 needs attention (a to-do is late), 🟡 keep an eye (flagged or due this week), 🟢 all clear. A **⚑ Flagged** chip filters to the ones the system flagged for a closer look (with the reason shown).
 
 - 👷‍♂️ **A sub's page / Sub profile** (`/sub/[id]`) — *everything* about one helper:
   - their open to-dos and how late they are
@@ -133,13 +135,15 @@ A little story:
 - ✅ The **Buildertrend grabber** works — pulls logs + photos, and the AI describes the photos.
 - ✅ Real daily logs are flowing in (150+ logs, real subs, real photos, AI summaries).
 - ✅ Fixed hidden bugs (the database was never "turned on"; a query that quietly returned nothing; stale data) and **deployed it live**.
+- ✅ **Contract Progress** on each house — the pay-app master checklist now shows "% billed" + a cost breakdown by line.
+- ✅ **"By boss" view** — chips on the front page *and* the Monday Meeting filter to one PM's houses.
+- ✅ **RED/YELLOW/GREEN health dots** on subs + a **⚑ Flagged** lane (with the reason shown).
+- ✅ **Monday-meeting run-of-show** (`/meeting`) — walks the houses, surfaces past-due / this-week / subs-to-watch, mark each one covered.
+- ✅ Fixed the **Buildertrend "Pull" button** crash (the "show browser" toggle) and pulled a full refresh.
 
 **STILL WANT (next, in rough order):**
-- 🎯 Use the **big master checklist (pay-app)** as the backbone everything attaches to.
-- 🎯 A **"by boss" view** — each PM sees just their own houses.
-- 🎯 Put the robot's full **truth-checking brain** inside the app (read → reconcile → double-check).
-- 🎯 **RED / YELLOW / GREEN health dots** for subs, and a real **Monday-meeting layout** (Office + Site).
-- 🎯 Later: **predict the schedule** and finish dates.
+- 🎯 Put the robot's full **truth-checking brain** *inside* the app (read → reconcile → double-check). That part still runs on the laptop today, not in the website.
+- 🎯 Later: a meeting that **forecasts** what to watch (reliability %, 2/4/8-week look-ahead) and **predicts finish dates** — not just shows today.
 
 ---
 
