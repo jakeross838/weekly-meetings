@@ -7,7 +7,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { PM } from "@/lib/types";
 import { Header } from "@/components/header";
-import { ImportForm } from "@/components/import-form";
+import { TranscriptImportModal } from "@/components/transcript-import-modal";
 import { BtSyncButton } from "@/components/bt-sync-button";
 import { BtPoSyncButton } from "@/components/bt-po-sync-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
@@ -129,7 +129,7 @@ export default async function ImportPage() {
             v2 review pipeline →
           </Link>
         </p>
-        <ImportForm
+        <TranscriptImportModal
           pms={pms}
           jobs={jobs}
           assignments={assignments}

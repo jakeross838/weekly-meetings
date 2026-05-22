@@ -507,8 +507,9 @@ export function ImportForm({
                                   ))}
                                 </select>
                                 {!row.sub_id && row.sub_name && (
-                                  <span className="font-mono text-[10px] text-ink-3">
-                                    extractor said: {row.sub_name}
+                                  <span className="font-mono text-[10px] text-gold">
+                                    ⚠ &ldquo;{row.sub_name}&rdquo; isn&apos;t a known
+                                    sub — pick one above
                                   </span>
                                 )}
                                 {/* Per-row Job dropdown — lets the user reassign

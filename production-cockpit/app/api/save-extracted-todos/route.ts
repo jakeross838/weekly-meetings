@@ -49,6 +49,27 @@ export async function POST(req: NextRequest) {
 
   const supabase = supabaseServer();
 
+  // F2 — hard dedup: refuse to re-import a transcript whose filename already
+  // produced to-dos, so a double upload can't create duplicates. The form also
+  // warns before processing; this is the server-side guarantee.
+  const sourceLabel = body.source_label?.trim();
+  if (sourceLabel && sourceLabel !== "cockpit-import") {
+    const { count } = await supabase
+      .from("todos")
+      .select("id", { count: "exact", head: true })
+      .eq("source_transcript", sourceLabel);
+    if ((count ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          duplicate: true,
+          error: `"${sourceLabel}" was already imported (${count} to-do${count === 1 ? "" : "s"} exist). Delete those first if you need to re-import.`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   // Build rows
   const now = Date.now();
   const rows = items.map((item, i) => {
