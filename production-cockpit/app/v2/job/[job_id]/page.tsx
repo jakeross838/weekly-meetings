@@ -153,7 +153,7 @@ export default async function V2JobPage({
       // % complete. Only ~5 jobs have a pay app loaded; tolerate absence.
       supabase
         .from("pay_app_line_items")
-        .select("description, scheduled_value, total_completed")
+        .select("description, division, scheduled_value, total_completed")
         .eq("job_id", job_id),
       // Purchase orders for this job (committed costs + outstanding). Matched
       // by job_key prefix like the daily logs. Tolerates the table being absent.
@@ -250,6 +250,7 @@ export default async function V2JobPage({
     payAppRes && !payAppRes.error
       ? ((payAppRes.data ?? []) as {
           description: string | null;
+          division: string | null;
           scheduled_value: number | null;
           total_completed: number | null;
         }[])
@@ -268,6 +269,7 @@ export default async function V2JobPage({
       const comp = Number(l.total_completed) || 0;
       return {
         description: l.description ?? "—",
+        division: l.division ?? null,
         sched,
         comp,
         pct: sched > 0 ? (comp / sched) * 100 : 0,
@@ -303,6 +305,15 @@ export default async function V2JobPage({
   const poLines = purchaseOrders.flatMap((po) =>
     (poLinesByPo.get(po.id) ?? []).map((l) => ({ ...l, po_id: po.id }))
   );
+  // Open-PO outstanding for this job — surfaced on the pay app (committed cost
+  // still owed, alongside what's billed).
+  const openPoOutstanding = purchaseOrders.reduce(
+    (s, p) => s + (Number(p.amount_remaining) || 0),
+    0
+  );
+  const openPoCount = purchaseOrders.filter(
+    (p) => (Number(p.amount_remaining) || 0) > 0
+  ).length;
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -448,6 +459,8 @@ export default async function V2JobPage({
         scheduled={payScheduled}
         completed={payCompleted}
         lines={payContractLines}
+        openPoOutstanding={openPoOutstanding}
+        openPoCount={openPoCount}
       />
 
       {purchaseOrders.length > 0 && (
@@ -538,19 +551,39 @@ function fmtMoney(n: number): string {
 
 // Contract progress from the latest pay app (schedule of values). Renders
 // nothing when the job has no pay app loaded, so it's safe on every job.
+// Bar/text tone by billed %: amber = in progress/open, green = complete,
+// red = overage (billed past the scheduled value).
+function barTone(pct: number): { bar: string; text: string } {
+  if (pct > 100.5) return { bar: "bg-urgent", text: "text-urgent" };
+  if (pct >= 99.5) return { bar: "bg-success", text: "text-success" };
+  return { bar: "bg-high", text: "text-ink-2" };
+}
+
 function PayAppProgress({
   pct,
   scheduled,
   completed,
   lines,
+  openPoOutstanding,
+  openPoCount,
 }: {
   pct: number | null;
   scheduled: number;
   completed: number;
-  lines: { description: string; sched: number; comp: number; pct: number }[];
+  lines: {
+    description: string;
+    division: string | null;
+    sched: number;
+    comp: number;
+    pct: number;
+  }[];
+  openPoOutstanding: number;
+  openPoCount: number;
 }) {
   if (pct === null || scheduled <= 0) return null;
   const clamped = Math.max(0, Math.min(100, pct));
+  const tone = barTone(pct);
+  const over = completed - scheduled;
   return (
     <section className="px-5 pt-2">
       <div className="border border-rule p-4">
@@ -558,16 +591,36 @@ function PayAppProgress({
           <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
             Contract progress
           </h2>
-          <span className="font-mono text-sm text-foreground tabular-nums">
+          <span className={`font-mono text-sm tabular-nums ${tone.text}`}>
             {pct.toFixed(0)}%
           </span>
         </div>
         <div className="mt-3 h-2 w-full bg-sand-2 overflow-hidden">
-          <div className="h-full bg-ink" style={{ width: `${clamped}%` }} />
+          <div className={`h-full ${tone.bar}`} style={{ width: `${clamped}%` }} />
         </div>
         <p className="mt-2 text-ink-3 text-xs">
           {fmtMoney(completed)} of {fmtMoney(scheduled)} billed to date
+          {over > 0 && (
+            <span className="text-urgent"> · {fmtMoney(over)} over</span>
+          )}
         </p>
+        {openPoCount > 0 && (
+          <p className="mt-1 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
+            <span className="text-urgent">{fmtMoney(openPoOutstanding)}</span> open
+            on {openPoCount} PO{openPoCount === 1 ? "" : "s"}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] uppercase tracking-wider text-ink-3">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 bg-high" /> in progress
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 bg-success" /> complete
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 bg-urgent" /> overage
+          </span>
+        </div>
 
         {lines.length > 0 && (
           <details className="mt-3 border-t border-rule pt-2">
@@ -577,21 +630,31 @@ function PayAppProgress({
             <ul className="mt-3 space-y-3">
               {lines.map((l, i) => {
                 const w = Math.max(0, Math.min(100, l.pct));
+                const lt = barTone(l.pct);
+                const lineOver = l.comp - l.sched;
                 return (
                   <li key={i}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-foreground text-xs truncate">
+                        {l.division && (
+                          <span className="font-mono text-ink-3">{l.division} · </span>
+                        )}
                         {l.description}
                       </span>
-                      <span className="shrink-0 font-mono text-[11px] text-ink-2 tabular-nums">
+                      <span
+                        className={`shrink-0 font-mono text-[11px] tabular-nums ${lt.text}`}
+                      >
                         {l.pct.toFixed(0)}%
                       </span>
                     </div>
                     <div className="mt-1 h-1 w-full bg-sand-2 overflow-hidden">
-                      <div className="h-full bg-accent" style={{ width: `${w}%` }} />
+                      <div className={`h-full ${lt.bar}`} style={{ width: `${w}%` }} />
                     </div>
                     <p className="mt-1 font-mono text-[10px] text-ink-3 tabular-nums">
                       {fmtMoney(l.comp)} / {fmtMoney(l.sched)}
+                      {lineOver > 0 && (
+                        <span className="text-urgent"> · {fmtMoney(lineOver)} over</span>
+                      )}
                     </p>
                   </li>
                 );

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes] = await Promise.all([
+  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes, poRes] = await Promise.all([
     supabase
       .from("pms")
       .select("id, full_name, active")
@@ -35,11 +35,17 @@ export default async function ImportPage() {
       .not("source_transcript", "is", null)
       .order("created_at", { ascending: false })
       .limit(1000),
-    // Daily-log recency + total. daily_logs has no created_at — use log_date.
+    // Daily-log recency + total — enriched_at ≈ when last pulled/imported.
     supabase
       .from("daily_logs")
-      .select("log_date", { count: "exact" })
-      .order("log_date", { ascending: false, nullsFirst: false })
+      .select("enriched_at", { count: "exact" })
+      .order("enriched_at", { ascending: false, nullsFirst: false })
+      .limit(1),
+    // Purchase-order pull recency + total — scraped_at is set on every upload.
+    supabase
+      .from("purchase_orders")
+      .select("scraped_at", { count: "exact" })
+      .order("scraped_at", { ascending: false, nullsFirst: false })
       .limit(1),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
@@ -69,9 +75,14 @@ export default async function ImportPage() {
     b.date.localeCompare(a.date)
   );
   const priorImports = transcriptImports.map((i) => ({ name: i.name, date: i.date }));
-  const dlRows = (dlRes.data ?? []) as { log_date: string | null }[];
+  const dlRows = (dlRes.data ?? []) as { enriched_at: string | null }[];
   const dailyCount = dlRes.count ?? null;
-  const latestLog = dlRows[0]?.log_date ?? null;
+  const lastDailyImport = dlRows[0]?.enriched_at
+    ? dlRows[0].enriched_at.slice(0, 10)
+    : null;
+  const poRows = (poRes.data ?? []) as { scraped_at: string | null }[];
+  const poCount = poRes.count ?? null;
+  const lastPoPull = poRows[0]?.scraped_at ? poRows[0].scraped_at.slice(0, 10) : null;
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -85,6 +96,25 @@ export default async function ImportPage() {
           Drop a Plaud meeting transcript or a Buildertrend daily-log JSON.
         </p>
       </div>
+
+      {/* LAST PULLS & IMPORTS — recency at a glance */}
+      <section className="px-5 pt-6">
+        <div className="border border-rule p-4">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+            Last pulls &amp; imports
+          </h2>
+          <div className="space-y-2 text-sm">
+            <HistoryRow label="Purchase orders" when={lastPoPull} count={poCount} unit="POs" />
+            <HistoryRow label="Daily logs" when={lastDailyImport} count={dailyCount} unit="logs" />
+            <HistoryRow
+              label="Transcripts"
+              when={transcriptImports[0]?.date ?? null}
+              count={transcriptImports.length || null}
+              unit="files"
+            />
+          </div>
+        </div>
+      </section>
 
       {/* TRANSCRIPT SECTION */}
       <section className="px-5 pt-10">
@@ -145,12 +175,6 @@ export default async function ImportPage() {
           logs + photos, writes to Supabase, and runs Claude vision over
           the photos. Or drop a scraper JSON manually further down.
         </p>
-        {(latestLog || dailyCount != null) && (
-          <p className="mb-4 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
-            {dailyCount ?? 0} daily logs
-            {latestLog ? ` · latest ${latestLog}` : ""}
-          </p>
-        )}
         <div className="mb-6">
           <BtSyncButton />
         </div>
@@ -189,5 +213,27 @@ export default async function ImportPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function HistoryRow({
+  label,
+  when,
+  count,
+  unit,
+}: {
+  label: string;
+  when: string | null;
+  count: number | null;
+  unit: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-ink-2">{label}</span>
+      <span className="font-mono text-xs tabular-nums text-ink-3">
+        {when ? `last ${when}` : "never"}
+        {count != null ? ` · ${count} ${unit}` : ""}
+      </span>
+    </div>
   );
 }
