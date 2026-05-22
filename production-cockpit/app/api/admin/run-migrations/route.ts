@@ -267,6 +267,32 @@ ALTER TABLE public.subs
 -- updates lines in place instead of delete+reinsert (which wiped edits/deletes).
 CREATE UNIQUE INDEX IF NOT EXISTS po_line_items_po_btli_uidx
     ON public.po_line_items (po_id, bt_line_item_id);
+
+-- Change orders scraped from Buildertrend (/api/ChangeOrders). owner_price is
+-- the client-facing CO amount. Manual-wins columns so edits/deletes survive a
+-- re-scrape (mirrors purchase_orders).
+CREATE TABLE IF NOT EXISTS public.change_orders (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bt_co_id bigint NOT NULL UNIQUE,
+    job_key text NOT NULL,
+    bt_job_id bigint,
+    co_number text,
+    title text,
+    status text,
+    approval_code int,
+    owner_price numeric,
+    builder_cost numeric,
+    total_with_tax numeric,
+    owner_name text,
+    date_approved date,
+    date_added date,
+    manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    manually_edited_at timestamptz,
+    hidden boolean NOT NULL DEFAULT false,
+    hidden_at timestamptz,
+    scraped_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS change_orders_job_idx ON public.change_orders (job_key);
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -400,7 +426,8 @@ export async function POST(req: NextRequest) {
         EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='po_line_items')                                                              AS has_po_line_items,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='purchase_orders' AND column_name='hidden')                                    AS has_po_hidden,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='po_line_items' AND column_name='manually_edited_fields')                      AS has_poli_manual,
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='manually_edited_fields')                         AS has_dl_manual
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='manually_edited_fields')                         AS has_dl_manual,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='change_orders')                                                               AS has_change_orders
     `);
     const verified = verifyRes.rows[0] as Record<string, unknown>;
     // Flag any boolean check that came back false so the operator sees

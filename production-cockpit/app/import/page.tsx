@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { TranscriptImportModal } from "@/components/transcript-import-modal";
 import { BtSyncButton } from "@/components/bt-sync-button";
 import { BtPoSyncButton } from "@/components/bt-po-sync-button";
+import { BtCoSyncButton } from "@/components/bt-co-sync-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -196,20 +197,20 @@ export default async function ImportPage() {
         </details>
       </section>
 
-      {/* PURCHASE ORDERS SECTION */}
+      {/* PURCHASE ORDERS + CHANGE ORDERS SECTION */}
       <section className="px-5 pt-16 pb-10">
         <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Purchase orders
+          Purchase orders &amp; change orders
         </h2>
         <p className="text-xs text-ink-3 mb-4">
-          One-click button logs into Buildertrend and refreshes every
-          job&apos;s purchase orders (cost, paid, outstanding, status) into
-          Supabase — they show on each job page. Fast grid pull by default;
-          tick &ldquo;include line items&rdquo; (slower) for the full
-          line-item breakdown.
+          One-click pulls from Buildertrend — purchase orders (cost, paid,
+          outstanding, status) and change orders — into Supabase. Both show on
+          each job page. PO grid pull is fast; tick &ldquo;include line
+          items&rdquo; for the full breakdown.
         </p>
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap gap-3">
           <BtPoSyncButton />
+          <BtCoSyncButton />
         </div>
       </section>
     </main>

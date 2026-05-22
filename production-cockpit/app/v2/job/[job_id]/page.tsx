@@ -15,6 +15,7 @@ import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
 import { AccountingTable } from "@/components/accounting-table";
 import { ClientSummaryPanel } from "@/components/client-summary-panel";
+import { ChangeOrdersSection, ChangeOrderRow } from "@/components/change-orders-section";
 import { CATEGORIES, styleFor } from "@/lib/categories";
 import {
   JobSummaryPanel,
@@ -95,6 +96,7 @@ export default async function V2JobPage({
     photoLogsRes,
     payAppRes,
     purchaseOrdersRes,
+    changeOrdersRes,
   ] = await Promise.all([
       supabase
         .from("items")
@@ -166,6 +168,13 @@ export default async function V2JobPage({
         .ilike("job_key", `${job.name}%`)
         .eq("hidden", false)
         .order("cost", { ascending: false }),
+      // Change orders for this job (matched by job_key prefix like POs).
+      supabase
+        .from("change_orders")
+        .select("id, co_number, title, status, owner_price, date_approved")
+        .ilike("job_key", `${job.name}%`)
+        .eq("hidden", false)
+        .order("date_added", { ascending: false }),
     ]);
 
   const pendingEvents = (pendingEventsRes.data ?? []) as {
@@ -315,6 +324,7 @@ export default async function V2JobPage({
   const openPoCount = purchaseOrders.filter(
     (p) => (Number(p.amount_remaining) || 0) > 0
   ).length;
+  const changeOrders = (changeOrdersRes.data ?? []) as ChangeOrderRow[];
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -471,6 +481,8 @@ export default async function V2JobPage({
           <AccountingTable pos={purchaseOrders} lines={poLines} jobName={job.name} />
         </section>
       )}
+
+      <ChangeOrdersSection cos={changeOrders} />
 
       <CategoryFilterPills
         basePath={`/v2/job/${job_id}`}
