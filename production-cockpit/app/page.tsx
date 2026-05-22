@@ -145,11 +145,15 @@ export default async function Page({
   // Header counts reflect the visible (filtered) jobs.
   let totalOpen = 0;
   let totalPastDue = 0;
+  let totalPending = 0;
   for (const j of rows) {
     const c = countsFor(j);
     totalOpen += c.open;
     totalPastDue += c.past_due;
+    totalPending += pendingByJob.get(j.id) ?? 0;
   }
+  const avgOpen = rows.length ? (totalOpen / rows.length).toFixed(1) : "0";
+  const avgPastDue = rows.length ? (totalPastDue / rows.length).toFixed(1) : "0";
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -160,15 +164,33 @@ export default async function Page({
           Jobs
         </h1>
         <p className="mt-2 text-ink-3 text-sm">
-          {totalOpen} open
-          {totalPastDue > 0 && (
-            <>
-              {" · "}
-              <span className="text-urgent">{totalPastDue} past due</span>
-            </>
-          )}
+          {pmFilter
+            ? `${pmNameById.get(pmFilter) ?? "Portfolio"} · ${rows.length} ${rows.length === 1 ? "job" : "jobs"}`
+            : "Across the portfolio"}
         </p>
       </header>
+
+      {/* Director stat strip — portfolio health at a glance (no extra queries;
+          all derived from data already loaded for the list). */}
+      <section className="px-5 pt-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <StatTile label="Active jobs" value={rows.length} />
+          <StatTile label="Open items" value={totalOpen} />
+          <StatTile
+            label="Past due"
+            value={totalPastDue}
+            tone={totalPastDue > 0 ? "urgent" : undefined}
+          />
+          <StatTile
+            label="To approve"
+            value={totalPending}
+            tone={totalPending > 0 ? "accent" : undefined}
+          />
+        </div>
+        <p className="mt-2 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
+          avg {avgOpen} open · {avgPastDue} past due / job
+        </p>
+      </section>
 
       {poCount > 0 && (
         <section className="px-5 pt-2">
@@ -220,7 +242,7 @@ export default async function Page({
               <li key={j.id}>
                 <Link
                   href={`/v2/job/${j.id}`}
-                  className="flex items-baseline gap-3 px-5 py-3.5 border-b border-rule hover:bg-sand-2/40 transition-colors"
+                  className="flex items-baseline gap-3 px-5 py-3.5 border-b border-rule hover:bg-oceanside/30 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-foreground text-sm leading-snug truncate">
@@ -261,6 +283,33 @@ export default async function Page({
         )}
       </ul>
     </main>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "urgent" | "accent";
+}) {
+  const color =
+    tone === "urgent"
+      ? "text-urgent"
+      : tone === "accent"
+        ? "text-accent"
+        : "text-foreground";
+  return (
+    <div className="border border-rule bg-paper p-3 transition hover:-translate-y-0.5 hover:border-accent hover:shadow-sm">
+      <div className={"font-head text-2xl leading-none tabular-nums " + color}>
+        {value}
+      </div>
+      <div className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">
+        {label}
+      </div>
+    </div>
   );
 }
 
