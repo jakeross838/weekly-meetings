@@ -125,6 +125,23 @@ Shipped 2026-05-20 (built, verified live, deployed to prod):
   exposes a large real backlog (≈186 past-due todos) — accurate, not a bug;
   many are stale historical items worth a closeout pass.
 
+Shipped 2026-05-22 (reliability hardening + full QA pass):
+
+- ✅ **All 3 Claude calls hardened with tool-use** — the job-summary,
+  transcript-extractor, and photo-vision routes asked Claude for free-text JSON
+  then `JSON.parse`'d it, which 502'd on malformed output (the Generate-Summary
+  button was failing exactly this way). All three now use tool-use with an
+  `input_schema`, so output is structurally guaranteed — no regex, no
+  `JSON.parse`. Files: `app/api/jobs/[id]/refresh-summary/route.ts`,
+  `app/api/import-transcript/route.ts`,
+  `app/v2/api/daily-logs/extract-photos/route.ts`. Each verified live.
+- ✅ **Full button-by-button QA** — home PM pills; meeting covered-toggle /
+  reset / scope pills; subs trade + flagged filters + RYG dots; sub editors
+  (specialties + checklist add/toggle/edit/delete, test data reverted); job
+  cost-breakdown, category pills, check-off (+re-open), generate-summary;
+  import BT modal; review queue + detail. One real bug (summary 502) found +
+  fixed; BT scraper re-verified end-to-end (full pull → Supabase → vision → live).
+
 Still open — larger, need your editorial calls (don't build blind):
 
 1. **The 3-call brain in-app** — Extractor/Reconciler/Auditor still run offline
@@ -155,5 +172,6 @@ Confirmed-skip:
 - **DB password** is in `.env` as `SUPABASE_DB_PASSWORD` — **rotate it** (it was shared in chat). Migrations apply via `/admin/migrate` or `node` + `pg` against `aws-1-us-west-2.pooler.supabase.com:6543`.
 - **jsonb columns** (`crews_present`, `absent_crews`): never use `.overlaps()` — use per-name `.filter(col,"cs",json)` containment.
 - **Screenshots** (`verify-*.png`, `m-*.png`) are local-only proof shots — gitignored via `/*.png` (this repo is public; client data must never be committed). They render the features with real data but are not in git.
+- **TWO Vercel projects** are wired to this repo: `production-cockpit` (the real app — GREEN, serves production-cockpit.vercel.app) and `weekly-meetings` (a duplicate whose root dir is the repo root, where there's no app — so it's RED on every commit). The red ✗ is **purely cosmetic** and does not affect the live site. **DANGER — do NOT add a `vercel.json` at the repo root to "fix" it:** BOTH projects read the repo root, so a root `vercel.json` overrides the REAL project's build and the live site serves a placeholder (learned the hard way 2026-05-22; caught + reverted in ~1 min). The duplicate can only be removed from the Vercel **account** (dashboard → `weekly-meetings` → Settings → Delete, or the Vercel MCP OAuth). The saved Vercel CLI tokens in `%APPDATA%/Roaming/com.vercel.cli/Data/auth.json` are **expired (403)**.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
