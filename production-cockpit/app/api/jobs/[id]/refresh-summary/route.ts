@@ -196,44 +196,85 @@ export async function POST(
   const client = new Anthropic({ apiKey: anthropicKey });
   const prompt = buildPrompt(job, windowDays, logs, openTodos, doneTodos);
 
+  // Force a valid, schema-shaped object via tool-use. Free-text JSON from the
+  // model occasionally came back malformed on big summaries (unescaped chars),
+  // which blew up JSON.parse and 502'd the route. A tool schema makes the
+  // output structurally guaranteed — no regex, no JSON.parse.
+  const summaryTool: Anthropic.Tool = {
+    name: "emit_job_summary",
+    description:
+      "Return the structured job summary for the Monday meeting binder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        headline: { type: "string" },
+        phase: { type: ["string", "null"] },
+        whats_happening: { type: "array", items: { type: "string" } },
+        subs_recently_on_site: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              days: { type: "integer" },
+              primary_activity: { type: ["string", "null"] },
+            },
+            required: ["name", "days"],
+          },
+        },
+        open_concerns: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string" },
+              priority: { type: "string", enum: ["URGENT", "HIGH", "NORMAL"] },
+              owner: { type: ["string", "null"] },
+            },
+            required: ["text", "priority"],
+          },
+        },
+        coming_up: { type: "array", items: { type: "string" } },
+        inspections_recent: { type: "array", items: { type: "string" } },
+        safety_flags: { type: "array", items: { type: "string" } },
+        confidence: { type: "string", enum: ["high", "medium", "low"] },
+      },
+      required: [
+        "headline",
+        "whats_happening",
+        "subs_recently_on_site",
+        "open_concerns",
+        "coming_up",
+        "inspections_recent",
+        "safety_flags",
+        "confidence",
+      ],
+    },
+  };
+
   const startedAt = Date.now();
-  let raw = "";
+  let parsed: JobSummary;
   try {
     const resp = await client.messages.create({
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: 4000,
+      tools: [summaryTool],
+      tool_choice: { type: "tool", name: "emit_job_summary" },
       messages: [{ role: "user", content: prompt }],
     });
-    raw = resp.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
+    const toolUse = resp.content.find((b) => b.type === "tool_use");
+    if (!toolUse || toolUse.type !== "tool_use") {
+      return NextResponse.json(
+        { ok: false, error: "Claude returned no tool_use block" },
+        { status: 502 }
+      );
+    }
+    parsed = toolUse.input as JobSummary;
   } catch (e) {
     return NextResponse.json(
       {
         ok: false,
         error: `Claude error: ${e instanceof Error ? e.message : String(e)}`,
-      },
-      { status: 502 }
-    );
-  }
-
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) {
-    return NextResponse.json(
-      { ok: false, error: "No JSON in Claude response", raw: raw.slice(0, 600) },
-      { status: 502 }
-    );
-  }
-  let parsed: JobSummary;
-  try {
-    parsed = JSON.parse(m[0]) as JobSummary;
-  } catch (e) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `JSON parse: ${e instanceof Error ? e.message : String(e)}`,
-        raw: raw.slice(0, 600),
       },
       { status: 502 }
     );
