@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RossBuiltLogo } from "./logo";
+import { ViewToggle } from "./view-toggle";
 
 // Minimal header: brand mark + 4 short links. Date stamp removed.
 // "Todos" was the v1 name for the portfolio home — renamed to "Jobs" to
@@ -32,6 +33,7 @@ export function Header() {
           >
             Import
           </Link>
+          <ViewToggle />
         </nav>
       </div>
     </header>

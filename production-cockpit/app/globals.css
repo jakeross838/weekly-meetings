@@ -85,6 +85,12 @@ body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* Desktop view toggle — when the user opts into desktop view (a `view-desktop`
+   class on <html>, set by components/view-toggle.tsx + the inline script in
+   layout.tsx), widen every page's mobile column. No effect on phones: their
+   viewport is already narrower than 560px, so a larger max-width is a no-op. */
+html.view-desktop .max-w-\[560px\] { max-width: 1100px; }
+
 /* Square corners on form controls; everything else can have a subtle radius
    for the modern luxury feel. */
 input, select, textarea { border-radius: 0; }

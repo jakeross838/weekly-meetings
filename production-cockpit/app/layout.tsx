@@ -37,6 +37,16 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={cn(head.variable, sans.variable, mono.variable)}>
+      <head>
+        {/* Apply the saved view mode before paint so there's no mobile→desktop
+            flash. Pairs with components/view-toggle.tsx. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('viewMode')==='desktop')document.documentElement.classList.add('view-desktop')}catch(e){}",
+          }}
+        />
+      </head>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
       </body>
