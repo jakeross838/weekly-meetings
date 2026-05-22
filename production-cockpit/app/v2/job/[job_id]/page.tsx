@@ -95,6 +95,7 @@ export default async function V2JobPage({
     summaryRes,
     photoLogsRes,
     payAppRes,
+    purchaseOrdersRes,
   ] = await Promise.all([
       supabase
         .from("items")
@@ -156,6 +157,15 @@ export default async function V2JobPage({
         .from("pay_app_line_items")
         .select("description, scheduled_value, total_completed")
         .eq("job_id", job_id),
+      // Purchase orders for this job (committed costs + outstanding). Matched
+      // by job_key prefix like the daily logs. Tolerates the table being absent.
+      supabase
+        .from("purchase_orders")
+        .select(
+          "id, po_number, title, vendor, approval_status, work_status, paid_status, cost, amount_paid, amount_remaining, pct_billed, cost_codes, date_added"
+        )
+        .ilike("job_key", `${job.name}%`)
+        .order("cost", { ascending: false }),
     ]);
 
   const pendingEvents = (pendingEventsRes.data ?? []) as {
@@ -266,6 +276,42 @@ export default async function V2JobPage({
     })
     .filter((l) => l.sched > 0)
     .sort((a, b) => b.sched - a.sched);
+
+  // Purchase orders + their line items (committed costs / outstanding).
+  const purchaseOrders =
+    purchaseOrdersRes && !purchaseOrdersRes.error
+      ? ((purchaseOrdersRes.data ?? []) as POForJob[])
+      : [];
+  const poLinesByPo = new Map<string, POLine[]>();
+  if (purchaseOrders.length > 0) {
+    const liRes = await supabase
+      .from("po_line_items")
+      .select(
+        "po_id, cost_code, title, description, quantity, unit_cost, amount, amount_paid"
+      )
+      .in(
+        "po_id",
+        purchaseOrders.map((p) => p.id)
+      )
+      .order("position", { ascending: true });
+    for (const li of (liRes.data ?? []) as (POLine & { po_id: string })[]) {
+      const arr = poLinesByPo.get(li.po_id) ?? [];
+      arr.push(li);
+      poLinesByPo.set(li.po_id, arr);
+    }
+  }
+  const poWithLines = purchaseOrders.map((po) => ({
+    po,
+    lines: poLinesByPo.get(po.id) ?? [],
+  }));
+  const poTotalCost = purchaseOrders.reduce(
+    (s, p) => s + (Number(p.cost) || 0),
+    0
+  );
+  const poOutstanding = purchaseOrders.reduce(
+    (s, p) => s + (Number(p.amount_remaining) || 0),
+    0
+  );
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -418,6 +464,12 @@ export default async function V2JobPage({
         lines={payContractLines}
       />
 
+      <PurchaseOrders
+        pos={poWithLines}
+        totalCost={poTotalCost}
+        outstanding={poOutstanding}
+      />
+
       <CategoryFilterPills
         basePath={`/v2/job/${job_id}`}
         activeCategory={catFilter}
@@ -457,6 +509,131 @@ export default async function V2JobPage({
         </section>
       )}
     </main>
+  );
+}
+
+type POForJob = {
+  id: string;
+  po_number: string | null;
+  title: string | null;
+  vendor: string | null;
+  approval_status: string | null;
+  work_status: string | null;
+  paid_status: string | null;
+  cost: number | null;
+  amount_paid: number | null;
+  amount_remaining: number | null;
+  pct_billed: number | null;
+  cost_codes: string[] | null;
+  date_added: string | null;
+};
+type POLine = {
+  cost_code: string | null;
+  title: string | null;
+  description: string | null;
+  quantity: number | null;
+  unit_cost: number | null;
+  amount: number | null;
+  amount_paid: number | null;
+};
+
+// Purchase orders for a job — committed costs, outstanding, and the line-item
+// breakdown (nested <details>: PO section → each PO → its lines). Renders
+// nothing when the job has no POs.
+function PurchaseOrders({
+  pos,
+  totalCost,
+  outstanding,
+}: {
+  pos: { po: POForJob; lines: POLine[] }[];
+  totalCost: number;
+  outstanding: number;
+}) {
+  if (pos.length === 0) return null;
+  const paid = totalCost - outstanding;
+  return (
+    <section className="px-5 pt-2">
+      <details className="border border-rule p-4">
+        <summary className="cursor-pointer flex items-baseline justify-between gap-3">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+            Purchase orders · {pos.length}
+          </h2>
+          <span className="font-mono text-sm text-foreground tabular-nums">
+            {fmtMoney(outstanding)}{" "}
+            <span className="text-ink-3 text-xs">left</span>
+          </span>
+        </summary>
+        <p className="mt-2 text-ink-3 text-xs">
+          {fmtMoney(totalCost)} committed · {fmtMoney(paid)} paid ·{" "}
+          {fmtMoney(outstanding)} outstanding
+        </p>
+        <ul className="mt-3 space-y-2">
+          {pos.map(({ po, lines }) => {
+            const out = Number(po.amount_remaining) || 0;
+            return (
+              <li key={po.id} className="border-t border-rule-soft pt-2">
+                <details>
+                  <summary className="cursor-pointer flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="font-mono text-[11px] text-ink-3">
+                        {po.po_number ?? "PO"}
+                      </span>{" "}
+                      <span className="text-foreground text-sm">
+                        {po.title ?? "—"}
+                      </span>
+                      <span className="block text-ink-3 text-xs truncate">
+                        {po.vendor ?? "—"}
+                        {po.paid_status ? ` · ${po.paid_status}` : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right font-mono text-xs tabular-nums">
+                      <span className="text-foreground">
+                        {fmtMoney(Number(po.cost) || 0)}
+                      </span>
+                      {out > 0 && (
+                        <span className="block text-urgent">
+                          {fmtMoney(out)} left
+                        </span>
+                      )}
+                    </span>
+                  </summary>
+                  {lines.length > 0 ? (
+                    <ul className="mt-2 space-y-1 pl-1">
+                      {lines.map((li, i) => (
+                        <li
+                          key={i}
+                          className="flex items-baseline justify-between gap-3 text-xs"
+                        >
+                          <span className="min-w-0 flex-1 text-ink-2">
+                            {li.cost_code && (
+                              <span className="text-ink-3">{li.cost_code} · </span>
+                            )}
+                            {li.title || li.description || "—"}
+                            {li.quantity != null && li.unit_cost != null && (
+                              <span className="text-ink-3">
+                                {" "}
+                                ({li.quantity} × {fmtMoney(Number(li.unit_cost) || 0)})
+                              </span>
+                            )}
+                          </span>
+                          <span className="shrink-0 font-mono tabular-nums text-ink-2">
+                            {fmtMoney(Number(li.amount) || 0)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 pl-1 text-ink-3 text-xs">
+                      {(po.cost_codes ?? []).join(", ") || "No line items."}
+                    </p>
+                  )}
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+    </section>
   );
 }
 

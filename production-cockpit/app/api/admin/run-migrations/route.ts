@@ -193,6 +193,50 @@ CREATE TABLE IF NOT EXISTS public.job_summaries (
 
 CREATE INDEX IF NOT EXISTS job_summaries_job_recent_idx
     ON public.job_summaries (job_id, generated_at DESC);
+
+-- Purchase Orders + line items scraped from Buildertrend (/api/PurchaseOrders).
+-- purchase_orders mirrors the PO grid row; po_line_items mirrors each PO's
+-- lineItems.value[]. amount_remaining is the outstanding (committed-unpaid) cost.
+CREATE TABLE IF NOT EXISTS public.purchase_orders (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bt_po_id bigint NOT NULL UNIQUE,
+    job_key text NOT NULL,
+    bt_job_id bigint,
+    po_number text,
+    title text,
+    vendor text,
+    bt_vendor_id bigint,
+    approval_status text,
+    work_status text,
+    paid_status text,
+    is_bill boolean NOT NULL DEFAULT false,
+    cost numeric,
+    amount_paid numeric,
+    amount_remaining numeric,
+    pct_paid numeric,
+    pct_remaining numeric,
+    pct_billed numeric,
+    cost_codes jsonb NOT NULL DEFAULT '[]'::jsonb,
+    date_added date,
+    scraped_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS purchase_orders_job_idx ON public.purchase_orders (job_key);
+
+CREATE TABLE IF NOT EXISTS public.po_line_items (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    po_id uuid NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+    bt_line_item_id bigint,
+    cost_code text,
+    title text,
+    description text,
+    quantity numeric,
+    unit_cost numeric,
+    amount numeric,
+    amount_paid numeric,
+    amount_billed numeric,
+    position int NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS po_line_items_po_idx ON public.po_line_items (po_id);
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -321,7 +365,9 @@ export async function POST(req: NextRequest) {
         -- F7 — per-sub running checklist
         EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sub_checklist_items')                                                        AS has_sub_checklist,
         -- F9 — per-job AI summary
-        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='job_summaries')                                                              AS has_job_summaries
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='job_summaries')                                                              AS has_job_summaries,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='purchase_orders')                                                            AS has_purchase_orders,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='po_line_items')                                                              AS has_po_line_items
     `);
     const verified = verifyRes.rows[0] as Record<string, unknown>;
     // Flag any boolean check that came back false so the operator sees

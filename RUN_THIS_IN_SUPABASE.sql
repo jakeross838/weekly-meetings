@@ -188,3 +188,46 @@ CREATE TABLE IF NOT EXISTS public.job_summaries (
 
 CREATE INDEX IF NOT EXISTS job_summaries_job_recent_idx
     ON public.job_summaries (job_id, generated_at DESC);
+
+-- Purchase Orders + line items scraped from Buildertrend (/api/PurchaseOrders).
+-- amount_remaining is the outstanding (committed-but-unpaid) cost.
+CREATE TABLE IF NOT EXISTS public.purchase_orders (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bt_po_id bigint NOT NULL UNIQUE,
+    job_key text NOT NULL,
+    bt_job_id bigint,
+    po_number text,
+    title text,
+    vendor text,
+    bt_vendor_id bigint,
+    approval_status text,
+    work_status text,
+    paid_status text,
+    is_bill boolean NOT NULL DEFAULT false,
+    cost numeric,
+    amount_paid numeric,
+    amount_remaining numeric,
+    pct_paid numeric,
+    pct_remaining numeric,
+    pct_billed numeric,
+    cost_codes jsonb NOT NULL DEFAULT '[]'::jsonb,
+    date_added date,
+    scraped_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS purchase_orders_job_idx ON public.purchase_orders (job_key);
+
+CREATE TABLE IF NOT EXISTS public.po_line_items (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    po_id uuid NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+    bt_line_item_id bigint,
+    cost_code text,
+    title text,
+    description text,
+    quantity numeric,
+    unit_cost numeric,
+    amount numeric,
+    amount_paid numeric,
+    amount_billed numeric,
+    position int NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS po_line_items_po_idx ON public.po_line_items (po_id);
