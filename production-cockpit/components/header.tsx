@@ -27,6 +27,9 @@ export function Header() {
           <Link href="/subs" className="hover:text-ink transition-colors">
             Subs
           </Link>
+          <Link href="/accounting" className="hover:text-ink transition-colors">
+            Acct
+          </Link>
           <Link
             href="/import"
             className="text-accent hover:text-ink transition-colors"

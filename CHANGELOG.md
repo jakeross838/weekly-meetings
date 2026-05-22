@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## 2026-05-22 (cont.) — Accounting ledger, CSV export, PO import button, polish
+
+Follow-up round closing out the PO feature and the universal edit/delete asks.
+
+### Accounting view + CSV export (`/accounting`)
+- New portfolio **purchase-order ledger**: every job's POs in one dense,
+  sortable, filterable table (PO# · job · vendor · status · cost · paid ·
+  outstanding · % billed) with committed/paid/outstanding totals and
+  expandable line items. Paginates past Supabase's 1000-row cap (loads all
+  1,260 POs / 2,099 lines). Filters: job, status, outstanding-only, search.
+- **CSV export** — two buttons (POs + line items) generate comma-safe,
+  Excel-friendly downloads of the current (filtered) set.
+- "Acct" added to the header nav. Totals verified against a direct DB sum
+  ($47.6M committed / $36.85M paid / $10.78M outstanding).
+
+### PO import button (`/import`)
+- One-click **"Pull POs from Buildertrend"** (mirrors the daily-logs button):
+  fast grid pull by default (PO totals/status, all jobs), optional line items.
+  Upload route gains `skipLineItems` so a grid pull never deletes existing line
+  items (verified non-destructive).
+
+### Polish
+- Job-page to-dos now **grouped by category** (SCHEDULE, QUALITY, PROCUREMENT,
+  SELECTION, BUDGET, CLIENT, ADMIN, SUB-TRADE, then Uncategorized), past-due
+  first within each.
+- Sub-delete **guards open to-dos** (warns "N open to-dos — delete anyway?").
+- Delete added to meeting agenda items. "Avg drift" tile removed from sub
+  profiles.
+
 ## 2026-05-22 — Purchase Orders finished + universal edit/delete (manual-wins)
 
 Full PO data pulled from Buildertrend and made first-class on the job page,
