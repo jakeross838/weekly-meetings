@@ -54,6 +54,42 @@ export default async function Page({
   }[];
   const pending = (pendingRes.data ?? []) as { job_id: string | null }[];
 
+  // Portfolio PO rollup — totals + averages across every job. Paginate past
+  // Supabase's 1000-row cap so all POs are counted.
+  let poCommitted = 0;
+  let poPaid = 0;
+  let poOutstanding = 0;
+  let poCount = 0;
+  const poJobKeys = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabase
+      .from("purchase_orders")
+      .select("cost, amount_paid, amount_remaining, job_key")
+      .eq("hidden", false)
+      .range(from, from + 999);
+    const poRows = (data ?? []) as {
+      cost: number | null;
+      amount_paid: number | null;
+      amount_remaining: number | null;
+      job_key: string | null;
+    }[];
+    for (const r of poRows) {
+      poCommitted += Number(r.cost) || 0;
+      poPaid += Number(r.amount_paid) || 0;
+      poOutstanding += Number(r.amount_remaining) || 0;
+      if (r.job_key) poJobKeys.add(r.job_key);
+    }
+    poCount += poRows.length;
+    if (poRows.length < 1000) break;
+  }
+  const poJobCount = poJobKeys.size;
+  const fmtM = (n: number) =>
+    n >= 1_000_000
+      ? `$${(n / 1_000_000).toFixed(1)}M`
+      : n >= 1_000
+        ? `$${Math.round(n / 1_000)}K`
+        : `$${Math.round(n)}`;
+
   const pmNameById = new Map(pms.map((p) => [p.id, p.full_name]));
   const activePmByJob = new Map<string, string>();
   for (const a of assignments) activePmByJob.set(a.job_id, a.pm_id);
@@ -133,6 +169,25 @@ export default async function Page({
           )}
         </p>
       </header>
+
+      {poCount > 0 && (
+        <section className="px-5 pt-2">
+          <div className="border border-rule p-4">
+            <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-2">
+              Portfolio · purchase orders
+            </h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm tabular-nums">
+              <span className="text-foreground">{fmtM(poCommitted)} committed</span>
+              <span className="text-ink-2">{fmtM(poPaid)} paid</span>
+              <span className="text-urgent">{fmtM(poOutstanding)} outstanding</span>
+            </div>
+            <p className="mt-2 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
+              {poCount} POs · {poJobCount} jobs · avg{" "}
+              {fmtM(poJobCount > 0 ? poOutstanding / poJobCount : 0)} outstanding/job
+            </p>
+          </div>
+        </section>
+      )}
 
       {pmPills.length > 0 && (
         <div className="px-5 pt-2 pb-1">

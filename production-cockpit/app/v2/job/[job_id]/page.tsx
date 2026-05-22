@@ -13,8 +13,7 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
-import { EditableText } from "@/components/editable-text";
-import { DeleteButton } from "@/components/delete-button";
+import { AccountingTable } from "@/components/accounting-table";
 import { CATEGORIES, styleFor } from "@/lib/categories";
 import {
   JobSummaryPanel,
@@ -301,17 +300,8 @@ export default async function V2JobPage({
       poLinesByPo.set(li.po_id, arr);
     }
   }
-  const poWithLines = purchaseOrders.map((po) => ({
-    po,
-    lines: poLinesByPo.get(po.id) ?? [],
-  }));
-  const poTotalCost = purchaseOrders.reduce(
-    (s, p) => s + (Number(p.cost) || 0),
-    0
-  );
-  const poOutstanding = purchaseOrders.reduce(
-    (s, p) => s + (Number(p.amount_remaining) || 0),
-    0
+  const poLines = purchaseOrders.flatMap((po) =>
+    (poLinesByPo.get(po.id) ?? []).map((l) => ({ ...l, po_id: po.id }))
   );
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
@@ -460,11 +450,11 @@ export default async function V2JobPage({
         lines={payContractLines}
       />
 
-      <PurchaseOrders
-        pos={poWithLines}
-        totalCost={poTotalCost}
-        outstanding={poOutstanding}
-      />
+      {purchaseOrders.length > 0 && (
+        <section className="px-5 pt-2">
+          <AccountingTable pos={purchaseOrders} lines={poLines} jobName={job.name} />
+        </section>
+      )}
 
       <CategoryFilterPills
         basePath={`/v2/job/${job_id}`}
@@ -540,188 +530,6 @@ type POLine = {
   amount_paid: number | null;
 };
 
-// One editable PO field rendered as a label/value row in the PO body's
-// definition list. Edits append the field to manually_edited_fields server-side
-// so the next scrape won't clobber them.
-function POField({
-  label,
-  poId,
-  field,
-  value,
-  type,
-  display,
-}: {
-  label: string;
-  poId: string;
-  field: string;
-  value: string | number | null;
-  type?: "text" | "money";
-  display?: string;
-}) {
-  return (
-    <>
-      <dt className="self-center font-mono text-[9px] uppercase tracking-wider text-ink-3">
-        {label}
-      </dt>
-      <dd className="min-w-0">
-        <EditableText
-          value={value}
-          field={field}
-          endpoint={`/v2/api/purchase-orders/${poId}/edit`}
-          type={type}
-          display={display}
-          placeholder={label.toLowerCase()}
-          className="text-foreground"
-        />
-      </dd>
-    </>
-  );
-}
-
-// Purchase orders for a job — committed costs, outstanding, and the line-item
-// breakdown (nested <details>: PO section → each PO → its lines). Renders
-// nothing when the job has no POs.
-function PurchaseOrders({
-  pos,
-  totalCost,
-  outstanding,
-}: {
-  pos: { po: POForJob; lines: POLine[] }[];
-  totalCost: number;
-  outstanding: number;
-}) {
-  if (pos.length === 0) return null;
-  const paid = totalCost - outstanding;
-  return (
-    <section className="px-5 pt-2">
-      <details className="border border-rule p-4">
-        <summary className="cursor-pointer flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
-            Purchase orders · {pos.length}
-          </h2>
-          <span className="font-mono text-sm text-foreground tabular-nums">
-            {fmtMoney(outstanding)}{" "}
-            <span className="text-ink-3 text-xs">left</span>
-          </span>
-        </summary>
-        <p className="mt-2 text-ink-3 text-xs">
-          {fmtMoney(totalCost)} committed · {fmtMoney(paid)} paid ·{" "}
-          {fmtMoney(outstanding)} outstanding
-        </p>
-        <ul className="mt-3 space-y-2">
-          {pos.map(({ po, lines }) => {
-            const out = Number(po.amount_remaining) || 0;
-            return (
-              <li key={po.id} className="border-t border-rule-soft pt-2">
-                <details>
-                  <summary className="cursor-pointer flex items-baseline justify-between gap-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="font-mono text-[11px] text-ink-3">
-                        {po.po_number ?? "PO"}
-                      </span>{" "}
-                      <span className="text-foreground text-sm">
-                        {po.title ?? "—"}
-                      </span>
-                      <span className="block text-ink-3 text-xs truncate">
-                        {po.vendor ?? "—"}
-                        {po.paid_status ? ` · ${po.paid_status}` : ""}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right font-mono text-xs tabular-nums">
-                      <span className="text-foreground">
-                        {fmtMoney(Number(po.cost) || 0)}
-                      </span>
-                      {out > 0 && (
-                        <span className="block text-urgent">
-                          {fmtMoney(out)} left
-                        </span>
-                      )}
-                    </span>
-                  </summary>
-
-                  {/* Editable PO fields live in the body — clicking an input
-                      inside <summary> would fight the open/close toggle. */}
-                  <dl className="mt-2 grid grid-cols-[3.5rem_1fr] items-baseline gap-x-2 gap-y-1 pl-1 text-xs">
-                    <POField label="Title" poId={po.id} field="title" value={po.title} />
-                    <POField label="Vendor" poId={po.id} field="vendor" value={po.vendor} />
-                    <POField
-                      label="Cost"
-                      poId={po.id}
-                      field="cost"
-                      value={po.cost}
-                      type="money"
-                      display={fmtMoney(Number(po.cost) || 0)}
-                    />
-                    <POField
-                      label="Status"
-                      poId={po.id}
-                      field="paid_status"
-                      value={po.paid_status}
-                    />
-                  </dl>
-                  <div className="mt-1.5 pl-1">
-                    <DeleteButton
-                      endpoint={`/v2/api/purchase-orders/${po.id}/delete`}
-                      label={`PO ${po.po_number ?? ""}`.trim()}
-                      confirmLabel="Delete this PO?"
-                    />
-                  </div>
-
-                  {lines.length > 0 ? (
-                    <ul className="mt-2 space-y-1 border-t border-rule-soft pt-2 pl-1">
-                      {lines.map((li) => (
-                        <li
-                          key={li.id}
-                          className="flex items-baseline justify-between gap-2 text-xs"
-                        >
-                          <span className="min-w-0 flex-1 text-ink-2">
-                            {li.cost_code && (
-                              <span className="text-ink-3">{li.cost_code} · </span>
-                            )}
-                            <EditableText
-                              value={li.title}
-                              display={li.title || li.description || "—"}
-                              field="title"
-                              endpoint={`/v2/api/po-line-items/${li.id}/edit`}
-                              placeholder="line item"
-                            />
-                            {li.quantity != null && li.unit_cost != null && (
-                              <span className="text-ink-3">
-                                {" "}
-                                ({li.quantity} × {fmtMoney(Number(li.unit_cost) || 0)})
-                              </span>
-                            )}
-                          </span>
-                          <EditableText
-                            value={li.amount}
-                            type="money"
-                            display={fmtMoney(Number(li.amount) || 0)}
-                            field="amount"
-                            endpoint={`/v2/api/po-line-items/${li.id}/edit`}
-                            className="shrink-0 font-mono tabular-nums text-ink-2"
-                            inputClassName="bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-20"
-                          />
-                          <DeleteButton
-                            endpoint={`/v2/api/po-line-items/${li.id}/delete`}
-                            label="line item"
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 border-t border-rule-soft pt-2 pl-1 text-ink-3 text-xs">
-                      {(po.cost_codes ?? []).join(", ") || "No line items."}
-                    </p>
-                  )}
-                </details>
-              </li>
-            );
-          })}
-        </ul>
-      </details>
-    </section>
-  );
-}
 
 function fmtMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;

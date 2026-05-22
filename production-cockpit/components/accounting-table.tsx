@@ -1,15 +1,11 @@
 "use client";
 
-// Portfolio purchase-order ledger. Dense, sortable, filterable, paginated table
-// of every job's POs with committed / paid / outstanding totals, expandable
-// line items, CSV export (POs + line items), and inline edit/delete per row.
-//
-// Pagination (100/page) keeps it fast: only the visible page's cells mount the
-// EditableText/DeleteButton client components, so the full 1,200-row dataset
-// stays snappy. Totals + filters + sort still operate on the whole set.
+// Per-job purchase-order ledger, embedded under each job page. Dense, sortable,
+// filterable table with committed / paid / outstanding totals, expandable +
+// editable line items, inline edit/delete per row, and CSV export (this job's
+// POs + line items). Paginated (100/page) so even a big job stays fast.
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { EditableText } from "@/components/editable-text";
 import { DeleteButton } from "@/components/delete-button";
 
@@ -19,15 +15,11 @@ export interface AcctPO {
   vendor: string | null;
   paid_status: string | null;
   approval_status: string | null;
-  work_status: string | null;
   cost: number | null;
   amount_paid: number | null;
   amount_remaining: number | null;
   pct_billed: number | null;
   date_added: string | null;
-  job_key: string;
-  jobId: string | null;
-  jobName: string;
 }
 export interface AcctLine {
   id: string;
@@ -41,15 +33,13 @@ export interface AcctLine {
   amount_paid: number | null;
 }
 
-type SortKey = "po" | "job" | "vendor" | "status" | "cost" | "paid" | "outstanding" | "pct";
+type SortKey = "po" | "vendor" | "status" | "cost" | "paid" | "outstanding" | "pct";
 const PAGE_SIZE = 100;
-const COLS = 10; // chevron, PO#, job, vendor, status, cost, paid, outstanding, %, delete
+const COLS = 9; // chevron, PO#, vendor, status, cost, paid, outstanding, %, delete
 
 function money(n: number | null | undefined): string {
   return "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
 }
-
-// CSV: quote any field containing a comma, quote, or newline; double inner quotes.
 function csvCell(v: unknown): string {
   const s = v == null ? "" : String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -66,9 +56,19 @@ function downloadCsv(filename: string, rows: (string | number | null)[][]) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+function slug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "job";
+}
 
-export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine[] }) {
-  const [jobFilter, setJobFilter] = useState("");
+export function AccountingTable({
+  pos,
+  lines,
+  jobName,
+}: {
+  pos: AcctPO[];
+  lines: AcctLine[];
+  jobName: string;
+}) {
   const [statusFilter, setStatusFilter] = useState("");
   const [outstandingOnly, setOutstandingOnly] = useState(false);
   const [search, setSearch] = useState("");
@@ -77,10 +77,6 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
 
-  const jobNames = useMemo(
-    () => Array.from(new Set(pos.map((p) => p.jobName))).sort((a, b) => a.localeCompare(b)),
-    [pos]
-  );
   const statuses = useMemo(
     () =>
       Array.from(new Set(pos.map((p) => p.paid_status).filter(Boolean) as string[])).sort((a, b) =>
@@ -101,16 +97,15 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return pos.filter((p) => {
-      if (jobFilter && p.jobName !== jobFilter) return false;
       if (statusFilter && p.paid_status !== statusFilter) return false;
       if (outstandingOnly && (Number(p.amount_remaining) || 0) <= 0) return false;
       if (q) {
-        const hay = `${p.po_number ?? ""} ${p.vendor ?? ""} ${p.jobName}`.toLowerCase();
+        const hay = `${p.po_number ?? ""} ${p.vendor ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [pos, jobFilter, statusFilter, outstandingOnly, search]);
+  }, [pos, statusFilter, outstandingOnly, search]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -120,9 +115,6 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
       switch (sortKey) {
         case "po":
           r = (a.po_number ?? "").localeCompare(b.po_number ?? "", undefined, { numeric: true });
-          break;
-        case "job":
-          r = a.jobName.localeCompare(b.jobName);
           break;
         case "vendor":
           r = (a.vendor ?? "").localeCompare(b.vendor ?? "");
@@ -149,9 +141,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   }, [filtered, sortKey, sortDir]);
 
   const totals = useMemo(() => {
-    let cost = 0,
-      paid = 0,
-      out = 0;
+    let cost = 0, paid = 0, out = 0;
     for (const p of filtered) {
       cost += Number(p.cost) || 0;
       paid += Number(p.amount_paid) || 0;
@@ -160,10 +150,9 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
     return { cost, paid, out };
   }, [filtered]);
 
-  // Reset to the first page whenever the result set changes.
   useEffect(() => {
     setPage(0);
-  }, [jobFilter, statusFilter, outstandingOnly, search, sortKey, sortDir]);
+  }, [statusFilter, outstandingOnly, search, sortKey, sortDir]);
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -173,9 +162,8 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   );
 
   function setSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortKey(key);
       setSortDir(["cost", "paid", "outstanding", "pct"].includes(key) ? "desc" : "asc");
     }
@@ -190,73 +178,55 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
   }
 
   function exportPOs() {
-    const header = [
-      "Job", "PO #", "Vendor", "Approval", "Paid status", "Cost", "Paid", "Outstanding", "% Billed", "Date added",
-    ];
+    const header = ["PO #", "Vendor", "Approval", "Paid status", "Cost", "Paid", "Outstanding", "% Billed", "Date added"];
     const rows: (string | number | null)[][] = [header];
     for (const p of sorted) {
       rows.push([
-        p.jobName, p.po_number, p.vendor, p.approval_status, p.paid_status,
+        p.po_number, p.vendor, p.approval_status, p.paid_status,
         Number(p.cost) || 0, Number(p.amount_paid) || 0, Number(p.amount_remaining) || 0,
         p.pct_billed, p.date_added,
       ]);
     }
-    downloadCsv("purchase-orders.csv", rows);
+    downloadCsv(`${slug(jobName)}-purchase-orders.csv`, rows);
   }
   function exportLines() {
     const ids = new Set(sorted.map((p) => p.id));
     const poById = new Map(sorted.map((p) => [p.id, p]));
-    const header = [
-      "Job", "PO #", "Vendor", "Cost code", "Line item", "Description", "Qty", "Unit cost", "Amount", "Amount paid",
-    ];
+    const header = ["PO #", "Vendor", "Cost code", "Line item", "Description", "Qty", "Unit cost", "Amount", "Amount paid"];
     const rows: (string | number | null)[][] = [header];
     for (const l of lines) {
       if (!ids.has(l.po_id)) continue;
       const p = poById.get(l.po_id)!;
       rows.push([
-        p.jobName, p.po_number, p.vendor, l.cost_code, l.title, l.description,
+        p.po_number, p.vendor, l.cost_code, l.title, l.description,
         l.quantity, l.unit_cost, Number(l.amount) || 0, Number(l.amount_paid) || 0,
       ]);
     }
-    downloadCsv("po-line-items.csv", rows);
+    downloadCsv(`${slug(jobName)}-line-items.csv`, rows);
   }
 
   const arrow = (key: SortKey) => (sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
   const rangeStart = sorted.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
   const rangeEnd = Math.min((safePage + 1) * PAGE_SIZE, sorted.length);
 
-  return (
-    <div className="mx-auto max-w-[1200px] px-5 pt-8">
-      <header className="mb-5">
-        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
-          Accounting
-        </h1>
-        <p className="mt-2 text-ink-3 text-sm">
-          {filtered.length} of {pos.length} purchase orders
-        </p>
-        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm tabular-nums">
-          <span className="text-foreground">{money(totals.cost)} committed</span>
-          <span className="text-ink-2">{money(totals.paid)} paid</span>
-          <span className="text-urgent">{money(totals.out)} outstanding</span>
-        </div>
-      </header>
+  if (pos.length === 0) return null;
 
-      {/* Filters + export */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select
-          value={jobFilter}
-          onChange={(e) => setJobFilter(e.target.value)}
-          className="bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink"
-        >
-          <option value="">All jobs</option>
-          {jobNames.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
+  return (
+    <div className="w-full">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+          Purchase orders · {filtered.length}
+        </h2>
+        <span className="font-mono text-xs tabular-nums text-foreground">{money(totals.cost)} committed</span>
+        <span className="font-mono text-xs tabular-nums text-ink-2">{money(totals.paid)} paid</span>
+        <span className="font-mono text-xs tabular-nums text-urgent">{money(totals.out)} left</span>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink"
+          className="bg-paper border border-rule px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-ink"
         >
           <option value="">All statuses</option>
           {statuses.map((s) => (
@@ -268,43 +238,33 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search PO# / vendor"
-          className="bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink"
+          className="bg-paper border border-rule px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-ink"
         />
-        <label className="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-xs text-ink-2 cursor-pointer">
           <input
             type="checkbox"
             checked={outstandingOnly}
             onChange={(e) => setOutstandingOnly(e.target.checked)}
-            className="h-4 w-4 accent-accent"
+            className="h-3.5 w-3.5 accent-accent"
           />
           Outstanding only
         </label>
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={exportPOs}
-            className="bg-ink text-paper px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
-          >
-            ⤓ POs CSV
+          <button type="button" onClick={exportPOs} className="bg-ink text-paper px-2.5 py-1.5 text-[11px] font-medium hover:bg-accent transition-colors">
+            ⤓ POs
           </button>
-          <button
-            type="button"
-            onClick={exportLines}
-            className="border border-ink text-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-paper transition-colors"
-          >
-            ⤓ Line items CSV
+          <button type="button" onClick={exportLines} className="border border-ink text-ink px-2.5 py-1.5 text-[11px] font-medium hover:bg-ink hover:text-paper transition-colors">
+            ⤓ Lines
           </button>
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto border border-rule">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[680px] text-sm">
           <thead>
             <tr className="border-b border-rule bg-sand-2/40 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
               <th className="w-6 px-2 py-2" />
               <Th onClick={() => setSort("po")} label={`PO#${arrow("po")}`} />
-              <Th onClick={() => setSort("job")} label={`Job${arrow("job")}`} />
               <Th onClick={() => setSort("vendor")} label={`Vendor${arrow("vendor")}`} />
               <Th onClick={() => setSort("status")} label={`Status${arrow("status")}`} />
               <Th onClick={() => setSort("cost")} label={`Cost${arrow("cost")}`} right />
@@ -317,7 +277,7 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
           <tbody>
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={COLS} className="px-3 py-10 text-center text-ink-3 text-sm">
+                <td colSpan={COLS} className="px-3 py-8 text-center text-ink-3 text-sm">
                   No purchase orders match.
                 </td>
               </tr>
@@ -335,35 +295,34 @@ export function AccountingTable({ pos, lines }: { pos: AcctPO[]; lines: AcctLine
         </table>
       </div>
 
-      {/* Pagination */}
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="font-mono text-[11px] tabular-nums text-ink-3">
-          {rangeStart}–{rangeEnd} of {sorted.length}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={safePage <= 0}
-            onClick={() => setPage(safePage - 1)}
-            className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
-          >
-            ← Prev
-          </button>
-          <span className="font-mono text-[11px] tabular-nums text-ink-2">
-            {safePage + 1}/{pageCount}
+      {pageCount > 1 && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="font-mono text-[11px] tabular-nums text-ink-3">
+            {rangeStart}–{rangeEnd} of {sorted.length}
           </span>
-          <button
-            type="button"
-            disabled={safePage >= pageCount - 1}
-            onClick={() => setPage(safePage + 1)}
-            className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
-          >
-            Next →
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={safePage <= 0}
+              onClick={() => setPage(safePage - 1)}
+              className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
+            >
+              ← Prev
+            </button>
+            <span className="font-mono text-[11px] tabular-nums text-ink-2">{safePage + 1}/{pageCount}</span>
+            <button
+              type="button"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage(safePage + 1)}
+              className="border border-rule px-2.5 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink disabled:opacity-40 disabled:hover:border-rule"
+            >
+              Next →
+            </button>
+          </div>
         </div>
-      </div>
-      <p className="mt-3 text-[10px] font-mono tracking-[0.14em] uppercase text-ink-3">
-        click a row ▸ for line items · click any cell to edit · ✕ deletes · PO# opens the job page
+      )}
+      <p className="mt-2 text-[10px] font-mono tracking-[0.14em] uppercase text-ink-3">
+        click a row ▸ for line items · click any cell to edit · ✕ deletes
       </p>
     </div>
   );
@@ -373,10 +332,7 @@ function Th({ label, onClick, right }: { label: string; onClick: () => void; rig
   return (
     <th
       onClick={onClick}
-      className={
-        "px-3 py-2 cursor-pointer select-none hover:text-ink whitespace-nowrap " +
-        (right ? "text-right" : "")
-      }
+      className={"px-3 py-2 cursor-pointer select-none hover:text-ink whitespace-nowrap " + (right ? "text-right" : "")}
     >
       {label}
     </th>
@@ -396,97 +352,40 @@ function PORow({
 }) {
   const out = Number(po.amount_remaining) || 0;
   const editEndpoint = `/v2/api/purchase-orders/${po.id}/edit`;
-  const moneyInput =
-    "bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-24 text-right";
+  const moneyInput = "bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-24 text-right";
   return (
     <>
       <tr className="border-b border-rule-soft hover:bg-sand-2/30">
         <td className="px-2 py-2 align-top">
           {lines.length > 0 ? (
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-label={isOpen ? "Collapse line items" : "Expand line items"}
-              className="text-ink-3 hover:text-ink font-mono"
-            >
+            <button type="button" onClick={onToggle} aria-label={isOpen ? "Collapse" : "Expand"} className="text-ink-3 hover:text-ink font-mono">
               {isOpen ? "▾" : "▸"}
             </button>
           ) : (
             <span className="text-ink-3/30 font-mono">·</span>
           )}
         </td>
-        <td className="px-3 py-2 align-top whitespace-nowrap font-mono text-[11px]">
-          {po.jobId ? (
-            <Link href={`/v2/job/${po.jobId}`} className="text-accent hover:underline">
-              {po.po_number ?? "PO"}
-            </Link>
-          ) : (
-            <span className="text-ink-2">{po.po_number ?? "PO"}</span>
-          )}
-        </td>
-        <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2">{po.jobName}</td>
+        <td className="px-3 py-2 align-top whitespace-nowrap font-mono text-[11px] text-ink-2">{po.po_number ?? "PO"}</td>
         <td className="px-3 py-2 align-top text-foreground">
-          <EditableText
-            value={po.vendor}
-            field="vendor"
-            endpoint={editEndpoint}
-            placeholder="vendor"
-            display={po.vendor ?? "—"}
-          />
+          <EditableText value={po.vendor} field="vendor" endpoint={editEndpoint} placeholder="vendor" display={po.vendor ?? "—"} />
         </td>
         <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2 text-xs">
-          <EditableText
-            value={po.paid_status}
-            field="paid_status"
-            endpoint={editEndpoint}
-            placeholder="status"
-            display={po.paid_status ?? "—"}
-          />
+          <EditableText value={po.paid_status} field="paid_status" endpoint={editEndpoint} placeholder="status" display={po.paid_status ?? "—"} />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-foreground whitespace-nowrap">
-          <EditableText
-            value={po.cost}
-            type="money"
-            field="cost"
-            endpoint={editEndpoint}
-            display={money(po.cost)}
-            inputClassName={moneyInput}
-          />
+          <EditableText value={po.cost} type="money" field="cost" endpoint={editEndpoint} display={money(po.cost)} inputClassName={moneyInput} />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-ink-2 whitespace-nowrap">
-          <EditableText
-            value={po.amount_paid}
-            type="money"
-            field="amount_paid"
-            endpoint={editEndpoint}
-            display={money(po.amount_paid)}
-            inputClassName={moneyInput}
-          />
+          <EditableText value={po.amount_paid} type="money" field="amount_paid" endpoint={editEndpoint} display={money(po.amount_paid)} inputClassName={moneyInput} />
         </td>
-        <td
-          className={
-            "px-3 py-2 align-top text-right font-mono tabular-nums whitespace-nowrap " +
-            (out > 0 ? "text-urgent" : "text-ink-3")
-          }
-        >
-          <EditableText
-            value={po.amount_remaining}
-            type="money"
-            field="amount_remaining"
-            endpoint={editEndpoint}
-            display={money(po.amount_remaining)}
-            inputClassName={moneyInput}
-          />
+        <td className={"px-3 py-2 align-top text-right font-mono tabular-nums whitespace-nowrap " + (out > 0 ? "text-urgent" : "text-ink-3")}>
+          <EditableText value={po.amount_remaining} type="money" field="amount_remaining" endpoint={editEndpoint} display={money(po.amount_remaining)} inputClassName={moneyInput} />
         </td>
         <td className="px-3 py-2 align-top text-right font-mono tabular-nums text-ink-3 whitespace-nowrap">
           {po.pct_billed != null ? `${Math.round(Number(po.pct_billed))}%` : "—"}
         </td>
         <td className="px-2 py-2 align-top text-right">
-          <DeleteButton
-            endpoint={`/v2/api/purchase-orders/${po.id}/delete`}
-            label={`PO ${po.po_number ?? ""}`.trim()}
-            confirmLabel="Delete?"
-          />
+          <DeleteButton endpoint={`/v2/api/purchase-orders/${po.id}/delete`} label={`PO ${po.po_number ?? ""}`.trim()} confirmLabel="Delete?" />
         </td>
       </tr>
       {isOpen && lines.length > 0 && (
@@ -495,20 +394,24 @@ function PORow({
           <td colSpan={COLS - 1} className="px-3 py-2">
             <ul className="space-y-1">
               {lines.map((l) => (
-                <li
-                  key={l.id}
-                  className="flex items-baseline justify-between gap-3 text-xs border-b border-rule-soft/60 last:border-b-0 py-0.5"
-                >
+                <li key={l.id} className="flex items-baseline justify-between gap-2 text-xs border-b border-rule-soft/60 last:border-b-0 py-0.5">
                   <span className="min-w-0 flex-1 text-ink-2">
                     {l.cost_code && <span className="text-ink-3">{l.cost_code} · </span>}
-                    {l.title || l.description || "—"}
+                    <EditableText value={l.title} display={l.title || l.description || "—"} field="title" endpoint={`/v2/api/po-line-items/${l.id}/edit`} placeholder="line item" />
                     {l.quantity != null && l.unit_cost != null && (
-                      <span className="text-ink-3">
-                        {" "}({l.quantity} × {money(l.unit_cost)})
-                      </span>
+                      <span className="text-ink-3"> ({l.quantity} × {money(l.unit_cost)})</span>
                     )}
                   </span>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-2">{money(l.amount)}</span>
+                  <EditableText
+                    value={l.amount}
+                    type="money"
+                    display={money(l.amount)}
+                    field="amount"
+                    endpoint={`/v2/api/po-line-items/${l.id}/edit`}
+                    className="shrink-0 font-mono tabular-nums text-ink-2"
+                    inputClassName="bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-20 text-right"
+                  />
+                  <DeleteButton endpoint={`/v2/api/po-line-items/${l.id}/delete`} label="line item" />
                 </li>
               ))}
             </ul>
