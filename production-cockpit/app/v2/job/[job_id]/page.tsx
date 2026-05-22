@@ -532,9 +532,8 @@ type POLine = {
 
 
 function fmtMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n)}`;
+  // Exact dollars — pay-app figures are read precisely, never rounded to K/M.
+  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
 // Contract progress from the latest pay app (schedule of values). Renders

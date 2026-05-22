@@ -129,3 +129,43 @@ button { border-radius: 0; }
 .border-ink        { border-color: var(--ink); }
 .border-gold       { border-color: var(--gold); }
 .border-accent     { border-color: var(--accent); }
+
+/* ─── Motion & feel ─────────────────────────────────────────────────────
+   Smooth, intentional micro-interactions so the app reads alive, not stale.
+   Kept subtle + reduced-motion-aware. */
+
+/* Smooth hover/focus on every interactive element — no instant color snaps. */
+a, button, summary, label, select {
+  transition: background-color 150ms ease, color 150ms ease,
+    border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+/* Gentle page entrance on each navigation. */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+main { animation: fadeUp 300ms ease-out both; }
+
+/* Loading skeleton shimmer (Next.js loading.tsx states). */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--sand-2) 25%,
+    var(--sand) 50%,
+    var(--sand-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Respect the OS "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  main { animation: none; }
+  .skeleton { animation: none; }
+  a, button, summary, label, select { transition: none; }
+}
