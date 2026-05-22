@@ -1,6 +1,6 @@
 # Ross Built — Project State & Handoff
 
-**Last updated:** 2026-05-20 (autonomous session)
+**Last updated:** 2026-05-22 (autonomous session)
 **Read this first.** It's the single source of truth for where the project is and how to finish it.
 
 ---
@@ -31,6 +31,8 @@ The DB schema is **applied to production Supabase** (us-west-2) and every cockpi
 | 8 | **Daily-log photo → AI context** | ⏳ code complete; needs real photos (blocked on BT login — see §4) |
 
 Also verified: home/jobs, /subs, /sub/[id], /v2/job/[id] (with AI Summary panel), /import, /admin/migrate, /v2/review all render; complete/uncomplete, sub-specialties, daily-logs upload, extract-photos, and the AI job summary (F9) all work. **Production build passes (31 routes).**
+
+**2026-05-22 — Purchase Orders + universal edit/delete (manual-wins).** Full BT pull live: **1,260 POs + 2,099 line items across 28 jobs** in Supabase, shown per-job on `/v2/job/[id]` (committed/paid/outstanding + expandable line items). Every PO field, every line item, the sub profile (name/trade/notes/aliases), and todo/item rows are now **click-to-edit + deletable**. Edits/deletes **survive re-scrape** via manual-wins columns (`manually_edited_fields`, `hidden`) on `purchase_orders`/`po_line_items`/`daily_logs` (+ `subs.hidden`) — uploads skip edited columns and never un-hide deletes. Proven by a reversible 22/22 stress test (edit→re-upload→survived; delete→re-upload→stayed gone) and a mobile+desktop UI pass. New: `components/editable-text.tsx`, `components/delete-button.tsx`, and 10 edit/delete API routes. See CHANGELOG 2026-05-22.
 
 ---
 

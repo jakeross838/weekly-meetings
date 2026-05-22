@@ -237,6 +237,36 @@ CREATE TABLE IF NOT EXISTS public.po_line_items (
     position int NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS po_line_items_po_idx ON public.po_line_items (po_id);
+
+-- Manual-wins for scraped tables: user edits/deletes survive the next scrape.
+-- manually_edited_fields holds the column names the user edited (uploads skip
+-- them); hidden = soft-delete (uploads never un-hide; UI filters hidden=false).
+ALTER TABLE public.purchase_orders
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+ALTER TABLE public.po_line_items
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+ALTER TABLE public.daily_logs
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+
+-- subs soft-delete: hidden survives re-scrape (ensureSubsForCrews is insert-only
+-- with ignoreDuplicates, so it never un-hides; the UI filters hidden=false).
+ALTER TABLE public.subs
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+
+-- Let po_line_items be upserted on (po_id, bt_line_item_id) so a re-scrape
+-- updates lines in place instead of delete+reinsert (which wiped edits/deletes).
+CREATE UNIQUE INDEX IF NOT EXISTS po_line_items_po_btli_uidx
+    ON public.po_line_items (po_id, bt_line_item_id);
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -367,7 +397,10 @@ export async function POST(req: NextRequest) {
         -- F9 — per-job AI summary
         EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='job_summaries')                                                              AS has_job_summaries,
         EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='purchase_orders')                                                            AS has_purchase_orders,
-        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='po_line_items')                                                              AS has_po_line_items
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='po_line_items')                                                              AS has_po_line_items,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='purchase_orders' AND column_name='hidden')                                    AS has_po_hidden,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='po_line_items' AND column_name='manually_edited_fields')                      AS has_poli_manual,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='manually_edited_fields')                         AS has_dl_manual
     `);
     const verified = verifyRes.rows[0] as Record<string, unknown>;
     // Flag any boolean check that came back false so the operator sees

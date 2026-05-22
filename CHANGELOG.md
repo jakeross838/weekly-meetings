@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-05-22 — Purchase Orders finished + universal edit/delete (manual-wins)
+
+Full PO data pulled from Buildertrend and made first-class on the job page,
+plus inline edit + delete across the cockpit — with every manual change
+protected from the next scrape.
+
+### Purchase Orders (job page)
+- **Full pull live:** 1,260 POs + 2,099 line items across 28 jobs in Supabase
+  (`scrape_po.py` → `/v2/api/purchase-orders/upload`). The job page shows
+  committed / paid / outstanding totals; each PO expands to its line items.
+- **Editable + deletable:** every PO field (title, vendor, cost, status) and
+  every line item (title, amount) is click-to-edit; ✕ soft-deletes a PO or
+  line. Edits live in the expanded body so the summary stays a clean toggle.
+
+### Universal edit/delete
+- New reusable `components/editable-text.tsx` (click → input/textarea → save;
+  `type="money"` edits the raw number but shows the formatted value) and
+  `components/delete-button.tsx` (inline "Delete? yes/no" confirm).
+- Wired into the job page (POs, line items, todo/item rows), the sub profile
+  (name, trade, notes, aliases + delete), and the subs list (delete).
+- 10 new API routes: edit + delete for `purchase_orders`, `po_line_items`,
+  `daily_logs`, `subs`; hard-delete for `todos` + `items`.
+
+### Manual-wins (edits/deletes survive re-scrape)
+- New columns on `purchase_orders`, `po_line_items`, `daily_logs`:
+  `manually_edited_fields text[]`, `manually_edited_at`, `hidden`, `hidden_at`
+  (+ `subs.hidden`). Unique `(po_id, bt_line_item_id)` so line items upsert
+  instead of delete+reinsert.
+- Uploads skip any column listed in `manually_edited_fields` and never
+  un-hide a deleted row; clean rows still refresh from BT.
+- Deleted (hidden) subs are filtered out of every list + picker.
+
+### Verified
+- Reversible stress test: **22/22** — edited PO cost / line amount / daily-log
+  note all survived a full re-upload; deleted PO / line / daily-log stayed
+  gone; a clean PO still refreshed to the scraped value; todo + item
+  hard-delete and sub edit + soft-delete all work.
+- UI checked at 390px (mobile) and 1100px (desktop view): no overlap, all
+  controls visible; click-to-edit confirmed in-browser; no console errors.
+- `tsc --noEmit` clean, `next lint` clean.
+
 ## 2026-05-18 — Cockpit polish round + BT scraper rebuild
 
 Eight feature asks landed across the cockpit, plus a fresh standalone

@@ -59,7 +59,8 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         .in("status", OPEN_STATUSES as Status[]),
       supabase
         .from("subs")
-        .select("id, name, flagged_for_pm_binder, flag_reasons"),
+        .select("id, name, flagged_for_pm_binder, flag_reasons")
+        .eq("hidden", false),
       supabase.from("pms").select("id, full_name"),
       supabase
         .from("job_pm_assignments")

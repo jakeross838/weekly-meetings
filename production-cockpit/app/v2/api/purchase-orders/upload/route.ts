@@ -1,9 +1,10 @@
 // POST /v2/api/purchase-orders/upload
 // Body: { payload: { byJob: { [jobKey]: PORecord[] } } }  (or the bare payload)
 //
-// Upserts purchase_orders by bt_po_id and replaces each PO's line items
-// (delete-by-po_id + insert). Batched so a full ~1,400-PO pull is a handful
-// of round-trips, not thousands.
+// Upserts purchase_orders by bt_po_id and upserts each PO's line items by
+// (po_id, bt_line_item_id). Manual-wins: rows the user has HIDDEN are left
+// untouched (never resurrected), and columns listed in a row's
+// manually_edited_fields are never overwritten by a re-scrape.
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
@@ -52,9 +53,54 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
+// Scraped columns only — never includes hidden / manually_edited_fields, so an
+// upsert never resurrects a hidden row or stomps the manual-edit bookkeeping.
+function poRow(po: PORecord, scrapedAt: string): Record<string, unknown> {
+  return {
+    bt_po_id: po.bt_po_id,
+    job_key: po.job_key,
+    bt_job_id: po.bt_job_id ?? null,
+    po_number: po.po_number ?? null,
+    is_bill: !!po.is_bill,
+    title: po.title ?? null,
+    vendor: po.vendor ?? null,
+    bt_vendor_id: po.bt_vendor_id ?? null,
+    approval_status: po.approval_status ?? null,
+    work_status: po.work_status ?? null,
+    paid_status: po.paid_status ?? null,
+    cost: po.cost ?? null,
+    amount_paid: po.amount_paid ?? null,
+    amount_remaining: po.amount_remaining ?? null,
+    pct_paid: po.pct_paid ?? null,
+    pct_remaining: po.pct_remaining ?? null,
+    pct_billed: po.pct_billed ?? null,
+    cost_codes: Array.isArray(po.cost_codes) ? po.cost_codes : [],
+    date_added: po.date_added ?? null,
+    scraped_at: scrapedAt,
+  };
+}
+function lineRow(poId: string, li: LineItem): Record<string, unknown> {
+  return {
+    po_id: poId,
+    bt_line_item_id: li.bt_line_item_id ?? null,
+    cost_code: li.cost_code ?? null,
+    title: li.title ?? null,
+    description: li.description ?? null,
+    quantity: li.quantity ?? null,
+    unit_cost: li.unit_cost ?? null,
+    amount: li.amount ?? null,
+    amount_paid: li.amount_paid ?? null,
+    amount_billed: li.amount_billed ?? null,
+    position: li.position ?? 0,
+  };
+}
+
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
-  let body: { payload?: { byJob?: Record<string, PORecord[]> }; byJob?: Record<string, PORecord[]> };
+  let body: {
+    payload?: { byJob?: Record<string, PORecord[]> };
+    byJob?: Record<string, PORecord[]>;
+  };
   try {
     body = await req.json();
   } catch {
@@ -73,72 +119,119 @@ export async function POST(req: NextRequest) {
   const idByBtId = new Map<number, string>();
   const errors: string[] = [];
 
-  // 1. Upsert POs (chunked), capturing id ⇄ bt_po_id.
-  for (const c of chunk(allPOs, 400)) {
-    const rows = c.map((po) => ({
-      bt_po_id: po.bt_po_id,
-      job_key: po.job_key,
-      bt_job_id: po.bt_job_id ?? null,
-      po_number: po.po_number ?? null,
-      is_bill: !!po.is_bill,
-      title: po.title ?? null,
-      vendor: po.vendor ?? null,
-      bt_vendor_id: po.bt_vendor_id ?? null,
-      approval_status: po.approval_status ?? null,
-      work_status: po.work_status ?? null,
-      paid_status: po.paid_status ?? null,
-      cost: po.cost ?? null,
-      amount_paid: po.amount_paid ?? null,
-      amount_remaining: po.amount_remaining ?? null,
-      pct_paid: po.pct_paid ?? null,
-      pct_remaining: po.pct_remaining ?? null,
-      pct_billed: po.pct_billed ?? null,
-      cost_codes: Array.isArray(po.cost_codes) ? po.cost_codes : [],
-      date_added: po.date_added ?? null,
-      scraped_at: scrapedAt,
-    }));
+  // --- existing PO manual state (edits / soft-deletes) ---
+  const poEdited = new Map<number, string[]>();
+  const poHidden = new Set<number>();
+  for (const c of chunk(allPOs.map((p) => p.bt_po_id), 500)) {
+    const { data } = await supabase
+      .from("purchase_orders")
+      .select("bt_po_id, manually_edited_fields, hidden")
+      .in("bt_po_id", c);
+    for (const r of (data ?? []) as { bt_po_id: number; manually_edited_fields: string[] | null; hidden: boolean }[]) {
+      if (Array.isArray(r.manually_edited_fields) && r.manually_edited_fields.length)
+        poEdited.set(r.bt_po_id, r.manually_edited_fields);
+      if (r.hidden) poHidden.add(r.bt_po_id);
+    }
+  }
+
+  // --- upsert POs: skip hidden entirely; omit edited columns for edited ones ---
+  const cleanPOs = allPOs.filter((p) => !poHidden.has(p.bt_po_id) && !poEdited.has(p.bt_po_id));
+  const editedPOs = allPOs.filter((p) => !poHidden.has(p.bt_po_id) && poEdited.has(p.bt_po_id));
+  for (const c of chunk(cleanPOs, 400)) {
     const { data, error } = await supabase
       .from("purchase_orders")
-      .upsert(rows, { onConflict: "bt_po_id" })
+      .upsert(c.map((p) => poRow(p, scrapedAt)), { onConflict: "bt_po_id" })
       .select("id, bt_po_id");
     if (error) {
       errors.push(`po upsert: ${error.message}`);
       continue;
     }
-    for (const r of data ?? []) idByBtId.set(r.bt_po_id as number, r.id as string);
+    for (const r of (data ?? []) as { id: string; bt_po_id: number }[]) idByBtId.set(r.bt_po_id, r.id);
+  }
+  for (const po of editedPOs) {
+    const row = poRow(po, scrapedAt);
+    for (const f of poEdited.get(po.bt_po_id) ?? []) delete row[f];
+    const { data, error } = await supabase
+      .from("purchase_orders")
+      .upsert([row], { onConflict: "bt_po_id" })
+      .select("id, bt_po_id");
+    if (error) {
+      errors.push(`po upsert(edited): ${error.message}`);
+      continue;
+    }
+    for (const r of (data ?? []) as { id: string; bt_po_id: number }[]) idByBtId.set(r.bt_po_id, r.id);
   }
 
-  // 2. Replace line items: delete for these POs, then insert fresh.
+  // --- existing line-item manual state, keyed `${po_id}|${bt_line_item_id}` ---
   const poIds = Array.from(idByBtId.values());
+  const lineEdited = new Map<string, string[]>();
+  const lineHidden = new Set<string>();
+  const existingByPo = new Map<string, { id: string; btli: number | null; clean: boolean }[]>();
   for (const c of chunk(poIds, 200)) {
-    const { error } = await supabase.from("po_line_items").delete().in("po_id", c);
+    const { data } = await supabase
+      .from("po_line_items")
+      .select("id, po_id, bt_line_item_id, manually_edited_fields, hidden")
+      .in("po_id", c);
+    for (const r of (data ?? []) as { id: string; po_id: string; bt_line_item_id: number | null; manually_edited_fields: string[] | null; hidden: boolean }[]) {
+      const key = `${r.po_id}|${r.bt_line_item_id}`;
+      const edited = Array.isArray(r.manually_edited_fields) && r.manually_edited_fields.length > 0;
+      if (edited) lineEdited.set(key, r.manually_edited_fields as string[]);
+      if (r.hidden) lineHidden.add(key);
+      const arr = existingByPo.get(r.po_id) ?? [];
+      arr.push({ id: r.id, btli: r.bt_line_item_id, clean: !edited && !r.hidden });
+      existingByPo.set(r.po_id, arr);
+    }
+  }
+
+  // --- delete only CLEAN lines BT no longer returns (preserve hidden/edited) ---
+  const toDeleteIds: string[] = [];
+  for (const po of allPOs) {
+    const poId = idByBtId.get(po.bt_po_id);
+    if (!poId) continue;
+    const incoming = new Set(
+      (po.line_items ?? []).map((li) => li.bt_line_item_id).filter((x): x is number => x != null)
+    );
+    for (const ex of existingByPo.get(poId) ?? []) {
+      if (ex.clean && (ex.btli == null || !incoming.has(ex.btli))) toDeleteIds.push(ex.id);
+    }
+  }
+  for (const c of chunk(toDeleteIds, 200)) {
+    const { error } = await supabase.from("po_line_items").delete().in("id", c);
     if (error) errors.push(`line delete: ${error.message}`);
   }
-  const allLines: Array<Record<string, unknown>> = [];
+
+  // --- upsert incoming lines: skip hidden; omit edited columns ---
+  const cleanLines: Record<string, unknown>[] = [];
+  const editedLineRows: Record<string, unknown>[] = [];
   for (const po of allPOs) {
     const poId = idByBtId.get(po.bt_po_id);
     if (!poId) continue;
     for (const li of po.line_items ?? []) {
-      allLines.push({
-        po_id: poId,
-        bt_line_item_id: li.bt_line_item_id ?? null,
-        cost_code: li.cost_code ?? null,
-        title: li.title ?? null,
-        description: li.description ?? null,
-        quantity: li.quantity ?? null,
-        unit_cost: li.unit_cost ?? null,
-        amount: li.amount ?? null,
-        amount_paid: li.amount_paid ?? null,
-        amount_billed: li.amount_billed ?? null,
-        position: li.position ?? 0,
-      });
+      const key = `${poId}|${li.bt_line_item_id}`;
+      if (lineHidden.has(key)) continue; // preserve user delete
+      const row = lineRow(poId, li);
+      if (lineEdited.has(key)) {
+        for (const f of lineEdited.get(key) ?? []) delete row[f];
+        editedLineRows.push(row);
+      } else {
+        cleanLines.push(row);
+      }
     }
   }
   let lineItems = 0;
-  for (const c of chunk(allLines, 500)) {
-    const { error } = await supabase.from("po_line_items").insert(c);
-    if (error) errors.push(`line insert: ${error.message}`);
+  for (const c of chunk(cleanLines, 500)) {
+    const { error } = await supabase
+      .from("po_line_items")
+      .upsert(c, { onConflict: "po_id,bt_line_item_id" });
+    if (error) errors.push(`line upsert: ${error.message}`);
     else lineItems += c.length;
+  }
+  for (const row of editedLineRows) {
+    const { error } = await supabase
+      .from("po_line_items")
+      .upsert([row], { onConflict: "po_id,bt_line_item_id" });
+    if (error) errors.push(`line upsert(edited): ${error.message}`);
+    else lineItems += 1;
   }
 
   return NextResponse.json({

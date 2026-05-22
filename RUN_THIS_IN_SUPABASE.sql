@@ -231,3 +231,25 @@ CREATE TABLE IF NOT EXISTS public.po_line_items (
     position int NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS po_line_items_po_idx ON public.po_line_items (po_id);
+
+-- Manual-wins for scraped tables: user edits/deletes survive the next scrape.
+ALTER TABLE public.purchase_orders
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+ALTER TABLE public.po_line_items
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+ALTER TABLE public.daily_logs
+    ADD COLUMN IF NOT EXISTS manually_edited_fields text[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS manually_edited_at timestamptz,
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+ALTER TABLE public.subs
+    ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS po_line_items_po_btli_uidx
+    ON public.po_line_items (po_id, bt_line_item_id);

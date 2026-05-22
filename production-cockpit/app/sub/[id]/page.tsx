@@ -15,6 +15,8 @@ import { Header } from "@/components/header";
 import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
 import { SubChecklistEditor, ChecklistItem } from "./checklist-editor";
+import { EditableText } from "@/components/editable-text";
+import { DeleteButton } from "@/components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -209,6 +211,7 @@ export default async function SubPage({
       .from("subs")
       .select("id, name, aliases")
       .eq("trade", sub.trade)
+      .eq("hidden", false)
       .neq("id", sub.id);
     const peerRows = (peerRes.data ?? []) as {
       id: string;
@@ -510,11 +513,22 @@ export default async function SubPage({
         </Link>
         <div className="mt-4">
           <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
-            {sub.name}
+            <EditableText
+              value={sub.name}
+              field="name"
+              endpoint={`/api/subs/${sub.id}/edit`}
+              placeholder="sub name"
+              inputClassName="bg-paper border border-ink px-1 py-0.5 font-head text-[28px] leading-none tracking-tight text-ink focus:outline-none w-full min-w-0"
+            />
           </h1>
-          {sub.trade && (
-            <p className="mt-1.5 text-ink-3 text-sm">{sub.trade}</p>
-          )}
+          <p className="mt-1.5 text-ink-3 text-sm">
+            <EditableText
+              value={sub.trade}
+              field="trade"
+              endpoint={`/api/subs/${sub.id}/edit`}
+              placeholder="add trade"
+            />
+          </p>
           <div className="mt-3 inline-flex items-center gap-2">
             <span
               className={`h-2 w-2 rounded-full ${health.dotClass}`}
@@ -526,6 +540,50 @@ export default async function SubPage({
           </div>
         </div>
       </header>
+
+      {/* Edit & admin — notes, aliases, delete. Collapsed so it doesn't crowd
+          the profile; aliases feed the daily-log crew matching used above. */}
+      <section className="px-5 pt-4">
+        <details>
+          <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-2">
+            Edit details
+          </summary>
+          <dl className="mt-2 grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 gap-y-2 text-sm">
+            <dt className="self-start pt-1 font-mono text-[9px] uppercase tracking-wider text-ink-3">
+              Notes
+            </dt>
+            <dd className="min-w-0">
+              <EditableText
+                value={sub.notes}
+                field="notes"
+                type="textarea"
+                endpoint={`/api/subs/${sub.id}/edit`}
+                placeholder="add notes"
+                className="text-foreground"
+              />
+            </dd>
+            <dt className="font-mono text-[9px] uppercase tracking-wider text-ink-3">
+              Aliases
+            </dt>
+            <dd className="min-w-0">
+              <EditableText
+                value={(sub.aliases ?? []).join(", ")}
+                field="aliases"
+                endpoint={`/api/subs/${sub.id}/edit`}
+                placeholder="comma, separated, names"
+                className="text-foreground"
+              />
+            </dd>
+          </dl>
+          <div className="mt-3">
+            <DeleteButton
+              endpoint={`/api/subs/${sub.id}/delete`}
+              label={sub.name}
+              confirmLabel="Delete this sub?"
+            />
+          </div>
+        </details>
+      </section>
 
       {/* Flag banner — surfaces flagged_for_pm_binder + reasons. Framed as an
           auto-derived signal, not a verdict: manual judgment wins (per the

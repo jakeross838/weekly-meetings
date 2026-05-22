@@ -26,7 +26,7 @@ export default async function ImportPage() {
       .from("job_pm_assignments")
       .select("job_id, pm_id")
       .is("ended_at", null),
-    supabase.from("subs").select("id, name").order("name"),
+    supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
   const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];

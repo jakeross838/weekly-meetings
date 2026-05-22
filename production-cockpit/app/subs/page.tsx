@@ -7,6 +7,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { Sub, OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
+import { DeleteButton } from "@/components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [subsRes, openTodosRes] = await Promise.all([
-    supabase.from("subs").select("*"),
+    supabase.from("subs").select("*").eq("hidden", false),
     supabase
       .from("todos")
       .select("sub_id, due_date")
@@ -182,10 +183,10 @@ function SubRow({
           ? `${health.label} — ${dueSoon} due within 7 days`
           : health.label;
   return (
-    <li>
+    <li className="flex items-stretch border-b border-rule hover:bg-sand-2/40 transition-colors">
       <Link
         href={`/sub/${sub.id}`}
-        className="flex items-baseline gap-3 px-5 py-3 border-b border-rule hover:bg-sand-2/40 transition-colors"
+        className="flex flex-1 items-baseline gap-3 px-5 py-3 min-w-0"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 min-w-0">
@@ -232,6 +233,12 @@ function SubRow({
           )}
         </div>
       </Link>
+      <DeleteButton
+        endpoint={`/api/subs/${sub.id}/delete`}
+        label={sub.name}
+        confirmLabel="Delete?"
+        className="self-center pr-4 pl-1 text-sm"
+      />
     </li>
   );
 }

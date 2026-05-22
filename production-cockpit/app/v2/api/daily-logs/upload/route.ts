@@ -320,21 +320,66 @@ export async function POST(req: NextRequest) {
 
     if (rows.length === 0) continue;
 
-    const { error, count } = await supabase
-      .from("daily_logs")
-      .upsert(rows, { onConflict: "job_key,log_id", count: "exact" });
-
-    if (error) {
-      return NextResponse.json(
-        {
-          error: `Upsert failed for ${jobKey}: ${error.message}`,
-          per_job: perJob,
-        },
-        { status: 500 }
-      );
+    // Manual-wins: skip logs the user soft-deleted (hidden), and don't
+    // overwrite columns they edited (manually_edited_fields). Keyed by log_id
+    // within this job; a job has only a handful of logs so no chunking needed.
+    const logIds = rows
+      .map((r) => r.log_id)
+      .filter((x): x is string => x != null);
+    const dlEdited = new Map<string, string[]>();
+    const dlHidden = new Set<string>();
+    if (logIds.length) {
+      const { data } = await supabase
+        .from("daily_logs")
+        .select("log_id, manually_edited_fields, hidden")
+        .eq("job_key", jobKey)
+        .in("log_id", logIds);
+      for (const r of (data ?? []) as {
+        log_id: string;
+        manually_edited_fields: string[] | null;
+        hidden: boolean;
+      }[]) {
+        if (Array.isArray(r.manually_edited_fields) && r.manually_edited_fields.length)
+          dlEdited.set(r.log_id, r.manually_edited_fields);
+        if (r.hidden) dlHidden.add(r.log_id);
+      }
     }
-    perJob[jobKey].inserted = count ?? rows.length;
-    totalInserted += count ?? rows.length;
+    const cleanRows = rows.filter(
+      (r) => r.log_id && !dlHidden.has(r.log_id) && !dlEdited.has(r.log_id)
+    );
+    const editedRows = rows.filter(
+      (r) => r.log_id && dlEdited.has(r.log_id) && !dlHidden.has(r.log_id)
+    );
+
+    let jobInserted = 0;
+    if (cleanRows.length) {
+      const { error, count } = await supabase
+        .from("daily_logs")
+        .upsert(cleanRows, { onConflict: "job_key,log_id", count: "exact" });
+      if (error) {
+        return NextResponse.json(
+          { error: `Upsert failed for ${jobKey}: ${error.message}`, per_job: perJob },
+          { status: 500 }
+        );
+      }
+      jobInserted += count ?? cleanRows.length;
+    }
+    for (const row of editedRows) {
+      const r2: Record<string, unknown> = { ...row };
+      for (const f of dlEdited.get(row.log_id as string) ?? []) delete r2[f];
+      const { error } = await supabase
+        .from("daily_logs")
+        .upsert([r2], { onConflict: "job_key,log_id" });
+      if (error) {
+        return NextResponse.json(
+          { error: `Upsert failed for ${jobKey} (edited): ${error.message}`, per_job: perJob },
+          { status: 500 }
+        );
+      }
+      jobInserted += 1;
+    }
+    perJob[jobKey].inserted = jobInserted;
+    totalInserted += jobInserted;
   }
 
   // Auto-create profiles for any newly-seen crews (insert-only; never touches

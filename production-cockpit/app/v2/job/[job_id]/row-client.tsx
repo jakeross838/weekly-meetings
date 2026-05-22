@@ -8,6 +8,7 @@ import { useState } from "react";
 import { CheckOffButton } from "./check-off-button";
 import { EditRowModal, SubOpt, RowEditValues } from "./edit-row";
 import { CategoryPillEdit } from "./category-pill-edit";
+import { DeleteButton } from "@/components/delete-button";
 
 function dayLabel(iso: string, today: string): string {
   if (iso < today) {
@@ -100,6 +101,15 @@ export function RowClient({
               {dayLabel(target_date, today)}
             </span>
           )}
+          <DeleteButton
+            endpoint={
+              source === "todo"
+                ? `/api/todos/${id}/delete`
+                : `/v2/api/items/${id}/delete`
+            }
+            label={source}
+            className="self-center text-sm"
+          />
         </div>
       </li>
       <EditRowModal

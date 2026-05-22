@@ -13,6 +13,8 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
+import { EditableText } from "@/components/editable-text";
+import { DeleteButton } from "@/components/delete-button";
 import {
   JobSummaryPanel,
   JobSummary,
@@ -132,7 +134,7 @@ export default async function V2JobPage({
         .select("id, proposed_count")
         .eq("job_id", job_id)
         .in("review_state", ["pending", "in_review"]),
-      supabase.from("subs").select("id, name").order("name"),
+      supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
       // F9 — latest job_summaries row for this job. Tolerates missing table.
       supabase
         .from("job_summaries")
@@ -165,6 +167,7 @@ export default async function V2JobPage({
           "id, po_number, title, vendor, approval_status, work_status, paid_status, cost, amount_paid, amount_remaining, pct_billed, cost_codes, date_added"
         )
         .ilike("job_key", `${job.name}%`)
+        .eq("hidden", false)
         .order("cost", { ascending: false }),
     ]);
 
@@ -287,8 +290,9 @@ export default async function V2JobPage({
     const liRes = await supabase
       .from("po_line_items")
       .select(
-        "po_id, cost_code, title, description, quantity, unit_cost, amount, amount_paid"
+        "id, po_id, cost_code, title, description, quantity, unit_cost, amount, amount_paid"
       )
+      .eq("hidden", false)
       .in(
         "po_id",
         purchaseOrders.map((p) => p.id)
@@ -528,6 +532,7 @@ type POForJob = {
   date_added: string | null;
 };
 type POLine = {
+  id: string;
   cost_code: string | null;
   title: string | null;
   description: string | null;
@@ -536,6 +541,44 @@ type POLine = {
   amount: number | null;
   amount_paid: number | null;
 };
+
+// One editable PO field rendered as a label/value row in the PO body's
+// definition list. Edits append the field to manually_edited_fields server-side
+// so the next scrape won't clobber them.
+function POField({
+  label,
+  poId,
+  field,
+  value,
+  type,
+  display,
+}: {
+  label: string;
+  poId: string;
+  field: string;
+  value: string | number | null;
+  type?: "text" | "money";
+  display?: string;
+}) {
+  return (
+    <>
+      <dt className="self-center font-mono text-[9px] uppercase tracking-wider text-ink-3">
+        {label}
+      </dt>
+      <dd className="min-w-0">
+        <EditableText
+          value={value}
+          field={field}
+          endpoint={`/v2/api/purchase-orders/${poId}/edit`}
+          type={type}
+          display={display}
+          placeholder={label.toLowerCase()}
+          className="text-foreground"
+        />
+      </dd>
+    </>
+  );
+}
 
 // Purchase orders for a job — committed costs, outstanding, and the line-item
 // breakdown (nested <details>: PO section → each PO → its lines). Renders
@@ -597,18 +640,53 @@ function PurchaseOrders({
                       )}
                     </span>
                   </summary>
+
+                  {/* Editable PO fields live in the body — clicking an input
+                      inside <summary> would fight the open/close toggle. */}
+                  <dl className="mt-2 grid grid-cols-[3.5rem_1fr] items-baseline gap-x-2 gap-y-1 pl-1 text-xs">
+                    <POField label="Title" poId={po.id} field="title" value={po.title} />
+                    <POField label="Vendor" poId={po.id} field="vendor" value={po.vendor} />
+                    <POField
+                      label="Cost"
+                      poId={po.id}
+                      field="cost"
+                      value={po.cost}
+                      type="money"
+                      display={fmtMoney(Number(po.cost) || 0)}
+                    />
+                    <POField
+                      label="Status"
+                      poId={po.id}
+                      field="paid_status"
+                      value={po.paid_status}
+                    />
+                  </dl>
+                  <div className="mt-1.5 pl-1">
+                    <DeleteButton
+                      endpoint={`/v2/api/purchase-orders/${po.id}/delete`}
+                      label={`PO ${po.po_number ?? ""}`.trim()}
+                      confirmLabel="Delete this PO?"
+                    />
+                  </div>
+
                   {lines.length > 0 ? (
-                    <ul className="mt-2 space-y-1 pl-1">
-                      {lines.map((li, i) => (
+                    <ul className="mt-2 space-y-1 border-t border-rule-soft pt-2 pl-1">
+                      {lines.map((li) => (
                         <li
-                          key={i}
-                          className="flex items-baseline justify-between gap-3 text-xs"
+                          key={li.id}
+                          className="flex items-baseline justify-between gap-2 text-xs"
                         >
                           <span className="min-w-0 flex-1 text-ink-2">
                             {li.cost_code && (
                               <span className="text-ink-3">{li.cost_code} · </span>
                             )}
-                            {li.title || li.description || "—"}
+                            <EditableText
+                              value={li.title}
+                              display={li.title || li.description || "—"}
+                              field="title"
+                              endpoint={`/v2/api/po-line-items/${li.id}/edit`}
+                              placeholder="line item"
+                            />
                             {li.quantity != null && li.unit_cost != null && (
                               <span className="text-ink-3">
                                 {" "}
@@ -616,14 +694,24 @@ function PurchaseOrders({
                               </span>
                             )}
                           </span>
-                          <span className="shrink-0 font-mono tabular-nums text-ink-2">
-                            {fmtMoney(Number(li.amount) || 0)}
-                          </span>
+                          <EditableText
+                            value={li.amount}
+                            type="money"
+                            display={fmtMoney(Number(li.amount) || 0)}
+                            field="amount"
+                            endpoint={`/v2/api/po-line-items/${li.id}/edit`}
+                            className="shrink-0 font-mono tabular-nums text-ink-2"
+                            inputClassName="bg-paper border border-ink px-1 py-0.5 text-xs text-ink focus:outline-none w-20"
+                          />
+                          <DeleteButton
+                            endpoint={`/v2/api/po-line-items/${li.id}/delete`}
+                            label="line item"
+                          />
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-1 pl-1 text-ink-3 text-xs">
+                    <p className="mt-2 border-t border-rule-soft pt-2 pl-1 text-ink-3 text-xs">
                       {(po.cost_codes ?? []).join(", ") || "No line items."}
                     </p>
                   )}
