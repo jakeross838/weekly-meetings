@@ -1,7 +1,9 @@
 "use client";
 
-// Small ✕ that asks for inline confirmation, then POSTs to `endpoint` (a
-// delete route — soft or hard) and refreshes. The standard delete affordance.
+// Small ✕ that asks for inline confirmation, then POSTs to `endpoint` (a delete
+// route — soft or hard) and refreshes. If the route returns HTTP 409 with
+// { requiresForce: true, error }, it surfaces that warning and a "delete anyway"
+// step that re-POSTs with { force: true }. The standard delete affordance.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,19 +20,32 @@ export function DeleteButton({
   className?: string;
 }) {
   const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
+  const [step, setStep] = useState<"idle" | "confirm" | "warn">("idle");
+  const [warnMsg, setWarnMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function del() {
+  async function del(force: boolean) {
     setBusy(true);
     setErr(null);
     try {
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify(force ? { force: true } : {}),
       });
+      if (r.status === 409) {
+        const b = await r.json().catch(() => ({}));
+        if (b.requiresForce) {
+          setWarnMsg(b.error || "Delete anyway?");
+          setStep("warn");
+          setBusy(false);
+          return;
+        }
+        setErr(b.error || "HTTP 409");
+        setBusy(false);
+        return;
+      }
       if (!r.ok) {
         const b = await r.json().catch(() => ({}));
         setErr(b.error || `HTTP ${r.status}`);
@@ -44,27 +59,34 @@ export function DeleteButton({
     }
   }
 
-  if (confirming) {
+  function cancel() {
+    setStep("idle");
+    setWarnMsg(null);
+    setErr(null);
+  }
+
+  if (step === "confirm" || step === "warn") {
+    const isWarn = step === "warn";
     return (
       <span className="inline-flex items-center gap-1.5 font-mono text-[10px] shrink-0">
-        <span className="text-ink-3">{confirmLabel ?? "Delete?"}</span>
+        <span className={isWarn ? "text-urgent" : "text-ink-3"}>
+          {isWarn ? warnMsg : confirmLabel ?? "Delete?"}
+        </span>
         <button
           type="button"
-          onClick={del}
+          onClick={() => del(isWarn)}
           disabled={busy}
           className="text-urgent hover:underline disabled:opacity-50"
         >
-          yes
+          {isWarn ? "delete anyway" : "yes"}
         </button>
         <button
           type="button"
-          onClick={() => {
-            setConfirming(false);
-            setErr(null);
-          }}
+          onClick={cancel}
+          disabled={busy}
           className="text-ink-3 hover:text-ink"
         >
-          no
+          {isWarn ? "keep" : "no"}
         </button>
         {err && <span className="text-urgent">{err}</span>}
       </span>
@@ -74,7 +96,7 @@ export function DeleteButton({
   return (
     <button
       type="button"
-      onClick={() => setConfirming(true)}
+      onClick={() => setStep("confirm")}
       title={label ? `Delete ${label}` : "Delete"}
       aria-label={label ? `Delete ${label}` : "Delete"}
       className={(className ?? "") + " shrink-0 text-ink-3 hover:text-urgent transition-colors"}

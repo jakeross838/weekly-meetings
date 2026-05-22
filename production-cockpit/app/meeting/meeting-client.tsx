@@ -7,6 +7,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { DeleteButton } from "@/components/delete-button";
 
 export interface MeetingItem {
   id: string;
@@ -251,6 +252,11 @@ function ItemRow({ it, pastDue }: { it: MeetingItem; pastDue?: boolean }) {
             ? "today"
             : `${it.daysTo}d`}
       </span>
+      <DeleteButton
+        endpoint={`/api/todos/${it.id}/delete`}
+        label="to-do"
+        className="self-center text-sm"
+      />
     </li>
   );
 }
