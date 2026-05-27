@@ -19,10 +19,14 @@ export default async function AdminUsersPage() {
 
   const supabase = supabaseServer();
   const [jobsRes, pmsRes] = await Promise.all([
-    supabase.from("jobs").select("id, name").order("name"),
+    supabase.from("jobs").select("id, name, pm_id").order("name"),
     supabase.from("pms").select("id, full_name").order("full_name"),
   ]);
-  const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
+  const jobs = (jobsRes.data ?? []) as {
+    id: string;
+    name: string;
+    pm_id: string | null;
+  }[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
   const users = await getAllUsers();
 

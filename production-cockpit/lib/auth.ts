@@ -100,10 +100,22 @@ export function isAdmin(u: User | null): boolean {
   return !!u && u.role === "admin";
 }
 
-export function canSeeJob(u: User | null, jobId: string): boolean {
+// Single source of truth for "can this user see this job":
+// admin → yes; otherwise the job's PM (from `jobs.pm_id`, or an active row in
+// `job_pm_assignments`) must match the user's own pmId. Pass `null` when the
+// job has no PM assigned — non-admins won't see it; admins still will.
+export function canSeeJobByPm(u: User | null, jobPmId: string | null): boolean {
   if (!u) return false;
-  if (u.allowedJobs.includes("*")) return true;
-  return u.allowedJobs.includes(jobId);
+  if (u.role === "admin") return true;
+  return !!jobPmId && jobPmId === u.pmId;
+}
+
+// Legacy shim — kept so callers compile, but it now ignores the overlay's
+// allowedJobs list (the overlay no longer drives visibility). Prefer
+// canSeeJobByPm at every call site so visibility tracks `jobs.pm_id`.
+export function canSeeJob(u: User | null, _jobId: string): boolean {
+  if (!u) return false;
+  return u.role === "admin";
 }
 
 // Re-export edge-safe constants so callers can `import { SESSION_COOKIE } from "@/lib/auth"`.

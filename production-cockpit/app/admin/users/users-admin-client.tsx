@@ -7,6 +7,7 @@ import type { User } from "@/lib/auth-users";
 interface JobOpt {
   id: string;
   name: string;
+  pm_id: string | null;
 }
 interface PmOpt {
   id: string;
@@ -26,17 +27,23 @@ export function UsersAdminClient({
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggleJob(email: string, jobId: string, current: string[]) {
+  // Toggle assigns / unassigns `jobs.pm_id` for that user's pmId. Clicking a
+  // job that already belongs to this PM → unassign (pm_id=null). Clicking a
+  // job belonging to a different PM → reassign to this one (the other PM
+  // loses it). This is the single source of truth for "who sees what".
+  async function toggleJob(userPmId: string | null, job: JobOpt) {
+    if (!userPmId) {
+      setError("This user has no pmId — can't assign jobs. Add a pmId via the user record first.");
+      return;
+    }
     setError(null);
-    setBusyEmail(email);
-    const next = current.includes(jobId)
-      ? current.filter((j) => j !== jobId)
-      : [...current, jobId];
+    setBusyEmail(userPmId);
+    const newPmId = job.pm_id === userPmId ? null : userPmId;
     try {
-      const r = await fetch("/api/admin/users", {
+      const r = await fetch("/api/admin/jobs", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, allowedJobs: next }),
+        body: JSON.stringify({ id: job.id, pm_id: newPmId }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) {
@@ -85,12 +92,11 @@ export function UsersAdminClient({
       <ul className="space-y-3">
         {users.map((u) => {
           const isAdminRow = u.role === "admin";
-          const allowAll = u.allowedJobs.includes("*");
           return (
             <li
               key={u.email}
               className="border border-rule p-4"
-              data-busy={busyEmail === u.email}
+              data-busy={busyEmail === u.pmId}
             >
               <div className="flex items-baseline justify-between gap-3">
                 <div className="min-w-0">
@@ -99,6 +105,7 @@ export function UsersAdminClient({
                   </p>
                   <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
                     {u.email} · {u.role}
+                    {u.pmId ? ` · pm:${u.pmId}` : ""}
                   </p>
                 </div>
                 {!isAdminRow && (
@@ -106,7 +113,7 @@ export function UsersAdminClient({
                     type="button"
                     onClick={() => removeUser(u.email)}
                     className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-urgent transition-colors"
-                    disabled={busyEmail === u.email}
+                    disabled={busyEmail === u.pmId}
                     title="Removes the overlay row; seed users revert to their default access."
                   >
                     Remove
@@ -114,30 +121,43 @@ export function UsersAdminClient({
                 )}
               </div>
 
-              {allowAll ? (
+              {isAdminRow ? (
                 <p className="mt-3 text-xs text-ink-2">
                   Admin — sees every job.
+                </p>
+              ) : !u.pmId ? (
+                <p className="mt-3 text-xs text-urgent">
+                  No pmId set — can&apos;t assign jobs to this user.
                 </p>
               ) : (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {jobs.map((j) => {
-                    const on = u.allowedJobs.includes(j.id);
+                    const on = j.pm_id === u.pmId;
+                    const otherPm = j.pm_id && j.pm_id !== u.pmId ? j.pm_id : null;
                     return (
                       <button
                         key={j.id}
                         type="button"
-                        disabled={busyEmail === u.email}
-                        onClick={() =>
-                          toggleJob(u.email, j.id, u.allowedJobs)
+                        disabled={busyEmail === u.pmId}
+                        onClick={() => toggleJob(u.pmId, j)}
+                        title={
+                          on
+                            ? "Click to unassign"
+                            : otherPm
+                              ? `Currently assigned to ${otherPm} — click to reassign`
+                              : "Click to assign"
                         }
                         className={
                           "px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors border " +
                           (on
                             ? "border-accent bg-accent text-paper"
-                            : "border-rule text-ink-2 hover:border-ink-2")
+                            : otherPm
+                              ? "border-rule text-ink-3 hover:border-ink-2"
+                              : "border-rule text-ink-2 hover:border-ink-2")
                         }
                       >
                         {j.name}
+                        {otherPm ? ` (${otherPm})` : ""}
                       </button>
                     );
                   })}

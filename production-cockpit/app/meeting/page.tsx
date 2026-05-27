@@ -16,7 +16,7 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
 import { MeetingAgenda, MeetingJob, MeetingItem } from "./meeting-client";
-import { currentUser, canSeeJob } from "@/lib/auth";
+import { currentUser, canSeeJobByPm } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +79,6 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
 
   const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
-  const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (todosRes.data ?? []) as TodoRow[];
   const subs = (subsRes.data ?? []) as SubRow[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
@@ -101,6 +100,10 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
   const activePmByJob = new Map<string, string>();
   for (const a of assignments) activePmByJob.set(a.job_id, a.pm_id);
   const pmForJob = (j: JobRow) => activePmByJob.get(j.id) ?? j.pm_id ?? null;
+
+  // Visibility model: PMs see jobs where `jobs.pm_id` (or an active
+  // job_pm_assignment) matches their pmId. Admin sees all.
+  const jobs = allJobs.filter((j) => canSeeJobByPm(user, pmForJob(j)));
 
   const subById = new Map(subs.map((s) => [s.id, s]));
 

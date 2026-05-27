@@ -6,6 +6,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser, isAdmin } from "@/lib/auth";
 import { upsertUserAccess, createUser, deleteUser, getAllUsers } from "@/lib/user-store";
+import { revalidatePath } from "next/cache";
+
+function bustUserCaches() {
+  revalidatePath("/admin/users");
+  revalidatePath("/admin");
+  revalidatePath("/");
+  revalidatePath("/meeting");
+}
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +52,7 @@ export async function PATCH(req: NextRequest) {
   }
   try {
     const user = await upsertUserAccess(email, allowedJobs);
+    bustUserCaches();
     return NextResponse.json({ ok: true, user });
   } catch (e) {
     return NextResponse.json(
@@ -85,6 +94,7 @@ export async function POST(req: NextRequest) {
       pmId: body.pmId ?? null,
       allowedJobs,
     });
+    bustUserCaches();
     return NextResponse.json({ ok: true, user });
   } catch (e) {
     return NextResponse.json(
@@ -107,6 +117,7 @@ export async function DELETE(req: NextRequest) {
   }
   try {
     await deleteUser(email);
+    bustUserCaches();
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

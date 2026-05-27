@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
-import { currentUser, canSeeJob } from "@/lib/auth";
+import { currentUser, canSeeJobByPm } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,6 @@ export default async function Page({
 
   const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
-  const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (openTodosRes.data ?? []) as {
     job: string | null;
     due_date: string | null;
@@ -56,6 +55,16 @@ export default async function Page({
     pm_id: string;
   }[];
   const pending = (pendingRes.data ?? []) as { job_id: string | null }[];
+
+  // Visibility model: a PM sees jobs where the active assignment (or the
+  // legacy jobs.pm_id) matches their own pmId. Admin sees everything. The
+  // user_overlay.allowed_jobs column is no longer consulted — single source
+  // of truth is `jobs.pm_id` so editing the assignment in /admin/jobs
+  // immediately changes what that PM sees.
+  const _activePmByJob = new Map<string, string>();
+  for (const a of assignments) _activePmByJob.set(a.job_id, a.pm_id);
+  const _pmForJob = (j: JobRow) => _activePmByJob.get(j.id) ?? j.pm_id ?? null;
+  const jobs = allJobs.filter((j) => canSeeJobByPm(user, _pmForJob(j)));
 
   // Portfolio PO rollup — totals + averages across every job the user can
   // see. POs match jobs by job_key prefix (e.g. job.name = "Krauss" matches

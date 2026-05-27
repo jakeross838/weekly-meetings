@@ -8,8 +8,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser, isAdmin } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
+
+// Invalidate every route whose render reads the jobs list / per-job
+// data, so admin edits show up on the next request without a hard refresh.
+function bustJobCaches(jobId?: string) {
+  revalidatePath("/");
+  revalidatePath("/meeting");
+  revalidatePath("/admin/jobs");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin");
+  revalidatePath("/subs");
+  if (jobId) revalidatePath(`/v2/job/${jobId}`);
+}
 
 async function adminGuard() {
   const u = await currentUser();
@@ -75,6 +88,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  bustJobCaches(id);
   return NextResponse.json({ ok: true, job: data });
 }
 
@@ -110,6 +124,7 @@ export async function PATCH(req: NextRequest) {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
+  bustJobCaches(id);
   return NextResponse.json({ ok: true, job: data });
 }
 
@@ -126,5 +141,6 @@ export async function DELETE(req: NextRequest) {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
+  bustJobCaches(id);
   return NextResponse.json({ ok: true });
 }
