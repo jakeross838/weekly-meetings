@@ -52,8 +52,10 @@ export async function getAllUsers(): Promise<User[]> {
     overlayByEmail.delete(seed.email.toLowerCase()); // consumed
     return rowToUser({ ...r, email: seed.email }); // preserve casing
   });
-  // Overlay-only users (not in seed) come after.
-  for (const r of overlayByEmail.values()) merged.push(rowToUser(r));
+  // Overlay-only users (not in seed) come after. Array.from() rather than
+  // direct `for…of overlayByEmail.values()` because Vercel's TS build target
+  // doesn't enable downlevelIteration for Map iterators.
+  Array.from(overlayByEmail.values()).forEach((r) => merged.push(rowToUser(r)));
   return merged;
 }
 
