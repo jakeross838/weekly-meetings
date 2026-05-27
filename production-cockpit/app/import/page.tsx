@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes, poRes] = await Promise.all([
+  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes, poRes, coRes] = await Promise.all([
     supabase
       .from("pms")
       .select("id, full_name, active")
@@ -45,6 +45,12 @@ export default async function ImportPage() {
     // Purchase-order pull recency + total — scraped_at is set on every upload.
     supabase
       .from("purchase_orders")
+      .select("scraped_at", { count: "exact" })
+      .order("scraped_at", { ascending: false, nullsFirst: false })
+      .limit(1),
+    // Change-order pull recency + total — same shape as POs.
+    supabase
+      .from("change_orders")
       .select("scraped_at", { count: "exact" })
       .order("scraped_at", { ascending: false, nullsFirst: false })
       .limit(1),
@@ -84,6 +90,9 @@ export default async function ImportPage() {
   const poRows = (poRes.data ?? []) as { scraped_at: string | null }[];
   const poCount = poRes.count ?? null;
   const lastPoPull = poRows[0]?.scraped_at ? poRows[0].scraped_at.slice(0, 10) : null;
+  const coRows = (coRes.data ?? []) as { scraped_at: string | null }[];
+  const coCount = coRes.count ?? null;
+  const lastCoPull = coRows[0]?.scraped_at ? coRows[0].scraped_at.slice(0, 10) : null;
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -96,6 +105,22 @@ export default async function ImportPage() {
         <p className="mt-2 text-ink-3 text-sm">
           Drop a Plaud meeting transcript or a Buildertrend daily-log JSON.
         </p>
+        {process.env.VERCEL === "1" && (
+          <div className="mt-4 border border-accent/40 bg-accent/5 px-3 py-2 text-xs text-ink-2 leading-relaxed">
+            <strong className="font-mono text-[10px] tracking-[0.18em] uppercase text-accent">
+              Heads up
+            </strong>
+            <span className="ml-2">
+              The Buildertrend pull buttons below only work from a local
+              cockpit — they spawn a Python scraper on your laptop. Run{" "}
+              <code className="font-mono">npm run dev</code> in{" "}
+              <code className="font-mono">production-cockpit/</code> and open
+              <code className="font-mono"> localhost:3000/import</code> to
+              actually pull. Clicking them on this deployed site will return
+              a &ldquo;requires local environment&rdquo; error.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* LAST PULLS & IMPORTS — recency at a glance */}
@@ -106,6 +131,7 @@ export default async function ImportPage() {
           </h2>
           <div className="space-y-2 text-sm">
             <HistoryRow label="Purchase orders" when={lastPoPull} count={poCount} unit="POs" />
+            <HistoryRow label="Change orders" when={lastCoPull} count={coCount} unit="COs" />
             <HistoryRow label="Daily logs" when={lastDailyImport} count={dailyCount} unit="logs" />
             <HistoryRow
               label="Transcripts"

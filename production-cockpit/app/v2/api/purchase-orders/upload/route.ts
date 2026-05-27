@@ -7,6 +7,7 @@
 // manually_edited_fields are never overwritten by a re-scrape.
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -240,6 +241,13 @@ export async function POST(req: NextRequest) {
     else lineItems += 1;
   }
   }
+
+  // Bust caches on every surface that reads PO data so a fresh pull is
+  // visible on the next navigation without a hard refresh.
+  revalidatePath("/");
+  revalidatePath("/meeting");
+  revalidatePath("/import");
+  revalidatePath("/v2/job/[job_id]", "page");
 
   return NextResponse.json({
     ok: errors.length === 0,

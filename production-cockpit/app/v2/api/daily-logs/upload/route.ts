@@ -388,6 +388,10 @@ export async function POST(req: NextRequest) {
 
   revalidatePath("/subs");
   revalidatePath("/sub/[id]", "page");
+  revalidatePath("/");
+  revalidatePath("/meeting");
+  revalidatePath("/import");
+  revalidatePath("/v2/job/[job_id]", "page");
 
   return NextResponse.json({
     ok: true,

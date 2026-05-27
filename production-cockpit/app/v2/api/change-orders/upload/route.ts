@@ -5,6 +5,7 @@
 // resurrected; columns in a row's manually_edited_fields are never overwritten.
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +109,13 @@ export async function POST(req: NextRequest) {
     if (error) errors.push(`co upsert(edited): ${error.message}`);
     else upserted += 1;
   }
+
+  // Bust caches on every surface that reads CO data so a fresh pull is
+  // visible on the next navigation without a hard refresh.
+  revalidatePath("/");
+  revalidatePath("/meeting");
+  revalidatePath("/import");
+  revalidatePath("/v2/job/[job_id]", "page");
 
   return NextResponse.json({
     ok: errors.length === 0,
