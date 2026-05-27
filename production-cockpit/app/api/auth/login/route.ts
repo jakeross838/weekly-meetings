@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const user = checkPassword(email, password);
+  const user = await checkPassword(email, password);
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "Wrong email or password" },

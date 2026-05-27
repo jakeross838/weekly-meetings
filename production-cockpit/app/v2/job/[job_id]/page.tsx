@@ -67,7 +67,7 @@ export default async function V2JobPage({
 
   // Show a single "Job not found" surface whether the job is missing OR the
   // signed-in user isn't allowed to see it. Don't leak existence to non-admins.
-  const user = currentUser();
+  const user = await currentUser();
   if (!jobRes.data || !canSeeJob(user, job_id)) {
     return (
       <main className="max-w-[560px] mx-auto min-h-screen bg-background px-5 py-16">

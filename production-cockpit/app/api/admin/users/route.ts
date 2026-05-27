@@ -9,8 +9,8 @@ import { upsertUserAccess, createUser, deleteUser, getAllUsers } from "@/lib/use
 
 export const dynamic = "force-dynamic";
 
-function adminGuard() {
-  const u = currentUser();
+async function adminGuard() {
+  const u = await currentUser();
   if (!isAdmin(u)) {
     return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
   }
@@ -18,13 +18,13 @@ function adminGuard() {
 }
 
 export async function GET() {
-  const block = adminGuard();
+  const block = await adminGuard();
   if (block) return block;
-  return NextResponse.json({ ok: true, users: getAllUsers() });
+  return NextResponse.json({ ok: true, users: await getAllUsers() });
 }
 
 export async function PATCH(req: NextRequest) {
-  const block = adminGuard();
+  const block = await adminGuard();
   if (block) return block;
   let body: { email?: string; allowedJobs?: string[] };
   try {
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
     );
   }
   try {
-    const user = upsertUserAccess(email, allowedJobs);
+    const user = await upsertUserAccess(email, allowedJobs);
     return NextResponse.json({ ok: true, user });
   } catch (e) {
     return NextResponse.json(
@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const block = adminGuard();
+  const block = await adminGuard();
   if (block) return block;
   let body: {
     email?: string;
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    const user = createUser({
+    const user = await createUser({
       email,
       name,
       pmId: body.pmId ?? null,
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const block = adminGuard();
+  const block = await adminGuard();
   if (block) return block;
   const url = new URL(req.url);
   const email = url.searchParams.get("email")?.trim() ?? "";
@@ -106,7 +106,7 @@ export async function DELETE(req: NextRequest) {
     );
   }
   try {
-    deleteUser(email);
+    await deleteUser(email);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

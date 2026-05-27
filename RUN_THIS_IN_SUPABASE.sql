@@ -253,3 +253,18 @@ ALTER TABLE public.subs
     ADD COLUMN IF NOT EXISTS hidden_at timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS po_line_items_po_btli_uidx
     ON public.po_line_items (po_id, bt_line_item_id);
+
+-- User overlay: per-PM job access (and any added-via-admin users). The seed
+-- list still lives in lib/auth-users.ts; overlay rows here win by email.
+CREATE TABLE IF NOT EXISTS public.user_overlay (
+    email text PRIMARY KEY,
+    name text NOT NULL,
+    role text NOT NULL DEFAULT 'pm',
+    pm_id text,
+    allowed_jobs text[] NOT NULL DEFAULT '{}',
+    password text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS user_overlay_email_lower_idx
+    ON public.user_overlay (lower(email));

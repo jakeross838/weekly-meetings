@@ -43,7 +43,7 @@ export default async function Page({
       .in("review_state", ["pending", "in_review"]),
   ]);
 
-  const user = currentUser();
+  const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
   const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (openTodosRes.data ?? []) as {

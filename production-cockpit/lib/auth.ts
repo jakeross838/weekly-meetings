@@ -53,7 +53,7 @@ export function encodeSession(email: string): string {
   return `${body}.${sig}`;
 }
 
-export function decodeSession(token: string | undefined): User | null {
+export async function decodeSession(token: string | undefined): Promise<User | null> {
   if (!token) return null;
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
@@ -76,13 +76,14 @@ export function decodeSession(token: string | undefined): User | null {
   return findUserByEmail(payload.email);
 }
 
-export function findUserByEmail(email: string): User | null {
+export async function findUserByEmail(email: string): Promise<User | null> {
   const norm = email.trim().toLowerCase();
-  return getAllUsers().find((u) => u.email.toLowerCase() === norm) ?? null;
+  const users = await getAllUsers();
+  return users.find((u) => u.email.toLowerCase() === norm) ?? null;
 }
 
-export function checkPassword(email: string, password: string): User | null {
-  const u = findUserByEmail(email);
+export async function checkPassword(email: string, password: string): Promise<User | null> {
+  const u = await findUserByEmail(email);
   if (!u) return null;
   // Plaintext comparison — see file header.
   if (u.password !== password) return null;
@@ -90,7 +91,7 @@ export function checkPassword(email: string, password: string): User | null {
 }
 
 // Server-component / route-handler helper. Reads the session cookie.
-export function currentUser(): User | null {
+export async function currentUser(): Promise<User | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   return decodeSession(token);
 }

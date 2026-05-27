@@ -8,8 +8,8 @@ import { currentUser } from "@/lib/auth";
 // "Todos" was the v1 name for the portfolio home — renamed to "Jobs" to
 // match the rebuilt /.
 
-export function Header() {
-  const user = currentUser();
+export async function Header() {
+  const user = await currentUser();
   return (
     <header className="border-b border-rule">
       <div className="max-w-[560px] mx-auto px-5 py-4 flex items-center justify-between gap-4">

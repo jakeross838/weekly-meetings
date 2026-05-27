@@ -10,13 +10,13 @@ import { redirect } from "next/navigation";
 export const metadata = { title: "Sign in · Ross Built" };
 export const dynamic = "force-dynamic";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { next?: string };
 }) {
   // If already signed in, hop straight to the cockpit.
-  const u = currentUser();
+  const u = await currentUser();
   if (u) {
     redirect(searchParams.next && searchParams.next.startsWith("/") ? searchParams.next : "/");
   }

@@ -13,7 +13,7 @@ import { UsersAdminClient } from "./users-admin-client";
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
-  const user = currentUser();
+  const user = await currentUser();
   if (!user) redirect("/login?next=/admin/users");
   if (!isAdmin(user)) notFound();
 
@@ -24,7 +24,7 @@ export default async function AdminUsersPage() {
   ]);
   const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
-  const users = getAllUsers();
+  const users = await getAllUsers();
 
   return (
     <main className="max-w-[720px] mx-auto min-h-screen bg-background pb-24">

@@ -77,7 +77,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         .select("job_id, scheduled_value, total_completed"),
     ]);
 
-  const user = currentUser();
+  const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
   const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (todosRes.data ?? []) as TodoRow[];
