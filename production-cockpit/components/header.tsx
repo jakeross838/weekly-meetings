@@ -36,6 +36,11 @@ export async function Header() {
           >
             Import
           </Link>
+          {user?.role === "admin" && (
+            <Link href="/admin" className="hover:text-ink transition-colors">
+              Admin
+            </Link>
+          )}
           <ViewToggle />
           {user && <UserPill name={user.name} role={user.role} />}
         </nav>
