@@ -110,13 +110,5 @@ export function canSeeJobByPm(u: User | null, jobPmId: string | null): boolean {
   return !!jobPmId && jobPmId === u.pmId;
 }
 
-// Legacy shim — kept so callers compile, but it now ignores the overlay's
-// allowedJobs list (the overlay no longer drives visibility). Prefer
-// canSeeJobByPm at every call site so visibility tracks `jobs.pm_id`.
-export function canSeeJob(u: User | null, _jobId: string): boolean {
-  if (!u) return false;
-  return u.role === "admin";
-}
-
 // Re-export edge-safe constants so callers can `import { SESSION_COOKIE } from "@/lib/auth"`.
 export { SESSION_COOKIE, SESSION_TTL_SEC };
