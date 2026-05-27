@@ -36,9 +36,12 @@ async function verifyToken(token: string): Promise<boolean> {
   const body = token.slice(0, dot);
   const sig = token.slice(dot + 1);
   try {
+    // The `as BufferSource` casts are because Vercel's TS lib types
+    // Uint8Array<ArrayBufferLike> doesn't match ArrayBufferView<ArrayBuffer>
+    // expected by crypto.subtle. Runtime accepts Uint8Array fine.
     const key = await crypto.subtle.importKey(
       "raw",
-      new TextEncoder().encode(getSecret()),
+      new TextEncoder().encode(getSecret()) as BufferSource,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["verify"]
@@ -46,8 +49,8 @@ async function verifyToken(token: string): Promise<boolean> {
     const ok = await crypto.subtle.verify(
       "HMAC",
       key,
-      base64urlToBytes(sig),
-      new TextEncoder().encode(body)
+      base64urlToBytes(sig) as BufferSource,
+      new TextEncoder().encode(body) as BufferSource
     );
     if (!ok) return false;
     // Also check exp.
