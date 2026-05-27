@@ -16,6 +16,7 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
 import { MeetingAgenda, MeetingJob, MeetingItem } from "./meeting-client";
+import { currentUser, canSeeJob } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,9 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         .select("job_id, scheduled_value, total_completed"),
     ]);
 
-  const jobs = (jobsRes.data ?? []) as JobRow[];
+  const user = currentUser();
+  const allJobs = (jobsRes.data ?? []) as JobRow[];
+  const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (todosRes.data ?? []) as TodoRow[];
   const subs = (subsRes.data ?? []) as SubRow[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
@@ -252,7 +255,9 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         </p>
       </header>
 
-      {pmPills.length > 0 && (
+      {/* PM filter pills only render for admins — PMs already see only their
+          jobs, so a filter would be redundant and noisy. */}
+      {user?.role === "admin" && pmPills.length > 0 && (
         <div className="px-5 pt-2 pb-1">
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
             <ScopePill href="/meeting" active={!pmFilter} label="All PMs" />

@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { RossBuiltLogo } from "./logo";
 import { ViewToggle } from "./view-toggle";
+import { UserPill } from "./user-pill";
+import { currentUser } from "@/lib/auth";
 
-// Minimal header: brand mark + 4 short links. Date stamp removed.
+// Minimal header: brand mark + 4 short links + signed-in pill.
 // "Todos" was the v1 name for the portfolio home — renamed to "Jobs" to
 // match the rebuilt /.
 
 export function Header() {
+  const user = currentUser();
   return (
     <header className="border-b border-rule">
       <div className="max-w-[560px] mx-auto px-5 py-4 flex items-center justify-between gap-4">
@@ -34,6 +37,7 @@ export function Header() {
             Import
           </Link>
           <ViewToggle />
+          {user && <UserPill name={user.name} role={user.role} />}
         </nav>
       </div>
     </header>

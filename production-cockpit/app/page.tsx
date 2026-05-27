@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
+import { currentUser, canSeeJob } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,9 @@ export default async function Page({
       .in("review_state", ["pending", "in_review"]),
   ]);
 
-  const jobs = (jobsRes.data ?? []) as JobRow[];
+  const user = currentUser();
+  const allJobs = (jobsRes.data ?? []) as JobRow[];
+  const jobs = allJobs.filter((j) => canSeeJob(user, j.id));
   const todos = (openTodosRes.data ?? []) as {
     job: string | null;
     due_date: string | null;
@@ -54,8 +57,17 @@ export default async function Page({
   }[];
   const pending = (pendingRes.data ?? []) as { job_id: string | null }[];
 
-  // Portfolio PO rollup — totals + averages across every job. Paginate past
+  // Portfolio PO rollup — totals + averages across every job the user can
+  // see. POs match jobs by job_key prefix (e.g. job.name = "Krauss" matches
+  // job_key "Krauss-427 South Blvd of the Presidents"). Paginate past
   // Supabase's 1000-row cap so all POs are counted.
+  // Build the allowed prefix set from the *visible* jobs so non-admins get a
+  // rollup scoped to their portfolio, not the whole company.
+  const allowedJobNames = jobs.map((j) => j.name);
+  const isPoVisible = (jobKey: string | null): boolean => {
+    if (!jobKey) return false;
+    return allowedJobNames.some((n) => jobKey.startsWith(n));
+  };
   let poCommitted = 0;
   let poPaid = 0;
   let poOutstanding = 0;
@@ -74,12 +86,13 @@ export default async function Page({
       job_key: string | null;
     }[];
     for (const r of poRows) {
+      if (!isPoVisible(r.job_key)) continue;
       poCommitted += Number(r.cost) || 0;
       poPaid += Number(r.amount_paid) || 0;
       poOutstanding += Number(r.amount_remaining) || 0;
       if (r.job_key) poJobKeys.add(r.job_key);
+      poCount += 1;
     }
-    poCount += poRows.length;
     if (poRows.length < 1000) break;
   }
   const poJobCount = poJobKeys.size;
@@ -211,7 +224,9 @@ export default async function Page({
         </section>
       )}
 
-      {pmPills.length > 0 && (
+      {/* PM filter pills only render for admins — PMs already see only their
+          jobs, so a filter would be redundant and noisy. */}
+      {user?.role === "admin" && pmPills.length > 0 && (
         <div className="px-5 pt-2 pb-1">
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
             <FilterPill href="/" active={!pmFilter} label="All PMs" />

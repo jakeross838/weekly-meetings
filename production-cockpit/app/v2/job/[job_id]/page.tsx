@@ -22,6 +22,7 @@ import {
   JobSummary,
   SummaryMeta,
 } from "./job-summary-panel";
+import { currentUser, canSeeJob } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,10 @@ export default async function V2JobPage({
     .eq("id", job_id)
     .maybeSingle();
 
-  if (!jobRes.data) {
+  // Show a single "Job not found" surface whether the job is missing OR the
+  // signed-in user isn't allowed to see it. Don't leak existence to non-admins.
+  const user = currentUser();
+  if (!jobRes.data || !canSeeJob(user, job_id)) {
     return (
       <main className="max-w-[560px] mx-auto min-h-screen bg-background px-5 py-16">
         <h1 className="font-head text-2xl text-foreground">Job not found</h1>
