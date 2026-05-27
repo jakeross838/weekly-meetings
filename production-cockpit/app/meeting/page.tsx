@@ -37,6 +37,7 @@ type TodoRow = {
   job: string | null;
   due_date: string | null;
   sub_id: string | null;
+  category: string | null;
 };
 type SubRow = {
   id: string;
@@ -56,7 +57,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
       supabase.from("jobs").select("id, name, address, pm_id").order("name"),
       supabase
         .from("todos")
-        .select("id, title, edited_title, job, due_date, sub_id")
+        .select("id, title, edited_title, job, due_date, sub_id, category")
         .in("status", OPEN_STATUSES as Status[]),
       supabase
         .from("subs")
@@ -164,6 +165,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
       daysTo:
         t.due_date && t.due_date >= today ? daysBetween(today, t.due_date) : null,
       subName: t.sub_id ? subById.get(t.sub_id)?.name ?? null : null,
+      category: t.category ?? null,
     });
 
     const pastDue = jobTodos
