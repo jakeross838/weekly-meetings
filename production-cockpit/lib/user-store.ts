@@ -81,7 +81,11 @@ export async function getAllUsersIncludingDisabled(): Promise<AdminUser[]> {
 }
 
 function stripFlag(u: AdminUser): User {
-  const { _disabled, _seedOnly, ...rest } = u;
+  // Mutating a shallow copy avoids destructure-into-unused-vars which trips
+  // Vercel's strict @typescript-eslint/no-unused-vars on every build.
+  const rest = { ...u } as Partial<AdminUser>;
+  delete rest._disabled;
+  delete rest._seedOnly;
   return rest as User;
 }
 

@@ -43,8 +43,9 @@ async function adminGuard() {
 // Redact `password` from every response so admin GET never echoes plaintext
 // passwords back to the browser (or chat / network logs).
 function redactUser<T extends { password?: string }>(u: T): Omit<T, "password"> {
-  const { password: _omit, ...rest } = u;
-  return rest;
+  const rest = { ...u } as { password?: string };
+  delete rest.password;
+  return rest as Omit<T, "password">;
 }
 
 export async function GET() {
