@@ -5,10 +5,40 @@
 // rossbuilt.com domain is verified in Resend.
 
 import { Resend } from "resend";
+import { supabaseServer } from "./supabase";
 
 const DEV_FROM = "Ross Built <onboarding@resend.dev>";
 // Once jakeross838 verifies rossbuilt.com in Resend → swap this and re-deploy.
 const PROD_FROM = process.env.RESEND_FROM || DEV_FROM;
+
+// Tiny in-memory cache so we don't hit Supabase on every sendEmail call.
+let cachedKey: { value: string | null; at: number } | null = null;
+const KEY_TTL_MS = 60_000;
+
+// Resolve the Resend API key from env first, then fall back to a row in
+// `public.app_config (key='RESEND_API_KEY')`. The Supabase fallback exists
+// because setting a real env var on Vercel needs the project owner's clicks
+// in the dashboard, and we want forgot-password / signup emails to work
+// without that ceremony.
+async function resolveResendKey(): Promise<string | null> {
+  const env = process.env.RESEND_API_KEY?.trim();
+  if (env) return env;
+  if (cachedKey && Date.now() - cachedKey.at < KEY_TTL_MS) return cachedKey.value;
+  try {
+    const sb = supabaseServer();
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "RESEND_API_KEY")
+      .maybeSingle();
+    const v = (data as { value: string | null } | null)?.value ?? null;
+    cachedKey = { value: v, at: Date.now() };
+    return v;
+  } catch {
+    cachedKey = { value: null, at: Date.now() };
+    return null;
+  }
+}
 
 export interface EmailInput {
   to: string;
@@ -26,7 +56,7 @@ export interface EmailResult {
 }
 
 export async function sendEmail(input: EmailInput): Promise<EmailResult> {
-  const key = process.env.RESEND_API_KEY;
+  const key = await resolveResendKey();
   if (!key) {
     // Dev fallback — log so the link is recoverable from server output.
     console.log("\n──────── [email · DEV FALLBACK · no RESEND_API_KEY] ────────");
