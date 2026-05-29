@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       cta: "Open cockpit",
       ctaUrl: `${origin}/`,
     }),
-    text: `Your Ross Built cockpit account is ready.\n\nSign in: ${origin}/login\nEmail: ${r.email}\nTemporary password: ${initialPassword}`,
+    text: `Your Ross Built cockpit access is ready. Open ${origin}/ — the jobs Jake assigns to you will show up there.`,
   });
 
   await sb
