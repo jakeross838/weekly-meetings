@@ -41,6 +41,15 @@ export default async function LoginPage({
 
         <LoginForm next={next} />
 
+        <div className="mt-6 flex items-center justify-between text-xs">
+          <a href="/forgot" className="text-accent hover:underline">
+            Forgot password?
+          </a>
+          <a href="/signup" className="text-accent hover:underline">
+            Request access →
+          </a>
+        </div>
+
         <p className="mt-8 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
           Internal — Ross Built
         </p>

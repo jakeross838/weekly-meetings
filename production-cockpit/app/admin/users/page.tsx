@@ -18,9 +18,14 @@ export default async function AdminUsersPage() {
   if (!isAdmin(user)) notFound();
 
   const supabase = supabaseServer();
-  const [jobsRes, pmsRes] = await Promise.all([
+  const [jobsRes, pmsRes, signupsRes] = await Promise.all([
     supabase.from("jobs").select("id, name, pm_id").order("name"),
     supabase.from("pms").select("id, full_name").order("full_name"),
+    supabase
+      .from("signup_requests")
+      .select("id, email, name, message, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
   ]);
   const jobs = (jobsRes.data ?? []) as {
     id: string;
@@ -28,6 +33,13 @@ export default async function AdminUsersPage() {
     pm_id: string | null;
   }[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
+  const pendingSignups = (signupsRes.data ?? []) as {
+    id: string;
+    email: string;
+    name: string;
+    message: string | null;
+    created_at: string;
+  }[];
   const users = await getAllUsersIncludingDisabled();
 
   return (
@@ -50,6 +62,7 @@ export default async function AdminUsersPage() {
         jobs={jobs}
         pms={pms}
         selfEmail={user.email}
+        pendingSignups={pendingSignups}
       />
     </main>
   );

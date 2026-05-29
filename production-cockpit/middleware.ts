@@ -11,7 +11,7 @@ import { SESSION_COOKIE } from "@/lib/auth-constants";
 // HMAC-SHA256 used by lib/auth.ts:sign(). Invalid signatures (e.g. a stale
 // cookie from before AUTH_SECRET was rotated) are treated as "no cookie".
 
-const PUBLIC_PREFIXES = ["/login", "/api", "/_next", "/favicon"];
+const PUBLIC_PREFIXES = ["/login", "/forgot", "/reset", "/signup", "/api", "/_next", "/favicon"];
 
 const DEV_FALLBACK_SECRET = "ross-built-dev-secret-please-change-me-now";
 

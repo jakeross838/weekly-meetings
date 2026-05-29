@@ -313,6 +313,36 @@ CREATE INDEX IF NOT EXISTS user_overlay_email_lower_idx
 -- Disabled flag: when true, user can't sign in (filtered out of getAllUsers).
 ALTER TABLE public.user_overlay
     ADD COLUMN IF NOT EXISTS disabled boolean NOT NULL DEFAULT false;
+
+-- Public signup requests + admin approval queue.
+CREATE TABLE IF NOT EXISTS public.signup_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email text NOT NULL,
+    name text NOT NULL,
+    role_requested text NOT NULL DEFAULT 'pm',
+    message text,
+    status text NOT NULL DEFAULT 'pending',
+    reviewed_by text,
+    reviewed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS signup_requests_status_idx
+    ON public.signup_requests (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS signup_requests_email_lower_idx
+    ON public.signup_requests (lower(email));
+
+-- One-time tokens for forgot-password emails.
+CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
+    token text PRIMARY KEY,
+    email text NOT NULL,
+    expires_at timestamptz NOT NULL,
+    used_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_reset_tokens_email_lower_idx
+    ON public.password_reset_tokens (lower(email));
+CREATE INDEX IF NOT EXISTS password_reset_tokens_expires_idx
+    ON public.password_reset_tokens (expires_at);
 `;
 
 function projectRefFromUrl(url: string): string | null {

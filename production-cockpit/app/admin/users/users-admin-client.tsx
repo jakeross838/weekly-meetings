@@ -14,20 +14,51 @@ interface PmOpt {
   full_name: string;
 }
 
+interface SignupRequest {
+  id: string;
+  email: string;
+  name: string;
+  message: string | null;
+  created_at: string;
+}
+
 export function UsersAdminClient({
   users,
   jobs,
   pms,
   selfEmail,
+  pendingSignups,
 }: {
   users: AdminUser[];
   jobs: JobOpt[];
   pms: PmOpt[];
   selfEmail: string;
+  pendingSignups: SignupRequest[];
 }) {
   const router = useRouter();
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
+  const [busySignup, setBusySignup] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function reviewSignup(id: string, action: "approve" | "reject", pmId?: string) {
+    setError(null);
+    setBusySignup(id);
+    try {
+      const r = await fetch("/api/admin/signup-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action, pmId: pmId || null }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) {
+        setError(j.error ?? `HTTP ${r.status}`);
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setBusySignup(null);
+    }
+  }
 
   async function withBusy<T>(email: string, fn: () => Promise<T>) {
     setError(null);
@@ -132,6 +163,58 @@ export function UsersAdminClient({
         >
           {error}
         </p>
+      )}
+
+      {pendingSignups.length > 0 && (
+        <section className="border-2 border-accent bg-accent/5 p-4">
+          <header className="flex items-baseline justify-between gap-3">
+            <h2 className="font-head text-[15px] text-foreground">
+              Pending access requests · {pendingSignups.length}
+            </h2>
+          </header>
+          <ul className="mt-3 space-y-2.5">
+            {pendingSignups.map((s) => (
+              <li key={s.id} className="border border-rule bg-paper p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-head text-sm text-foreground">
+                      {s.name}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+                      {s.email} · {new Date(s.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => reviewSignup(s.id, "approve")}
+                      disabled={busySignup === s.id}
+                      className="bg-ink text-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] hover:bg-accent transition-colors disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => reviewSignup(s.id, "reject")}
+                      disabled={busySignup === s.id}
+                      className="border border-rule text-ink-3 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] hover:text-urgent hover:border-urgent transition-colors disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+                {s.message && (
+                  <p className="mt-2 text-xs text-ink-2 leading-relaxed border-t border-rule pt-2">
+                    {s.message}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 font-mono text-[10px] text-ink-3">
+            Approve sends them a welcome email with a temporary password.
+          </p>
+        </section>
       )}
 
       <div className="flex items-baseline justify-between gap-3 pb-1">
