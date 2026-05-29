@@ -1,10 +1,11 @@
-// /signup — public-facing request-access form. Approval is manual by Jake.
+// /signup — public account creation. Anyone can sign up with a password.
+// They're signed in immediately but see no jobs until admin grants access.
 
 import Link from "next/link";
 import { RossBuiltLogo } from "@/components/logo";
 import { SignupForm } from "./signup-form";
 
-export const metadata = { title: "Request access · Ross Built" };
+export const metadata = { title: "Create account · Ross Built" };
 export const dynamic = "force-dynamic";
 
 export default function SignupPage() {
@@ -20,11 +21,12 @@ export default function SignupPage() {
         <div className="flex flex-col items-center text-center">
           <RossBuiltLogo size={42} />
           <h1 className="mt-7 font-head text-[26px] leading-none tracking-tight text-foreground">
-            Request access
+            Create account
           </h1>
           <p className="mt-2.5 text-sm text-ink-2 leading-relaxed">
-            Send Jake a quick request — once he approves, you&apos;ll get an
-            email with your account details.
+            You can sign in right away. You won&apos;t see any jobs until
+            Jake grants you access — just click <strong>Request access</strong>
+            {" "}from your home screen and Jake will approve it.
           </p>
         </div>
 

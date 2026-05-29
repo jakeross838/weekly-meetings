@@ -3,10 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser, isAdmin } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase";
-import { createUser, setUserPassword } from "@/lib/user-store";
 import { sendEmail, brandWrap } from "@/lib/email";
 import { revalidatePath } from "next/cache";
-import crypto from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +45,6 @@ export async function POST(req: NextRequest) {
   let body: {
     id?: string;
     action?: "approve" | "reject";
-    pmId?: string | null;
-    password?: string;
   };
   try {
     body = await req.json();
@@ -91,41 +87,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Approve — create user + assign a fresh password + email it to them.
-  const initialPassword =
-    body.password?.trim() || crypto.randomBytes(6).toString("base64url");
-  try {
-    await createUser({
-      email: r.email,
-      name: r.name,
-      pmId: body.pmId?.trim() || null,
-      allowedJobs: [],
-      password: initialPassword,
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 400 }
-    );
-  }
-  // Belt-and-suspenders: explicitly set the password too (createUser also
-  // accepts it but setting again is a no-op idempotent safeguard).
-  await setUserPassword(r.email, initialPassword);
-
+  // Approve — the user already exists (they signed up themselves with
+  // their own password). All we do is mark the ticket approved and email
+  // them a heads-up. Actual job assignment happens via /admin/jobs.
   const origin = req.nextUrl.origin;
   await sendEmail({
     to: r.email,
-    subject: "Your Ross Built cockpit account is ready",
+    subject: "Your Ross Built cockpit access is ready",
     html: brandWrap({
-      preheader: "Your access has been approved.",
-      intro: `Welcome, ${r.name.split(" ")[0]} — Jake just approved your access.`,
+      preheader: "Jake just approved your access — jobs are on the way.",
+      intro: `Hey ${r.name.split(" ")[0]} — Jake just approved your access request.`,
       body:
-        `Sign in at <a href="${origin}/login" style="color:#5B8497">${origin}/login</a> with these credentials:<br/><br/>` +
-        `<strong>Email:</strong> ${r.email}<br/>` +
-        `<strong>Temporary password:</strong> <code style="background:#EBEEF0;padding:2px 6px;">${initialPassword}</code><br/><br/>` +
-        `Once you sign in, set a new password from the user menu.`,
+        `You should start seeing the jobs Jake assigns to you on your home page. Refresh ` +
+        `<a href="${origin}/" style="color:#5B8497">${origin}/</a> if they don't show up right away.`,
       cta: "Open cockpit",
-      ctaUrl: `${origin}/login`,
+      ctaUrl: `${origin}/`,
     }),
     text: `Your Ross Built cockpit account is ready.\n\nSign in: ${origin}/login\nEmail: ${r.email}\nTemporary password: ${initialPassword}`,
   });

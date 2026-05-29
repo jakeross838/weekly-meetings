@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
+import { RequestAccessCard } from "@/components/request-access-card";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -251,10 +252,17 @@ export default async function Page({
         </div>
       )}
 
+      {/* Empty-state CTA: newly-signed-up users who haven't been granted any
+          jobs yet land here. Don't show for admin (they always see jobs) or
+          when filtering. */}
+      {rows.length === 0 && user && user.role !== "admin" && !pmFilter && (
+        <RequestAccessCard />
+      )}
+
       <ul className="mt-4 stagger-children">
         {rows.length === 0 ? (
           <li className="px-5 py-16 text-center text-ink-3 text-sm">
-            {pmFilter ? "No jobs for this PM." : "No jobs."}
+            {pmFilter ? "No jobs for this PM." : "No jobs yet."}
           </li>
         ) : (
           rows.map((j) => {
