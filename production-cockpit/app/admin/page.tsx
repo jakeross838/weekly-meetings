@@ -18,11 +18,9 @@ const SECTIONS = [
     label: "Jobs",
     blurb: "Create, rename, or remove jobs from the portfolio.",
   },
-  {
-    href: "/admin/migrate",
-    label: "Migrations",
-    blurb: "Apply pending Supabase DDL (idempotent).",
-  },
+  // Migrations card removed 2026-05-29 — Jake didn't want the raw "Supabase
+  // DDL" surface visible in the panel. The /admin/migrate route still exists
+  // for emergency schema changes; just not linked from the hub.
 ];
 
 export default async function AdminHub() {
