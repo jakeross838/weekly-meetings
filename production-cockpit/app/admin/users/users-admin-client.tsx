@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { User } from "@/lib/auth-users";
+import type { AdminUser } from "@/lib/user-store";
 
 interface JobOpt {
   id: string;
@@ -18,39 +18,22 @@ export function UsersAdminClient({
   users,
   jobs,
   pms,
+  selfEmail,
 }: {
-  users: User[];
+  users: AdminUser[];
   jobs: JobOpt[];
   pms: PmOpt[];
+  selfEmail: string;
 }) {
   const router = useRouter();
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Toggle assigns / unassigns `jobs.pm_id` for that user's pmId. Clicking a
-  // job that already belongs to this PM → unassign (pm_id=null). Clicking a
-  // job belonging to a different PM → reassign to this one (the other PM
-  // loses it). This is the single source of truth for "who sees what".
-  async function toggleJob(userPmId: string | null, job: JobOpt) {
-    if (!userPmId) {
-      setError("This user has no pmId — can't assign jobs. Add a pmId via the user record first.");
-      return;
-    }
+  async function withBusy<T>(email: string, fn: () => Promise<T>) {
     setError(null);
-    setBusyEmail(userPmId);
-    const newPmId = job.pm_id === userPmId ? null : userPmId;
+    setBusyEmail(email);
     try {
-      const r = await fetch("/api/admin/jobs", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: job.id, pm_id: newPmId }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) {
-        setError(j.error ?? `HTTP ${r.status}`);
-      } else {
-        router.refresh();
-      }
+      return await fn();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -58,24 +41,86 @@ export function UsersAdminClient({
     }
   }
 
-  async function removeUser(email: string) {
-    if (!confirm(`Remove ${email}?`)) return;
-    setError(null);
-    setBusyEmail(email);
-    try {
-      const r = await fetch(
-        `/api/admin/users?email=${encodeURIComponent(email)}`,
-        { method: "DELETE" }
-      );
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) {
-        setError(j.error ?? `HTTP ${r.status}`);
-      } else {
-        router.refresh();
-      }
-    } finally {
-      setBusyEmail(null);
+  async function postJson(method: string, url: string, body?: unknown) {
+    const r = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({} as { ok?: boolean; error?: string }));
+    if (!r.ok || (j as { ok?: boolean }).ok === false) {
+      throw new Error((j as { error?: string }).error ?? `HTTP ${r.status}`);
     }
+    return j;
+  }
+
+  // Clicking a job tile flips jobs.pm_id between this user's pmId and the
+  // "owned by someone else" state — the API closes any stale assignment row
+  // server-side so the change actually takes effect.
+  async function toggleJob(userPmId: string | null, job: JobOpt) {
+    if (!userPmId) {
+      setError("This user has no pmId — can't assign jobs. Set a pmId first.");
+      return;
+    }
+    const newPmId = job.pm_id === userPmId ? null : userPmId;
+    await withBusy(userPmId, async () => {
+      await postJson("PATCH", "/api/admin/jobs", { id: job.id, pm_id: newPmId });
+      router.refresh();
+    });
+  }
+
+  async function resetPassword(email: string) {
+    const next = window.prompt(
+      `New password for ${email}? (leave blank to cancel)`,
+      ""
+    );
+    if (!next) return;
+    await withBusy(email, async () => {
+      await postJson("PATCH", "/api/admin/users", { email, password: next });
+      router.refresh();
+      alert(`Password for ${email} set to: ${next}\n\n(Share this securely.)`);
+    });
+  }
+
+  async function toggleDisabled(email: string, currentlyDisabled: boolean) {
+    const verb = currentlyDisabled ? "re-enable" : "disable";
+    if (!window.confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${email}?`)) return;
+    await withBusy(email, async () => {
+      await postJson("PATCH", "/api/admin/users", {
+        email,
+        disabled: !currentlyDisabled,
+      });
+      router.refresh();
+    });
+  }
+
+  async function toggleRole(email: string, currentRole: "admin" | "pm") {
+    const newRole = currentRole === "admin" ? "pm" : "admin";
+    const msg =
+      newRole === "admin"
+        ? `Make ${email} an ADMIN? They'll see every job + this panel.`
+        : `Revoke admin from ${email}? They'll go back to seeing only their own jobs.`;
+    if (!window.confirm(msg)) return;
+    await withBusy(email, async () => {
+      await postJson("PATCH", "/api/admin/users", { email, role: newRole });
+      router.refresh();
+    });
+  }
+
+  async function removeUser(email: string) {
+    if (
+      !window.confirm(
+        `Remove ${email}? This only removes their overlay row. Seed users revert to defaults; overlay-only users are gone for good.`
+      )
+    )
+      return;
+    await withBusy(email, async () => {
+      await postJson(
+        "DELETE",
+        `/api/admin/users?email=${encodeURIComponent(email)}`
+      );
+      router.refresh();
+    });
   }
 
   return (
@@ -92,29 +137,79 @@ export function UsersAdminClient({
       <ul className="space-y-3">
         {users.map((u) => {
           const isAdminRow = u.role === "admin";
+          const isSelf = u.email.toLowerCase() === selfEmail.toLowerCase();
+          const disabled = u._disabled;
+          const busy = busyEmail === u.pmId || busyEmail === u.email;
           return (
             <li
               key={u.email}
-              className="border border-rule p-4"
-              data-busy={busyEmail === u.pmId}
+              className={
+                "border p-4 transition-all " +
+                (disabled
+                  ? "border-rule bg-sand/30 opacity-60"
+                  : "border-rule bg-paper")
+              }
             >
               <div className="flex items-baseline justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-head text-[15px] text-foreground">
                     {u.name}
+                    {isSelf && (
+                      <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.14em] text-accent">
+                        you
+                      </span>
+                    )}
+                    {disabled && (
+                      <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.14em] text-urgent">
+                        disabled
+                      </span>
+                    )}
                   </p>
                   <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
                     {u.email} · {u.role}
                     {u.pmId ? ` · pm:${u.pmId}` : ""}
+                    {u._seedOnly ? " · seed" : " · overlay"}
                   </p>
                 </div>
-                {!isAdminRow && (
+              </div>
+
+              {/* Inline admin actions row */}
+              <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-mono uppercase tracking-[0.14em]">
+                <button
+                  type="button"
+                  onClick={() => resetPassword(u.email)}
+                  disabled={busy}
+                  className="text-ink-3 hover:text-ink transition-colors disabled:opacity-50"
+                >
+                  Reset password
+                </button>
+                {!isSelf && (
+                  <button
+                    type="button"
+                    onClick={() => toggleDisabled(u.email, disabled)}
+                    disabled={busy}
+                    className="text-ink-3 hover:text-urgent transition-colors disabled:opacity-50"
+                  >
+                    {disabled ? "Re-enable" : "Disable"}
+                  </button>
+                )}
+                {!isSelf && (
+                  <button
+                    type="button"
+                    onClick={() => toggleRole(u.email, isAdminRow ? "admin" : "pm")}
+                    disabled={busy}
+                    className="text-ink-3 hover:text-accent transition-colors disabled:opacity-50"
+                  >
+                    {isAdminRow ? "Revoke admin" : "Make admin"}
+                  </button>
+                )}
+                {!isSelf && !u._seedOnly && (
                   <button
                     type="button"
                     onClick={() => removeUser(u.email)}
-                    className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-urgent transition-colors"
-                    disabled={busyEmail === u.pmId}
-                    title="Removes the overlay row; seed users revert to their default access."
+                    disabled={busy}
+                    className="text-ink-3 hover:text-urgent transition-colors disabled:opacity-50"
+                    title="Only deletes the overlay row (works on non-seed users)."
                   >
                     Remove
                   </button>
@@ -122,45 +217,51 @@ export function UsersAdminClient({
               </div>
 
               {isAdminRow ? (
-                <p className="mt-3 text-xs text-ink-2">
+                <p className="mt-4 text-xs text-ink-2">
                   Admin — sees every job.
                 </p>
               ) : !u.pmId ? (
-                <p className="mt-3 text-xs text-urgent">
+                <p className="mt-4 text-xs text-urgent">
                   No pmId set — can&apos;t assign jobs to this user.
                 </p>
               ) : (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {jobs.map((j) => {
-                    const on = j.pm_id === u.pmId;
-                    const otherPm = j.pm_id && j.pm_id !== u.pmId ? j.pm_id : null;
-                    return (
-                      <button
-                        key={j.id}
-                        type="button"
-                        disabled={busyEmail === u.pmId}
-                        onClick={() => toggleJob(u.pmId, j)}
-                        title={
-                          on
-                            ? "Click to unassign"
-                            : otherPm
-                              ? `Currently assigned to ${otherPm} — click to reassign`
-                              : "Click to assign"
-                        }
-                        className={
-                          "px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors border " +
-                          (on
-                            ? "border-accent bg-accent text-paper"
-                            : otherPm
-                              ? "border-rule text-ink-3 hover:border-ink-2"
-                              : "border-rule text-ink-2 hover:border-ink-2")
-                        }
-                      >
-                        {j.name}
-                        {otherPm ? ` (${otherPm})` : ""}
-                      </button>
-                    );
-                  })}
+                <div className="mt-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3 mb-2">
+                    Jobs · click to assign / unassign
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {jobs.map((j) => {
+                      const on = j.pm_id === u.pmId;
+                      const otherPm =
+                        j.pm_id && j.pm_id !== u.pmId ? j.pm_id : null;
+                      return (
+                        <button
+                          key={j.id}
+                          type="button"
+                          disabled={busy || disabled}
+                          onClick={() => toggleJob(u.pmId, j)}
+                          title={
+                            on
+                              ? "Click to unassign"
+                              : otherPm
+                                ? `Currently assigned to ${otherPm} — click to reassign here`
+                                : "Click to assign"
+                          }
+                          className={
+                            "px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors border " +
+                            (on
+                              ? "border-accent bg-accent text-paper"
+                              : otherPm
+                                ? "border-rule text-ink-3 hover:border-ink-2"
+                                : "border-rule text-ink-2 hover:border-ink-2")
+                          }
+                        >
+                          {j.name}
+                          {otherPm ? ` (${otherPm})` : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </li>
@@ -185,6 +286,7 @@ function AddUserForm({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [pmId, setPmId] = useState("");
+  const [password, setPassword] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,6 +313,7 @@ function AddUserForm({
           name,
           pmId: pmId || null,
           allowedJobs: Array.from(picked),
+          password: password || undefined,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -221,6 +324,7 @@ function AddUserForm({
       setEmail("");
       setName("");
       setPmId("");
+      setPassword("");
       setPicked(new Set());
       onAdded();
     } catch (err) {
@@ -231,13 +335,11 @@ function AddUserForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="border border-rule p-4 mt-2"
-    >
+    <form onSubmit={onSubmit} className="border border-rule p-4 mt-2">
       <h2 className="font-head text-[15px] text-foreground">Add a PM</h2>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
-        Password defaults to <span className="font-mono">password</span>
+        Password defaults to <span className="font-mono">password</span> if left blank.
+        A new pmId also auto-creates the PM record so jobs can be assigned.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -269,27 +371,56 @@ function AddUserForm({
         </label>
       </div>
 
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+            Link to existing PM record
+          </span>
+          <select
+            value={pmId}
+            onChange={(e) => setPmId(e.target.value)}
+            className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
+          >
+            <option value="">— or type a new pmId below —</option>
+            {pms.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name} ({p.id})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+            New pmId (if not linking)
+          </span>
+          <input
+            type="text"
+            value={pmId.startsWith("__") ? "" : pmId}
+            onChange={(e) =>
+              setPmId(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+            }
+            placeholder="sarah"
+            className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
+          />
+        </label>
+      </div>
+
       <label className="block mt-3">
         <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-          Link to existing PM record (optional)
+          Initial password (optional)
         </span>
-        <select
-          value={pmId}
-          onChange={(e) => setPmId(e.target.value)}
+        <input
+          type="text"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="leave blank for default 'password'"
           className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
-        >
-          <option value="">— none —</option>
-          {pms.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name} ({p.id})
-            </option>
-          ))}
-        </select>
+        />
       </label>
 
       <div className="mt-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3 mb-2">
-          Jobs this PM can see
+          Jobs this PM owns (sets jobs.pm_id)
         </p>
         <div className="flex flex-wrap gap-1.5">
           {jobs.map((j) => {

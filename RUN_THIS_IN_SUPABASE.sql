@@ -268,3 +268,9 @@ CREATE TABLE IF NOT EXISTS public.user_overlay (
 );
 CREATE INDEX IF NOT EXISTS user_overlay_email_lower_idx
     ON public.user_overlay (lower(email));
+
+-- Disabled flag: when true, the user can't sign in and disappears from
+-- visibility. Cleaner than deleting the seed user, which would require a
+-- code edit + redeploy.
+ALTER TABLE public.user_overlay
+    ADD COLUMN IF NOT EXISTS disabled boolean NOT NULL DEFAULT false;

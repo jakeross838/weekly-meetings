@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "pg";
+import { currentUser, isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -308,6 +309,10 @@ CREATE TABLE IF NOT EXISTS public.user_overlay (
 );
 CREATE INDEX IF NOT EXISTS user_overlay_email_lower_idx
     ON public.user_overlay (lower(email));
+
+-- Disabled flag: when true, user can't sign in (filtered out of getAllUsers).
+ALTER TABLE public.user_overlay
+    ADD COLUMN IF NOT EXISTS disabled boolean NOT NULL DEFAULT false;
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -317,6 +322,12 @@ function projectRefFromUrl(url: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  // Admin only — this route can rewrite the schema; never expose to PMs.
+  const u = await currentUser();
+  if (!isAdmin(u)) {
+    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  }
+
   let body: { db_password?: string } = {};
   try {
     body = await req.json();

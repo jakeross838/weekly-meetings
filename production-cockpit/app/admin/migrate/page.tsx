@@ -9,10 +9,16 @@
 
 import { Header } from "@/components/header";
 import { MigrateForm } from "./migrate-form";
+import { currentUser, isAdmin } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function MigratePage() {
+export default async function MigratePage() {
+  // Admin-only — this page can apply schema changes. Same gate as the API.
+  const u = await currentUser();
+  if (!u) redirect("/login?next=/admin/migrate");
+  if (!isAdmin(u)) notFound();
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />

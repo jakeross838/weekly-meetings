@@ -6,7 +6,7 @@
 import { Header } from "@/components/header";
 import { supabaseServer } from "@/lib/supabase";
 import { currentUser, isAdmin } from "@/lib/auth";
-import { getAllUsers } from "@/lib/user-store";
+import { getAllUsersIncludingDisabled } from "@/lib/user-store";
 import { redirect, notFound } from "next/navigation";
 import { UsersAdminClient } from "./users-admin-client";
 
@@ -28,7 +28,7 @@ export default async function AdminUsersPage() {
     pm_id: string | null;
   }[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
-  const users = await getAllUsers();
+  const users = await getAllUsersIncludingDisabled();
 
   return (
     <main className="max-w-[720px] mx-auto min-h-screen bg-background pb-24">
@@ -39,12 +39,18 @@ export default async function AdminUsersPage() {
           User access
         </h1>
         <p className="mt-2 text-ink-3 text-sm">
-          Each PM only sees their own jobs. Toggle access per user, or add a
-          new PM. Changes persist immediately.
+          Each PM only sees their own jobs. Click a job to assign or
+          re-assign it. Reset a password, disable an account, or grant admin
+          inline — changes persist immediately.
         </p>
       </div>
 
-      <UsersAdminClient users={users} jobs={jobs} pms={pms} />
+      <UsersAdminClient
+        users={users}
+        jobs={jobs}
+        pms={pms}
+        selfEmail={user.email}
+      />
     </main>
   );
 }

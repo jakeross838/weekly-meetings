@@ -98,64 +98,92 @@ export default async function ImportPage() {
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
-      <div className="px-5 pt-8">
-        <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
+      {/* Page hero — clear what this page is for */}
+      <div className="px-5 pt-10 pb-2">
+        <h1 className="font-head text-[32px] leading-none tracking-tight text-foreground">
           Import
         </h1>
-        <p className="mt-2 text-ink-3 text-sm">
-          Drop a Plaud meeting transcript or a Buildertrend daily-log JSON.
+        <p className="mt-3 text-ink-2 text-[15px] leading-relaxed">
+          This is where new information comes into the cockpit — meeting
+          notes from Plaud, daily logs and financials from Buildertrend.
+          Everything you drop here ends up on the job pages, the meeting
+          agenda, and the subs profiles.
         </p>
         {process.env.VERCEL === "1" && (
-          <div className="mt-4 border border-accent/40 bg-accent/5 px-3 py-2 text-xs text-ink-2 leading-relaxed">
-            <strong className="font-mono text-[10px] tracking-[0.18em] uppercase text-accent">
-              Heads up
+          <div className="mt-5 border border-accent/40 bg-accent/5 px-4 py-3 text-sm text-ink-2 leading-relaxed">
+            <strong className="block font-mono text-[10px] tracking-[0.18em] uppercase text-accent mb-1">
+              Heads up — you&apos;re on the deployed site
             </strong>
-            <span className="ml-2">
-              The Buildertrend pull buttons below only work from a local
-              cockpit — they spawn a Python scraper on your laptop. Run{" "}
-              <code className="font-mono">npm run dev</code> in{" "}
-              <code className="font-mono">production-cockpit/</code> and open
-              <code className="font-mono"> localhost:3000/import</code> to
-              actually pull. Clicking them on this deployed site will return
-              a &ldquo;requires local environment&rdquo; error.
-            </span>
+            The Buildertrend pull buttons below only work from your laptop
+            (they need to run a Python script that can&apos;t live on
+            Vercel). To actually pull, open the cockpit on your own
+            machine: <code className="font-mono text-[12px]">npm run dev</code>
+            {" "}in <code className="font-mono text-[12px]">production-cockpit/</code>
+            {" "}then go to <code className="font-mono text-[12px]">localhost:3000/import</code>.
+            Clicking the buttons here will pop a &ldquo;requires local
+            environment&rdquo; error.
           </div>
         )}
       </div>
 
-      {/* LAST PULLS & IMPORTS — recency at a glance */}
-      <section className="px-5 pt-6">
-        <div className="border border-rule p-4">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            Last pulls &amp; imports
-          </h2>
-          <div className="space-y-2 text-sm">
-            <HistoryRow label="Purchase orders" when={lastPoPull} count={poCount} unit="POs" />
-            <HistoryRow label="Change orders" when={lastCoPull} count={coCount} unit="COs" />
-            <HistoryRow label="Daily logs" when={lastDailyImport} count={dailyCount} unit="logs" />
-            <HistoryRow
-              label="Transcripts"
-              when={transcriptImports[0]?.date ?? null}
-              count={transcriptImports.length || null}
-              unit="files"
-            />
-          </div>
+      {/* SECTION 1 — Status check at the top */}
+      <Section
+        eyebrow="At a glance"
+        title="When did we last sync?"
+        description={
+          <>Quick health check. Each row shows when this source was last
+          pulled and how many records are currently in the system. If a
+          number looks stale, scroll down and pull again.</>
+        }
+      >
+        <div className="border border-rule bg-paper p-5 space-y-2.5 text-sm">
+          <HistoryRow label="Purchase orders" when={lastPoPull} count={poCount} unit="POs" />
+          <HistoryRow label="Change orders" when={lastCoPull} count={coCount} unit="COs" />
+          <HistoryRow label="Daily logs" when={lastDailyImport} count={dailyCount} unit="logs" />
+          <HistoryRow
+            label="Transcripts"
+            when={transcriptImports[0]?.date ?? null}
+            count={transcriptImports.length || null}
+            unit="files"
+          />
         </div>
-      </section>
+      </Section>
 
-      {/* TRANSCRIPT SECTION */}
-      <section className="px-5 pt-10">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Transcript
-        </h2>
-        <p className="text-xs text-ink-3 mb-4">
-          Plaud .txt — Claude extracts action items and writes them to the
-          to-do table. PM, job, date, and meeting type auto-fill from the
-          filename.{" "}
-          <Link href="/v2/upload" className="text-accent hover:underline">
-            v2 review pipeline →
-          </Link>
-        </p>
+      {/* SECTION 2 — Transcript */}
+      <Section
+        eyebrow="Meeting transcripts"
+        title="Drop a Plaud recording"
+        description={
+          <>
+            Upload the <code className="font-mono text-[12px]">.txt</code> file
+            from your Plaud recorder. Claude reads through it and pulls out
+            the action items — who said they&apos;d do what, by when. They land
+            in the to-do list on the right job. The PM, job name, date, and
+            meeting type are auto-detected from the filename.
+          </>
+        }
+        howItWorks={
+          <>
+            <p className="mb-2">
+              The text is sent to Claude with a strict schema (tool-use), so
+              the output is always structured action items — no risk of
+              malformed JSON. Filename pattern:{" "}
+              <code className="font-mono text-[11px]">
+                MM-DD &lt;Job&gt; &lt;Site|Office|Other&gt; Production Meeting-transcript.txt
+              </code>
+              .
+            </p>
+            <p>
+              For the newer review-queue flow (proposed changes before they
+              hit todos),{" "}
+              <Link href="/v2/upload" className="text-accent hover:underline">
+                use /v2/upload
+              </Link>{" "}
+              instead.
+            </p>
+          </>
+        }
+      >
         <TranscriptImportModal
           pms={pms}
           jobs={jobs}
@@ -163,27 +191,22 @@ export default async function ImportPage() {
           subs={subs}
           priorImports={priorImports}
         />
-
-        <p className="mt-4 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-3">
-          Naming · MM-DD &lt;Job&gt; &lt;Site|Office|Other&gt; Production
-          Meeting-transcript.txt
-        </p>
         {transcriptImports.length > 0 && (
-          <details className="mt-2">
+          <details className="mt-5">
             <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
-              Import history · {transcriptImports.length}
+              Transcript history · {transcriptImports.length}
             </summary>
-            <ul className="mt-1">
+            <ul className="mt-2 border border-rule bg-paper divide-y divide-rule">
               {transcriptImports.slice(0, 20).map((imp) => (
                 <li
                   key={imp.name}
-                  className="flex items-baseline justify-between gap-3 border-b border-rule-soft py-2 last:border-b-0"
+                  className="flex items-baseline justify-between gap-3 px-4 py-2.5"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-ink-2 text-sm">
                       {prettyImport(imp.name)}
                     </span>
-                    <span className="block truncate font-mono text-[10px] text-ink-3">
+                    <span className="block truncate font-mono text-[10px] text-ink-3 mt-0.5">
                       {imp.name}
                     </span>
                   </span>
@@ -195,29 +218,50 @@ export default async function ImportPage() {
             </ul>
           </details>
         )}
-      </section>
+      </Section>
 
-      {/* DAILY LOG SECTION */}
-      <section className="px-5 pt-16">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Daily logs
-        </h2>
-        <p className="text-xs text-ink-3 mb-4">
-          One-click button below logs into Buildertrend, downloads daily
-          logs + photos, writes to Supabase, and runs Claude vision over
-          the photos. Or drop a scraper JSON manually further down.
-        </p>
-        <div className="mb-6">
-          <BtSyncButton />
-        </div>
-        <details className="mb-6">
+      {/* SECTION 3 — Daily logs */}
+      <Section
+        eyebrow="Buildertrend daily logs"
+        title="Pull this week&rsquo;s field activity"
+        description={
+          <>
+            One click logs into Buildertrend, downloads every daily log + on-site
+            photos from the past two weeks, and writes it all to the cockpit.
+            Claude then looks at the photos and writes a short summary of what
+            was happening on site. After it&apos;s done you&apos;ll see fresh
+            crew counts, weather, photo summaries, and a refreshed timeline on
+            every job page.
+          </>
+        }
+        howItWorks={
+          <>
+            <p className="mb-2">
+              The button spawns a Python + Playwright scraper on your laptop
+              that hits BT&apos;s JSON API directly. Credentials are passed via
+              env vars and never persisted in the browser. The scraper output
+              upserts into <code className="font-mono text-[11px]">daily_logs</code>;
+              manually-edited fields are preserved on re-pull.
+            </p>
+            <p>
+              First-time login? Tick &ldquo;show browser&rdquo; in the modal
+              so you can complete the MFA prompt. The session sticks for ~2
+              weeks after that.
+            </p>
+          </>
+        }
+      >
+        <BtSyncButton />
+        <details className="mt-5">
           <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
-            Manual upload (advanced)
+            Already have a scraper JSON? Upload it manually
           </summary>
-          <div className="mt-3">
-            <p className="text-xs text-ink-3 mb-4">
-              Drop a Buildertrend scraper JSON — full week for every job.
-              Powers the no-show metric on{" "}
+          <div className="mt-3 text-sm text-ink-3 leading-relaxed">
+            <p className="mb-4">
+              If you ran the BT scraper outside the cockpit, drop the resulting{" "}
+              <code className="font-mono text-[11px]">daily-logs.json</code>{" "}
+              here. Same upsert logic as the one-click button. Powers the
+              no-show metric on{" "}
               <Link href="/subs" className="text-accent hover:underline">
                 /subs
               </Link>
@@ -226,25 +270,90 @@ export default async function ImportPage() {
             <DailyLogUploadForm />
           </div>
         </details>
-      </section>
+      </Section>
 
-      {/* PURCHASE ORDERS + CHANGE ORDERS SECTION */}
-      <section className="px-5 pt-16 pb-10">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Purchase orders &amp; change orders
-        </h2>
-        <p className="text-xs text-ink-3 mb-4">
-          One-click pulls from Buildertrend — purchase orders (cost, paid,
-          outstanding, status) and change orders — into Supabase. Both show on
-          each job page. PO grid pull is fast; tick &ldquo;include line
-          items&rdquo; for the full breakdown.
-        </p>
-        <div className="mb-6 flex flex-wrap gap-3">
+      {/* SECTION 4 — POs + COs */}
+      <Section
+        eyebrow="Buildertrend financials"
+        title="Pull purchase orders &amp; change orders"
+        description={
+          <>
+            Refresh the accounting view: every PO (committed cost, what&apos;s
+            been paid, what&apos;s still open) and every change order. After
+            it lands you&apos;ll see updated cost-breakdown bars on each pay
+            app and a fresh portfolio rollup at the top of the home page.
+          </>
+        }
+        howItWorks={
+          <>
+            <p className="mb-2">
+              The grid pull is fast (~30s for ~1,200 POs across the whole
+              portfolio). Tick &ldquo;include line items&rdquo; for the
+              detailed breakdown per PO, but pair it with a job filter — it
+              hits one request per PO and can take 10–30 minutes across the
+              whole portfolio.
+            </p>
+            <p>
+              Edits you make in the PO ledger survive future pulls — every
+              column you touch is added to{" "}
+              <code className="font-mono text-[11px]">manually_edited_fields</code>{" "}
+              and the upserter skips it on the next sync.
+            </p>
+          </>
+        }
+        bottomGap
+      >
+        <div className="flex flex-wrap gap-3">
           <BtPoSyncButton />
           <BtCoSyncButton />
         </div>
-      </section>
+      </Section>
     </main>
+  );
+}
+
+// Reusable section shell — eyebrow tag, big readable heading, plain-English
+// description, optional "How it works" expander, then the section's content.
+// Keeps every section on /import looking the same so the page reads as a
+// short list of distinct tasks, not a wall.
+function Section({
+  eyebrow,
+  title,
+  description,
+  howItWorks,
+  bottomGap,
+  children,
+}: {
+  eyebrow: string;
+  title: React.ReactNode;
+  description: React.ReactNode;
+  howItWorks?: React.ReactNode;
+  bottomGap?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`px-5 pt-12 ${bottomGap ? "pb-12" : ""}`}>
+      <div className="border-t border-rule pt-8">
+        <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-accent">
+          {eyebrow}
+        </p>
+        <h2 className="mt-2 font-head text-[22px] leading-tight tracking-tight text-foreground">
+          {title}
+        </h2>
+        <p className="mt-3 text-ink-2 text-sm leading-relaxed">{description}</p>
+        {howItWorks && (
+          <details className="mt-3">
+            <summary className="cursor-pointer inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 hover:text-ink py-1.5">
+              <span aria-hidden>ⓘ</span> How it works
+            </summary>
+            <div className="mt-2 text-ink-3 text-sm leading-relaxed border-l-2 border-rule pl-3">
+              {howItWorks}
+            </div>
+          </details>
+        )}
+        <div className="mt-6">{children}</div>
+      </div>
+    </section>
   );
 }
 

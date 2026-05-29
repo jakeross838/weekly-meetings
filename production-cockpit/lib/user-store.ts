@@ -16,6 +16,7 @@ interface OverlayRow {
   pm_id: string | null;
   allowed_jobs: string[] | null;
   password: string | null;
+  disabled: boolean | null;
 }
 
 function rowToUser(r: OverlayRow): User {
@@ -33,7 +34,7 @@ async function readOverlay(): Promise<OverlayRow[]> {
   const sb = supabaseServer();
   const { data, error } = await sb
     .from("user_overlay")
-    .select("email, name, role, pm_id, allowed_jobs, password");
+    .select("email, name, role, pm_id, allowed_jobs, password, disabled");
   if (error) {
     console.warn("[user-store] could not read user_overlay:", error.message);
     return [];
@@ -41,22 +42,72 @@ async function readOverlay(): Promise<OverlayRow[]> {
   return (data ?? []) as OverlayRow[];
 }
 
-// Merged users: seed + overlay. Overlay rows win by case-insensitive email.
+// Merged users for ACTIVE sign-in + visibility: disabled overlay rows are
+// excluded entirely. If a seed user has a disabled overlay, the seed user is
+// also excluded (the overlay disable wins). Used by login + page guards.
 export async function getAllUsers(): Promise<User[]> {
+  return (await getAllUsersIncludingDisabled()).filter((u) => !u._disabled).map(stripFlag);
+}
+
+// Same shape but includes the `_disabled` flag, so the admin panel can render
+// disabled users in the list (greyed out) while still letting an admin
+// re-enable them.
+export interface AdminUser extends User {
+  _disabled: boolean;
+  _seedOnly: boolean;
+}
+export async function getAllUsersIncludingDisabled(): Promise<AdminUser[]> {
   const overlay = await readOverlay();
   const overlayByEmail = new Map<string, OverlayRow>();
   for (const r of overlay) overlayByEmail.set(r.email.toLowerCase(), r);
-  const merged: User[] = USERS.map((seed) => {
+  const merged: AdminUser[] = USERS.map((seed) => {
     const r = overlayByEmail.get(seed.email.toLowerCase());
-    if (!r) return seed;
+    if (!r) return { ...seed, _disabled: false, _seedOnly: true };
     overlayByEmail.delete(seed.email.toLowerCase()); // consumed
-    return rowToUser({ ...r, email: seed.email }); // preserve casing
+    return {
+      ...rowToUser({ ...r, email: seed.email }),
+      _disabled: r.disabled === true,
+      _seedOnly: false,
+    };
   });
-  // Overlay-only users (not in seed) come after. Array.from() rather than
-  // direct `for…of overlayByEmail.values()` because Vercel's TS build target
-  // doesn't enable downlevelIteration for Map iterators.
-  Array.from(overlayByEmail.values()).forEach((r) => merged.push(rowToUser(r)));
+  Array.from(overlayByEmail.values()).forEach((r) =>
+    merged.push({
+      ...rowToUser(r),
+      _disabled: r.disabled === true,
+      _seedOnly: false,
+    })
+  );
   return merged;
+}
+
+function stripFlag(u: AdminUser): User {
+  const { _disabled, _seedOnly, ...rest } = u;
+  return rest as User;
+}
+
+// Helper: load (or insert seed-mirror of) the overlay row for an email so any
+// admin update has a row to write to. Returns the canonical email (preserved
+// casing) to use as the .eq() key in the subsequent UPDATE.
+async function ensureOverlayRow(email: string): Promise<string> {
+  const norm = email.trim().toLowerCase();
+  const seed = USERS.find((u) => u.email.toLowerCase() === norm);
+  const sb = supabaseServer();
+  const { data: existing } = await sb
+    .from("user_overlay")
+    .select("email")
+    .ilike("email", email.trim())
+    .maybeSingle();
+  if (existing) return (existing as { email: string }).email;
+  if (!seed) throw new Error(`No such user: ${email}`);
+  const { error } = await sb.from("user_overlay").insert({
+    email: seed.email,
+    name: seed.name,
+    role: seed.role,
+    pm_id: seed.pmId,
+    allowed_jobs: [],
+  });
+  if (error) throw new Error(error.message);
+  return seed.email;
 }
 
 export async function upsertUserAccess(
@@ -64,34 +115,46 @@ export async function upsertUserAccess(
   allowedJobs: string[]
 ): Promise<User> {
   const norm = email.trim().toLowerCase();
-  const seed = USERS.find((u) => u.email.toLowerCase() === norm);
+  const key = await ensureOverlayRow(email);
   const sb = supabaseServer();
-  // If an overlay row already exists, just update the allowed_jobs (preserve
-  // any prior name/role/pm_id edits). Otherwise seed the row from USERS.
-  const { data: existing } = await sb
+  const { error } = await sb
     .from("user_overlay")
-    .select("email")
-    .ilike("email", email.trim())
-    .maybeSingle();
-  if (existing) {
-    const { error } = await sb
-      .from("user_overlay")
-      .update({ allowed_jobs: allowedJobs, updated_at: new Date().toISOString() })
-      .eq("email", (existing as { email: string }).email);
-    if (error) throw new Error(error.message);
-  } else if (seed) {
-    const { error } = await sb.from("user_overlay").insert({
-      email: seed.email,
-      name: seed.name,
-      role: seed.role,
-      pm_id: seed.pmId,
-      allowed_jobs: allowedJobs,
-    });
-    if (error) throw new Error(error.message);
-  } else {
-    throw new Error(`No such user: ${email}`);
-  }
+    .update({ allowed_jobs: allowedJobs, updated_at: new Date().toISOString() })
+    .eq("email", key);
+  if (error) throw new Error(error.message);
   return (await getAllUsers()).find((u) => u.email.toLowerCase() === norm)!;
+}
+
+export async function setUserPassword(email: string, password: string): Promise<void> {
+  if (!password) throw new Error("password required");
+  const key = await ensureOverlayRow(email);
+  const sb = supabaseServer();
+  const { error } = await sb
+    .from("user_overlay")
+    .update({ password, updated_at: new Date().toISOString() })
+    .eq("email", key);
+  if (error) throw new Error(error.message);
+}
+
+export async function setUserDisabled(email: string, disabled: boolean): Promise<void> {
+  const key = await ensureOverlayRow(email);
+  const sb = supabaseServer();
+  const { error } = await sb
+    .from("user_overlay")
+    .update({ disabled, updated_at: new Date().toISOString() })
+    .eq("email", key);
+  if (error) throw new Error(error.message);
+}
+
+export async function setUserRole(email: string, role: Role): Promise<void> {
+  if (role !== "admin" && role !== "pm") throw new Error("role must be admin or pm");
+  const key = await ensureOverlayRow(email);
+  const sb = supabaseServer();
+  const { error } = await sb
+    .from("user_overlay")
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq("email", key);
+  if (error) throw new Error(error.message);
 }
 
 export async function createUser(input: {
@@ -99,27 +162,48 @@ export async function createUser(input: {
   name: string;
   pmId: string | null;
   allowedJobs: string[];
+  password?: string;
 }): Promise<User> {
   const norm = input.email.trim().toLowerCase();
   if (!norm.includes("@")) throw new Error("Invalid email");
-  const all = await getAllUsers();
+  const all = await getAllUsersIncludingDisabled();
   if (all.some((u) => u.email.toLowerCase() === norm)) {
     throw new Error("A user with that email already exists");
   }
   const sb = supabaseServer();
+  const cleanName = input.name.trim() || norm;
+  const pmId = input.pmId?.trim() || null;
   const { error } = await sb.from("user_overlay").insert({
     email: input.email.trim(),
-    name: input.name.trim() || norm,
+    name: cleanName,
     role: "pm",
-    pm_id: input.pmId?.trim() || null,
+    pm_id: pmId,
     allowed_jobs: input.allowedJobs,
+    password: input.password?.trim() || null,
   });
   if (error) throw new Error(error.message);
+
+  // Two-way sync: if the new user has a brand-new pmId that's not already in
+  // the `pms` table, insert it so the new PM shows up in dropdowns (e.g. on
+  // /admin/jobs) and on per-PM views. Idempotent via upsert on `id`.
+  if (pmId) {
+    const { error: pmErr } = await sb
+      .from("pms")
+      .upsert(
+        { id: pmId, full_name: cleanName, active: true },
+        { onConflict: "id", ignoreDuplicates: false }
+      );
+    if (pmErr) {
+      console.warn("[user-store] pms upsert failed (non-fatal):", pmErr.message);
+    }
+  }
+
   return (await getAllUsers()).find((u) => u.email.toLowerCase() === norm)!;
 }
 
 export async function deleteUser(email: string): Promise<void> {
-  // Seed users can't be hard-deleted — only their overlay row.
+  // Seed users can't be hard-deleted — only their overlay row. To revoke a
+  // seed user use setUserDisabled instead.
   const sb = supabaseServer();
   const { error } = await sb
     .from("user_overlay")
