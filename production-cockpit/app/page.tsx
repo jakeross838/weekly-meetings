@@ -251,7 +251,7 @@ export default async function Page({
         </div>
       )}
 
-      <ul className="mt-4">
+      <ul className="mt-4 stagger-children">
         {rows.length === 0 ? (
           <li className="px-5 py-16 text-center text-ink-3 text-sm">
             {pmFilter ? "No jobs for this PM." : "No jobs."}

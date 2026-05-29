@@ -102,7 +102,7 @@ export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
       {jobs.length === 0 ? (
         <p className="px-5 pt-10 text-ink-3 text-sm">No jobs in scope.</p>
       ) : (
-        <ol className="px-5 pt-6 pb-16 space-y-7">
+        <ol className="px-5 pt-6 pb-16 space-y-7 stagger-children">
           {jobs.map((j, i) => (
             <JobCard
               key={j.id}

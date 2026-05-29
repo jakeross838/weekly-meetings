@@ -146,7 +146,7 @@ export function UsersAdminClient({
         </a>
       </div>
 
-      <ul className="space-y-3">
+      <ul className="space-y-3 stagger-children">
         {users.map((u) => {
           const isAdminRow = u.role === "admin";
           const isSelf = u.email.toLowerCase() === selfEmail.toLowerCase();

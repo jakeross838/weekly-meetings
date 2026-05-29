@@ -88,7 +88,7 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
         </a>
       </div>
 
-      <ul className="space-y-3">
+      <ul className="space-y-3 stagger-children">
         {jobs.map((j) => (
           <JobRow
             key={j.id}

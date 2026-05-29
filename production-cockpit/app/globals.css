@@ -180,9 +180,117 @@ main { animation: fadeUp 300ms ease-out both; }
   animation: shimmer 1.4s linear infinite;
 }
 
+/* ───────────────── Brand accents + animations (2026-05-29 v4) ─────────────── */
+
+/* Slim brand gradient band, lives directly under <Header>. The gradient
+   uses oceanside → accent → ink → accent → oceanside so it has a clear
+   "highlight pass" that drifts left → right on a 12s loop. Subtle enough
+   to live under every page without distracting. */
+.brand-band {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--oceanside) 0%,
+    var(--accent)   30%,
+    var(--ink)      50%,
+    var(--accent)   70%,
+    var(--oceanside) 100%
+  );
+  background-size: 200% 100%;
+  animation: brandShift 14s ease-in-out infinite;
+  opacity: 0.85;
+}
+@keyframes brandShift {
+  0%, 100% { background-position:   0% 0; }
+  50%      { background-position: 200% 0; }
+}
+
+/* Diagonal soft-stripes texture overlay for hero strips — barely visible
+   but adds depth instead of flat color. Combine with bg-accent/10 etc. */
+.brand-texture {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 6%, transparent) 0px,
+    color-mix(in oklab, var(--accent) 6%, transparent) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
+/* Cascading fade-up for list items. Wrap a container in
+   `.stagger-children` and every direct child fades in with a small
+   increasing delay (capped at 12 items so we don't get tiny offsets). */
+.stagger-children > * {
+  animation: fadeUp 380ms ease-out both;
+}
+.stagger-children > *:nth-child(1)  { animation-delay:  40ms; }
+.stagger-children > *:nth-child(2)  { animation-delay:  80ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 160ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 240ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 280ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 320ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 360ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(11) { animation-delay: 440ms; }
+.stagger-children > *:nth-child(12) { animation-delay: 480ms; }
+
+/* Soft accent pulse — for the active "this is happening" element
+   (Pulling… / Saving… / etc.) */
+@keyframes accentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 35%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+.pulse-accent {
+  animation: accentPulse 1.6s ease-in-out infinite;
+}
+
+/* Gradient hover sheen for primary CTAs. Apply alongside bg-ink or
+   bg-accent; the sheen passes across on hover. */
+.cta-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.cta-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--paper) 22%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: transform 600ms ease;
+  pointer-events: none;
+}
+.cta-sheen:hover::after { transform: translateX(100%); }
+
+/* Soft gradient hero wash — for the top of pages that have a clear
+   "intro" block. Sits behind the headline. */
+.hero-wash {
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in oklab, var(--oceanside) 50%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      100% 70% at 100% 0%,
+      color-mix(in oklab, var(--accent) 18%, transparent) 0%,
+      transparent 55%
+    );
+}
+
 /* Respect the OS "reduce motion" setting. */
 @media (prefers-reduced-motion: reduce) {
   main { animation: none; }
   .skeleton { animation: none; }
+  .brand-band { animation: none; }
+  .stagger-children > * { animation: none; }
+  .pulse-accent { animation: none; }
+  .cta-sheen::after { transition: none; }
   a, button, summary, label, select { transition: none; }
 }

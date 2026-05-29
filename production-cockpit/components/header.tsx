@@ -11,7 +11,7 @@ import { currentUser } from "@/lib/auth";
 export async function Header() {
   const user = await currentUser();
   return (
-    <header className="border-b border-rule">
+    <header>
       <div className="max-w-[560px] mx-auto px-5 py-4 flex items-center justify-between gap-4">
         <Link
           href="/"
@@ -45,6 +45,8 @@ export async function Header() {
           {user && <UserPill name={user.name} role={user.role} />}
         </nav>
       </div>
+      {/* Slim brand gradient band — universal accent under every page. */}
+      <div className="brand-band" aria-hidden />
     </header>
   );
 }
