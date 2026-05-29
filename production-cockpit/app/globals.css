@@ -32,15 +32,14 @@
    slateTile is the primary ink, stoneBlue the accent, whiteSand the surface.
    Whitespace-forward, no grid pattern. */
 :root {
-  /* Page surface — whiteSand neutrals (official brand) — shifted 2026-05-29
-     to feel less stark / less tech-white. `--paper` is now a soft cream
-     instead of pure white (every card on every page reads warmer); the
-     page background goes one step deeper into the brand sand so cards
-     pop off it; rule color slightly deeper for cleaner edges. */
-  --paper:    #FBF8F1;     /* soft cream — was #FFFFFF (pure white) */
-  --background: #EFEBE0;   /* deeper sand — was #F7F5EF */
-  --sand:     #F1EDE2;     /* whiteSand — slightly deeper, sits between */
-  --sand-2:   #E6E0D2;     /* deeper whiteSand inset — was #ECE7DB */
+  /* Page surface — neutrals shifted COOL + lighter (2026-05-29 v3). The
+     warm-cream pass felt too brown; this version pushes toward the brand's
+     oceanside grey-blue and brightens everything so the app reads clean
+     and airy instead of muddy. Still distinctly not-stark-white. */
+  --paper:    #FBFCFD;     /* near-white with a faint cool blue tint */
+  --background: #ECEFF1;   /* light cool grey-blue page bg */
+  --sand:     #EBEEF0;     /* same family, sits one notch between paper + bg */
+  --sand-2:   #DDE1E3;     /* deeper grey-blue inset for tile fills */
 
   /* slateTile — primary ink (official brand dark) */
   --ink:      #3B5864;     /* primary text (slateTile) */
@@ -57,8 +56,8 @@
   --gold:     #B08D57;
 
   /* Hairlines — cooler, lighter than v2's drafting-tan */
-  --rule:     #D6D1C5;     /* deepened — was #E2DFD9 (too soft on cream cards) */
-  --rule-soft: #E1DDD2;    /* deepened — was #EDEBE5 */
+  --rule:     #CFD5D8;     /* cool grey-blue hairline (was warm #D6D1C5) */
+  --rule-soft: #DEE3E5;    /* cool soft hairline (was warm #E1DDD2) */
 
   /* Semantic */
   --urgent:   #A14F3D;
