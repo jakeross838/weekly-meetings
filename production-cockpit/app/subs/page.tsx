@@ -249,9 +249,9 @@ function SubRow({
               </span>
             )}
           </div>
-          {showReason && sub.flag_reasons?.[0] ? (
+          {showReason && sub.flag_note ? (
             <p className="mt-0.5 text-ink-3 text-xs leading-snug">
-              {sub.flag_reasons[0]}
+              {sub.flag_note}
             </p>
           ) : (
             sub.trade && (

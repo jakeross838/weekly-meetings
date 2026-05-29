@@ -14,7 +14,7 @@ export interface Sub extends SubEmbedded {
   aliases: string[] | null;
   jobs_performed: number | null;
   flagged_for_pm_binder: boolean;
-  flag_reasons: string[] | null;
+  flag_note: string | null;
   rating_basis: string[] | null;
   notes: string | null;
   updated_at: string;

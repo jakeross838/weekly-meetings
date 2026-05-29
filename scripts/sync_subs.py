@@ -179,23 +179,18 @@ def main():
             densities = [r["primary_density"] for r in rollup_entries if r.get("primary_density") is not None]
             avg_density = sum(densities) / len(densities) if densities else None
             jobs = max((r.get("jobs_performed", 0) or 0) for r in rollup_entries)
-            flagged = any(r.get("flag_for_pm_binder") for r in rollup_entries)
-            flag_reasons: list[str] = []
-            for r in rollup_entries:
-                if r.get("flag_for_pm_binder") and r.get("flag_reasons"):
-                    flag_reasons.extend(r["flag_reasons"])
             reliability = int(round(avg_density * 100)) if avg_density is not None else None
-            # Avg active days per (sub, phase, job) — pulled directly from the
-            # BT rollup data so we can show "this sub typically takes N days
-            # for this phase" without the density vocabulary.
             day_medians = [r.get("primary_active_days_median") for r in rollup_entries if r.get("primary_active_days_median")]
             avg_days = round(sum(day_medians) / len(day_medians), 1) if day_medians else None
         else:
             reliability = None
             jobs = None
-            flagged = False
-            flag_reasons = []
             avg_days = None
+        # The `flagged_for_pm_binder` flag is manual-only as of 2026-05-29 —
+        # Jake removed the auto-derived density / burst-rate flagging since the
+        # reason strings ("density 0.56 below 0.65 threshold") were opaque.
+        # We deliberately do NOT write `flagged_for_pm_binder` or `flag_note`
+        # here so manual values in Supabase survive a sync.
         rows.append({
             "id": slug,
             "name": entry["name"],
@@ -205,8 +200,6 @@ def main():
             "reliability_pct": reliability,
             "avg_days_per_job": avg_days,
             "jobs_performed": jobs,
-            "flagged_for_pm_binder": flagged,
-            "flag_reasons": flag_reasons[:5] or None,
             "rating_basis": basis,
         })
 

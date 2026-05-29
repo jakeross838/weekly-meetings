@@ -1,7 +1,9 @@
 // POST /api/subs/[id]/edit
-// Body: any of { name, trade, notes, flagged_for_pm_binder, aliases }.
+// Body: any of { name, trade, notes, flagged_for_pm_binder, flag_note, aliases }.
 // Subs are insert-only from the scraper (never overwritten), so no
 // manually_edited_fields needed. aliases accepts an array or comma string.
+// flag_note replaced the auto-derived flag_reasons array — a single human
+// sentence the PM types when flagging a sub.
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -9,7 +11,14 @@ import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED = new Set(["name", "trade", "notes", "flagged_for_pm_binder", "aliases"]);
+const ALLOWED = new Set([
+  "name",
+  "trade",
+  "notes",
+  "flagged_for_pm_binder",
+  "flag_note",
+  "aliases",
+]);
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = supabaseServer();

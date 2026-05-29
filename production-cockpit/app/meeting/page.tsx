@@ -43,7 +43,7 @@ type SubRow = {
   id: string;
   name: string;
   flagged_for_pm_binder: boolean;
-  flag_reasons: string[] | null;
+  flag_note: string | null;
 };
 
 export default async function MeetingPage({ searchParams }: { searchParams: SP }) {
@@ -61,7 +61,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         .in("status", OPEN_STATUSES as Status[]),
       supabase
         .from("subs")
-        .select("id, name, flagged_for_pm_binder, flag_reasons")
+        .select("id, name, flagged_for_pm_binder, flag_note")
         .eq("hidden", false),
       supabase.from("pms").select("id, full_name"),
       supabase
@@ -196,7 +196,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
           name: s?.name ?? sid,
           status: h.status,
           dotClass: h.dotClass,
-          reason: s?.flag_reasons?.[0] ?? null,
+          reason: s?.flag_note ?? null,
         };
       })
       .filter((s) => s.status !== "green")
