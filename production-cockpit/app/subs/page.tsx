@@ -8,6 +8,8 @@ import { Sub, OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
 import { Header } from "@/components/header";
 import { DeleteButton } from "@/components/delete-button";
+import { currentUser, canSeeJobByPm } from "@/lib/auth";
+import { RequestAccessCard } from "@/components/request-access-card";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +25,49 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  const [subsRes, openTodosRes] = await Promise.all([
+  const [subsRes, openTodosRes, jobsRes, assignRes] = await Promise.all([
     supabase.from("subs").select("*").eq("hidden", false),
     supabase
       .from("todos")
       .select("sub_id, due_date")
       .in("status", OPEN_STATUSES as Status[])
       .not("sub_id", "is", null),
+    supabase.from("jobs").select("id, pm_id"),
+    supabase
+      .from("job_pm_assignments")
+      .select("job_id, pm_id")
+      .is("ended_at", null),
   ]);
+
+  // Visibility gate: a non-admin who has no jobs assigned to them should see
+  // the same empty/"request access" state on /subs as they see on /. Subs
+  // is a portfolio-wide catalog; if they have no portfolio they shouldn't
+  // see it.
+  const user = await currentUser();
+  if (user && user.role !== "admin") {
+    const _assignPm = new Map<string, string>();
+    for (const a of (assignRes.data ?? []) as { job_id: string; pm_id: string }[]) {
+      _assignPm.set(a.job_id, a.pm_id);
+    }
+    const _visibleJobs = ((jobsRes.data ?? []) as { id: string; pm_id: string | null }[])
+      .filter((j) => canSeeJobByPm(user, _assignPm.get(j.id) ?? j.pm_id));
+    if (_visibleJobs.length === 0) {
+      return (
+        <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
+          <Header />
+          <div className="px-5 pt-8 pb-2">
+            <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
+              Subs
+            </h1>
+            <p className="mt-1 text-ink-3 text-sm">
+              You&apos;ll see the sub catalog once Jake grants you access.
+            </p>
+          </div>
+          <RequestAccessCard />
+        </main>
+      );
+    }
+  }
 
   const subs = (subsRes.data ?? []) as Sub[];
   const openTodos = (openTodosRes.data ?? []) as {

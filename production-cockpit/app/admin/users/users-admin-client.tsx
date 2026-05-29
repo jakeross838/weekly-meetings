@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/user-store";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 interface JobOpt {
   id: string;
@@ -100,56 +101,61 @@ export function UsersAdminClient({
     });
   }
 
-  async function resetPassword(email: string) {
-    const next = window.prompt(
-      `New password for ${email}? (leave blank to cancel)`,
-      ""
-    );
-    if (!next) return;
-    await withBusy(email, async () => {
-      await postJson("PATCH", "/api/admin/users", { email, password: next });
-      router.refresh();
-      alert(`Password for ${email} set to: ${next}\n\n(Share this securely.)`);
-    });
-  }
+  // All destructive admin actions go through the ConfirmModal — no more
+  // browser confirm/prompt that some users / browsers ignore.
+  type PendingAction =
+    | { kind: "password"; user: AdminUser }
+    | { kind: "disable"; user: AdminUser }
+    | { kind: "enable"; user: AdminUser }
+    | { kind: "make-admin"; user: AdminUser }
+    | { kind: "revoke-admin"; user: AdminUser }
+    | { kind: "remove"; user: AdminUser }
+    | null;
+  const [pending, setPending] = useState<PendingAction>(null);
 
-  async function toggleDisabled(email: string, currentlyDisabled: boolean) {
-    const verb = currentlyDisabled ? "re-enable" : "disable";
-    if (!window.confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${email}?`)) return;
-    await withBusy(email, async () => {
-      await postJson("PATCH", "/api/admin/users", {
-        email,
-        disabled: !currentlyDisabled,
-      });
-      router.refresh();
-    });
-  }
-
-  async function toggleRole(email: string, currentRole: "admin" | "pm") {
-    const newRole = currentRole === "admin" ? "pm" : "admin";
-    const msg =
-      newRole === "admin"
-        ? `Make ${email} an ADMIN? They'll see every job + this panel.`
-        : `Revoke admin from ${email}? They'll go back to seeing only their own jobs.`;
-    if (!window.confirm(msg)) return;
-    await withBusy(email, async () => {
-      await postJson("PATCH", "/api/admin/users", { email, role: newRole });
-      router.refresh();
-    });
-  }
-
-  async function removeUser(email: string) {
-    if (
-      !window.confirm(
-        `Remove ${email}? This only removes their overlay row. Seed users revert to defaults; overlay-only users are gone for good.`
-      )
-    )
-      return;
-    await withBusy(email, async () => {
-      await postJson(
-        "DELETE",
-        `/api/admin/users?email=${encodeURIComponent(email)}`
-      );
+  async function runPending(input?: string) {
+    if (!pending) return;
+    const u = pending.user;
+    await withBusy(u.email, async () => {
+      switch (pending.kind) {
+        case "password":
+          await postJson("PATCH", "/api/admin/users", {
+            email: u.email,
+            password: input,
+          });
+          break;
+        case "disable":
+          await postJson("PATCH", "/api/admin/users", {
+            email: u.email,
+            disabled: true,
+          });
+          break;
+        case "enable":
+          await postJson("PATCH", "/api/admin/users", {
+            email: u.email,
+            disabled: false,
+          });
+          break;
+        case "make-admin":
+          await postJson("PATCH", "/api/admin/users", {
+            email: u.email,
+            role: "admin",
+          });
+          break;
+        case "revoke-admin":
+          await postJson("PATCH", "/api/admin/users", {
+            email: u.email,
+            role: "pm",
+          });
+          break;
+        case "remove":
+          await postJson(
+            "DELETE",
+            `/api/admin/users?email=${encodeURIComponent(u.email)}`
+          );
+          break;
+      }
+      setPending(null);
       router.refresh();
     });
   }
@@ -268,22 +274,33 @@ export function UsersAdminClient({
                 </div>
               </div>
 
-              {/* Inline admin actions row */}
-              <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-mono uppercase tracking-[0.14em]">
+              {/* Inline admin actions row — real buttons, color-coded by
+                  consequence, each triggers a confirmation modal. */}
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => resetPassword(u.email)}
+                  onClick={() => setPending({ kind: "password", user: u })}
                   disabled={busy}
-                  className="text-ink-3 hover:text-ink transition-colors disabled:opacity-50"
+                  className="border border-rule bg-paper text-ink px-3 py-1.5 text-xs font-head hover:border-ink-2 hover:bg-oceanside/40 transition-colors disabled:opacity-50"
                 >
                   Reset password
                 </button>
                 {!isSelf && (
                   <button
                     type="button"
-                    onClick={() => toggleDisabled(u.email, disabled)}
+                    onClick={() =>
+                      setPending({
+                        kind: disabled ? "enable" : "disable",
+                        user: u,
+                      })
+                    }
                     disabled={busy}
-                    className="text-ink-3 hover:text-urgent transition-colors disabled:opacity-50"
+                    className={
+                      "border px-3 py-1.5 text-xs font-head transition-colors disabled:opacity-50 " +
+                      (disabled
+                        ? "border-success/40 bg-success/5 text-success hover:bg-success/10"
+                        : "border-urgent/40 bg-urgent/5 text-urgent hover:bg-urgent/10")
+                    }
                   >
                     {disabled ? "Re-enable" : "Disable"}
                   </button>
@@ -291,9 +308,14 @@ export function UsersAdminClient({
                 {!isSelf && (
                   <button
                     type="button"
-                    onClick={() => toggleRole(u.email, isAdminRow ? "admin" : "pm")}
+                    onClick={() =>
+                      setPending({
+                        kind: isAdminRow ? "revoke-admin" : "make-admin",
+                        user: u,
+                      })
+                    }
                     disabled={busy}
-                    className="text-ink-3 hover:text-accent transition-colors disabled:opacity-50"
+                    className="border border-accent/40 bg-accent/5 text-accent px-3 py-1.5 text-xs font-head hover:bg-accent/10 transition-colors disabled:opacity-50"
                   >
                     {isAdminRow ? "Revoke admin" : "Make admin"}
                   </button>
@@ -301,9 +323,9 @@ export function UsersAdminClient({
                 {!isSelf && !u._seedOnly && (
                   <button
                     type="button"
-                    onClick={() => removeUser(u.email)}
+                    onClick={() => setPending({ kind: "remove", user: u })}
                     disabled={busy}
-                    className="text-ink-3 hover:text-urgent transition-colors disabled:opacity-50"
+                    className="border border-urgent text-urgent bg-paper px-3 py-1.5 text-xs font-head hover:bg-urgent hover:text-paper transition-colors disabled:opacity-50"
                     title="Only deletes the overlay row (works on non-seed users)."
                   >
                     Remove
@@ -366,6 +388,100 @@ export function UsersAdminClient({
 
       <div id="add-pm" />
       <AddUserForm jobs={jobs} pms={pms} onAdded={() => router.refresh()} />
+
+      {/* Confirmation modal — one component renders all admin actions */}
+      <ConfirmModal
+        open={!!pending}
+        title={
+          pending?.kind === "password"
+            ? "Reset password"
+            : pending?.kind === "disable"
+              ? "Disable account"
+              : pending?.kind === "enable"
+                ? "Re-enable account"
+                : pending?.kind === "make-admin"
+                  ? "Promote to admin"
+                  : pending?.kind === "revoke-admin"
+                    ? "Revoke admin"
+                    : pending?.kind === "remove"
+                      ? "Remove user"
+                      : ""
+        }
+        subject={pending ? `${pending.user.name} · ${pending.user.email}` : ""}
+        body={
+          pending?.kind === "password" ? (
+            <>
+              Enter a new password for <strong>{pending.user.name}</strong>.
+              They&apos;ll need to use this password on their next sign-in —
+              share it with them out-of-band.
+            </>
+          ) : pending?.kind === "disable" ? (
+            <>
+              <strong>{pending.user.name}</strong> won&apos;t be able to sign
+              in. Any active browser session will stop working on next page
+              load. You can re-enable them later — nothing is deleted.
+            </>
+          ) : pending?.kind === "enable" ? (
+            <>
+              <strong>{pending.user.name}</strong> will be able to sign in
+              again using their existing password.
+            </>
+          ) : pending?.kind === "make-admin" ? (
+            <>
+              <strong>{pending.user.name}</strong> will see every job in the
+              portfolio AND get access to this admin panel — including the
+              ability to reset other people&apos;s passwords, disable users,
+              and run migrations. Only promote people you fully trust.
+            </>
+          ) : pending?.kind === "revoke-admin" ? (
+            <>
+              <strong>{pending.user.name}</strong> will lose access to the
+              admin panel and go back to seeing only their assigned jobs.
+              They keep their account.
+            </>
+          ) : pending?.kind === "remove" ? (
+            <>
+              This removes the overlay row for <strong>{pending.user.name}</strong>.
+              {pending.user._seedOnly
+                ? " (Seed user — they'll revert to defaults.)"
+                : " They'll lose their account entirely. To preserve the account but block sign-in, use Disable instead."}
+            </>
+          ) : null
+        }
+        confirmLabel={
+          pending?.kind === "password"
+            ? "Set new password"
+            : pending?.kind === "disable"
+              ? "Disable"
+              : pending?.kind === "enable"
+                ? "Re-enable"
+                : pending?.kind === "make-admin"
+                  ? "Yes, make admin"
+                  : pending?.kind === "revoke-admin"
+                    ? "Revoke admin"
+                    : pending?.kind === "remove"
+                      ? "Remove permanently"
+                      : ""
+        }
+        tone={
+          pending?.kind === "enable" || pending?.kind === "make-admin"
+            ? "accent"
+            : "urgent"
+        }
+        input={
+          pending?.kind === "password"
+            ? {
+                label: "New password",
+                type: "password",
+                placeholder: "min 6 characters",
+                minLength: 6,
+              }
+            : undefined
+        }
+        busy={busyEmail === pending?.user.email}
+        onCancel={() => setPending(null)}
+        onConfirm={runPending}
+      />
     </div>
   );
 }
