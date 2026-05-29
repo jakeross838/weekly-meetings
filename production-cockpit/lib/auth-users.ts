@@ -25,6 +25,20 @@ export const USERS: User[] = [
     allowedJobs: ["*"],
   },
   {
+    // Second admin login that uses Jake's actual Gmail address. On the Resend
+    // free tier, only emails to the account-owner address (jakeross838@gmail.com)
+    // are accepted — sending to jake@rossbuilt.com gets blocked with a
+    // validation_error until the rossbuilt.com domain is verified in Resend.
+    // Logging in as this user means forgot-password and other email flows
+    // actually land in the inbox.
+    email: "jakeross838@gmail.com",
+    password: "password",
+    name: "Jake Ross",
+    role: "admin",
+    pmId: null,
+    allowedJobs: ["*"],
+  },
+  {
     email: "bob@rossbuilt.com",
     password: "password",
     name: "Bob Mozine",
