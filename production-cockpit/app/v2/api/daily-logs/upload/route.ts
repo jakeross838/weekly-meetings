@@ -66,18 +66,26 @@ const CREW_LABELS_TO_STRIP = new Set([
   "Read more",
 ]);
 
+// Strip a trailing "(N)" headcount marker so the parsed crew name matches
+// the canonical sub record. BT's `crews` string field embeds counts like
+// "Watts Stucco (3); Drywall Co (4)" — without this, the auto-sub creator
+// would manufacture distinct rows ("Watts Stucco (3)" ≠ "Watts Stucco").
+function stripCount(name: string): string {
+  return name.replace(/\s*\(\d+\)\s*$/, "").trim();
+}
+
 function parseCrews(raw: string | undefined): string[] {
   if (!raw) return [];
   return raw
     .split(";")
-    .map((s) => s.trim())
+    .map((s) => stripCount(s.trim()))
     .filter((s) => s && !CREW_LABELS_TO_STRIP.has(s));
 }
 
 function pickCrews(rec: BTRecord): string[] {
   if (Array.isArray(rec.crews_clean) && rec.crews_clean.length > 0) {
     return rec.crews_clean
-      .map((s) => (s ?? "").trim())
+      .map((s) => stripCount((s ?? "").trim()))
       .filter((s) => s && !CREW_LABELS_TO_STRIP.has(s));
   }
   return parseCrews(rec.crews);
