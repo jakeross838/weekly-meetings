@@ -8,6 +8,7 @@
 
 import { supabaseServer } from "./supabase";
 import { USERS, type User, type Role } from "./auth-users";
+import { setJobPm } from "./job-assignments";
 
 interface OverlayRow {
   email: string;
@@ -199,6 +200,25 @@ export async function createUser(input: {
       );
     if (pmErr) {
       console.warn("[user-store] pms upsert failed (non-fatal):", pmErr.message);
+    }
+  }
+
+  // Actually move the picked jobs to this new PM. The form labels the toggle
+  // "Jobs this PM owns (sets jobs.pm_id)" — until this loop existed, that
+  // promise was a lie: the picked jobs were saved to user_overlay.allowed_jobs
+  // (a deprecated column nothing reads) and the new PM ended up with zero
+  // jobs visible. Now we use the shared setJobPm helper which writes BOTH
+  // jobs.pm_id and the job_pm_assignments row.
+  if (pmId && input.allowedJobs.length > 0) {
+    for (const jobId of input.allowedJobs) {
+      try {
+        await setJobPm(jobId, pmId);
+      } catch (e) {
+        console.warn(
+          `[user-store] could not assign job ${jobId} to ${pmId}:`,
+          e instanceof Error ? e.message : String(e)
+        );
+      }
     }
   }
 

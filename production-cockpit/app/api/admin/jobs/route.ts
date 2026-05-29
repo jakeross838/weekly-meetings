@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser, isAdmin } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { syncJobPmAssignment } from "@/lib/job-assignments";
 
 export const dynamic = "force-dynamic";
 
@@ -22,35 +23,6 @@ function bustJobCaches(jobId?: string) {
   revalidatePath("/admin");
   revalidatePath("/subs");
   if (jobId) revalidatePath(`/v2/job/${jobId}`);
-}
-
-// Close any active job_pm_assignments rows for this job and (optionally)
-// open a fresh one for the new pmId. Visibility logic on every page reads
-// `activePmByJob.get(j.id) ?? j.pm_id`, so without this step a stale
-// assignment row would silently override what admin sets in jobs.pm_id —
-// reassignments wouldn't actually move the job. Belt + suspenders: writes
-// both columns consistently.
-async function syncJobPmAssignment(jobId: string, newPmId: string | null) {
-  const sb = supabaseServer();
-  const today = new Date().toISOString().slice(0, 10);
-  // 1. Close any open assignments for this job.
-  const { error: closeErr } = await sb
-    .from("job_pm_assignments")
-    .update({ ended_at: today })
-    .eq("job_id", jobId)
-    .is("ended_at", null);
-  if (closeErr) {
-    console.warn("[admin/jobs] close stale assignments failed:", closeErr.message);
-  }
-  // 2. Open a fresh row for the new owner (unless we're unassigning).
-  if (newPmId) {
-    const { error: insErr } = await sb
-      .from("job_pm_assignments")
-      .insert({ job_id: jobId, pm_id: newPmId, assigned_at: today });
-    if (insErr) {
-      console.warn("[admin/jobs] insert new assignment failed:", insErr.message);
-    }
-  }
 }
 
 async function adminGuard() {

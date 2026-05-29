@@ -371,39 +371,32 @@ function AddUserForm({
         </label>
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-            Link to existing PM record
-          </span>
-          <select
-            value={pmId}
-            onChange={(e) => setPmId(e.target.value)}
-            className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
-          >
-            <option value="">— or type a new pmId below —</option>
-            {pms.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name} ({p.id})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-            New pmId (if not linking)
-          </span>
-          <input
-            type="text"
-            value={pmId.startsWith("__") ? "" : pmId}
-            onChange={(e) =>
-              setPmId(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
-            }
-            placeholder="sarah"
-            className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
-          />
-        </label>
-      </div>
+      <label className="block mt-3">
+        <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+          pmId
+        </span>
+        <input
+          type="text"
+          value={pmId}
+          onChange={(e) =>
+            setPmId(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+          }
+          list="pms-list"
+          placeholder="sarah  (pick existing or type a new one)"
+          className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent"
+        />
+        <datalist id="pms-list">
+          {pms.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.full_name}
+            </option>
+          ))}
+        </datalist>
+        <span className="mt-1 block font-mono text-[10px] text-ink-3">
+          Lowercase letters / digits / _ / - only. New pmIds also auto-create
+          a row in the <span className="font-mono">pms</span> table.
+        </span>
+      </label>
 
       <label className="block mt-3">
         <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
