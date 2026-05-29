@@ -76,6 +76,18 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
         </p>
       )}
 
+      <div className="flex items-baseline justify-between gap-3 pb-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+          {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+        </p>
+        <a
+          href="#add-job"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent hover:text-ink transition-colors"
+        >
+          + Add new job →
+        </a>
+      </div>
+
       <ul className="space-y-3">
         {jobs.map((j) => (
           <JobRow
@@ -89,6 +101,7 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
         ))}
       </ul>
 
+      <div id="add-job" />
       <AddJobForm pms={pms} onAdded={() => router.refresh()} />
     </div>
   );

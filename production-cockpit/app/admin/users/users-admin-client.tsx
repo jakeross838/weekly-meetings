@@ -134,6 +134,18 @@ export function UsersAdminClient({
         </p>
       )}
 
+      <div className="flex items-baseline justify-between gap-3 pb-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+          {users.length} {users.length === 1 ? "user" : "users"}
+        </p>
+        <a
+          href="#add-pm"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent hover:text-ink transition-colors"
+        >
+          + Add new PM →
+        </a>
+      </div>
+
       <ul className="space-y-3">
         {users.map((u) => {
           const isAdminRow = u.role === "admin";
@@ -269,6 +281,7 @@ export function UsersAdminClient({
         })}
       </ul>
 
+      <div id="add-pm" />
       <AddUserForm jobs={jobs} pms={pms} onAdded={() => router.refresh()} />
     </div>
   );
