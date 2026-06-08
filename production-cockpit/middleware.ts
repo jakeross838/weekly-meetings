@@ -11,7 +11,13 @@ import { SESSION_COOKIE } from "@/lib/auth-constants";
 // HMAC-SHA256 used by lib/auth.ts:sign(). Invalid signatures (e.g. a stale
 // cookie from before AUTH_SECRET was rotated) are treated as "no cookie".
 
-const PUBLIC_PREFIXES = ["/login", "/forgot", "/reset", "/signup", "/api", "/_next", "/favicon"];
+// Both /api/** AND /v2/api/** are internal server-to-server routes — they're
+// invoked by the BT sync route (and others) via fetch(origin/...), which
+// doesn't carry the browser session cookie. Gating them would 302 internal
+// requests to /login and the JSON parser on the caller side would then
+// silently fail on HTML response bodies. They use the Supabase service role
+// and are trusted-internal-only by design.
+const PUBLIC_PREFIXES = ["/login", "/forgot", "/reset", "/signup", "/api", "/v2/api", "/_next", "/favicon"];
 
 const DEV_FALLBACK_SECRET = "ross-built-dev-secret-please-change-me-now";
 

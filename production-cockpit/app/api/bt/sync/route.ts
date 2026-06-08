@@ -90,10 +90,12 @@ export async function POST(req: NextRequest) {
   const days = Number.isFinite(body.days) && body.days! > 0 ? body.days! : 14;
   const jobs = body.jobs?.trim() || "";
   const skipPhotos = Boolean(body.skipPhotos);
+  // 0 = no cap (scrape_api.py treats cap=0 as "download every photo"). Only
+  // honor a positive override; otherwise pull every photo on every log.
   const maxPhotos =
     Number.isFinite(body.maxPhotosPerLog) && body.maxPhotosPerLog! > 0
       ? body.maxPhotosPerLog!
-      : 6;
+      : 0;
   const extractVision = body.extractVision !== false;
 
   const scraperDir = process.env.BT_SCRAPER_DIR || DEFAULT_SCRAPER_DIR;

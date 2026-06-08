@@ -46,6 +46,11 @@ interface PORecord {
   cost_codes: string[];
   date_added: string | null;
   line_items: LineItem[];
+  // Incremental flag. Set by the scraper when it skipped the per-PO
+  // line-items detail call (because we already had them locally). When
+  // true the upload route MUST leave this PO's existing line items
+  // untouched — otherwise reconciliation would delete them all.
+  line_items_unchanged?: boolean;
 }
 
 function chunk<T>(arr: T[], n: number): T[][] {
@@ -192,8 +197,12 @@ export async function POST(req: NextRequest) {
   }
 
   // --- delete only CLEAN lines BT no longer returns (preserve hidden/edited) ---
+  // Skip POs flagged line_items_unchanged — the scraper didn't fetch line
+  // items for them, so an empty `line_items` array doesn't mean "BT dropped
+  // them," it means "we already have them." Deleting would be catastrophic.
   const toDeleteIds: string[] = [];
   for (const po of allPOs) {
+    if (po.line_items_unchanged) continue;
     const poId = idByBtId.get(po.bt_po_id);
     if (!poId) continue;
     const incoming = new Set(
@@ -209,9 +218,11 @@ export async function POST(req: NextRequest) {
   }
 
   // --- upsert incoming lines: skip hidden; omit edited columns ---
+  // Same incremental gate: a line_items_unchanged PO contributes no rows.
   const cleanLines: Record<string, unknown>[] = [];
   const editedLineRows: Record<string, unknown>[] = [];
   for (const po of allPOs) {
+    if (po.line_items_unchanged) continue;
     const poId = idByBtId.get(po.bt_po_id);
     if (!poId) continue;
     for (const li of po.line_items ?? []) {

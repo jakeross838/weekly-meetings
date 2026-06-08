@@ -22,6 +22,8 @@ import { NextRequest } from "next/server";
 import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
+import os from "os";
+import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // informational — route refuses on VERCEL=1
@@ -204,9 +206,42 @@ export async function POST(req: NextRequest) {
       let overallOk = true;
 
       // ─── Step 1: Daily logs ─────────────────────────────────────────
-      send({ kind: "step:start", step: "daily-logs", label: "Pulling daily logs" });
+      // Incremental: ask Supabase for the most recent log date we have, then
+      // tell the scraper to only pull logs on/after that day (minus a 2-day
+      // grace window to catch late edits). First run on an empty DB falls
+      // back to 14 days. --max-photos-per-log 0 means unlimited (all photos).
+      let dailySince = "";
+      try {
+        const sb = supabaseServer();
+        const { data } = await sb
+          .from("daily_logs")
+          .select("date")
+          .order("date", { ascending: false, nullsFirst: false })
+          .limit(1);
+        const maxDate = (data?.[0] as { date?: string } | undefined)?.date ?? null;
+        if (maxDate) {
+          const d = new Date(maxDate + "T00:00:00Z");
+          d.setUTCDate(d.getUTCDate() - 2);
+          dailySince = d.toISOString().slice(0, 10);
+        }
+      } catch {
+        // ignore — fall through to --days 14
+      }
 
-      const dailyArgs: string[] = ["--days", "14", "--max-photos-per-log", "6", "-v"];
+      send({
+        kind: "step:start",
+        step: "daily-logs",
+        label: dailySince
+          ? `Pulling daily logs since ${dailySince}`
+          : "Pulling daily logs (last 14 days)",
+      });
+
+      const dailyArgs: string[] = ["--max-photos-per-log", "0", "-v"];
+      if (dailySince) {
+        dailyArgs.push("--since", dailySince);
+      } else {
+        dailyArgs.push("--days", "14");
+      }
       if (headed) dailyArgs.push("--headed");
 
       const dailyRun = await runChild(
@@ -262,20 +297,46 @@ export async function POST(req: NextRequest) {
             overallOk = false;
           }
 
-          // Vision pass — best-effort. A vision failure shouldn't fail the step.
+          // Vision pass — loop until every new photo has a summary or we hit
+          // a safety cap. Each extract-photos call processes a batch; we keep
+          // calling it until `considered` comes back 0 (or the cap trips).
           if (dailyStep.ok) {
-            try {
-              const vR = await fetch(`${origin}/v2/api/daily-logs/extract-photos`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ limit: 30 }),
-              });
-              if (vR.ok) {
-                dailyStep.vision = (await vR.json().catch(() => null)) as StepDoneEvent["vision"];
+            let visionLoops = 0;
+            const MAX_LOOPS = 50; // 50 × ~30 photos ≈ 1,500 photos / run
+            let cumProcessed = 0;
+            let cumFailed = 0;
+            let cumConsidered = 0;
+            while (visionLoops < MAX_LOOPS) {
+              try {
+                const vR = await fetch(`${origin}/v2/api/daily-logs/extract-photos`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ limit: 30 }),
+                });
+                if (!vR.ok) break;
+                const v = (await vR.json().catch(() => null)) as {
+                  considered?: number;
+                  processed?: number;
+                  failed?: number;
+                } | null;
+                if (!v) break;
+                cumConsidered += v.considered ?? 0;
+                cumProcessed += v.processed ?? 0;
+                cumFailed += v.failed ?? 0;
+                visionLoops++;
+                // No more photos to consider → done.
+                if ((v.considered ?? 0) === 0) break;
+                // Made no progress on this batch → avoid infinite loop.
+                if ((v.processed ?? 0) === 0 && (v.failed ?? 0) === 0) break;
+              } catch {
+                break;
               }
-            } catch {
-              // ignore
             }
+            dailyStep.vision = {
+              considered: cumConsidered,
+              processed: cumProcessed,
+              failed: cumFailed,
+            };
           }
         } catch (e) {
           dailyStep.ok = false;
@@ -286,13 +347,59 @@ export async function POST(req: NextRequest) {
       }
 
       // ─── Step 2: Purchase orders (all jobs, with line items) ────────
+      // Incremental: collect bt_po_ids for which we already have ≥1 line
+      // item in Supabase. The scraper will pull the grid (PO totals) for
+      // every job, but skip the slow per-PO line-items fetch for IDs in
+      // this set — making repeat pulls fast while still grabbing line
+      // items for brand-new POs the first time we see them.
+      let knownPoIdsPath = "";
+      let knownPoCount = 0;
+      try {
+        const sb = supabaseServer();
+        // 1) collect po_ids that have at least one line item already
+        const { data: liData } = await sb
+          .from("po_line_items")
+          .select("po_id")
+          .limit(50000);
+        const poIdsWithLines = new Set<string>();
+        for (const r of (liData ?? []) as { po_id: string | null }[]) {
+          if (r.po_id) poIdsWithLines.add(r.po_id);
+        }
+        // 2) resolve those internal po_ids to bt_po_ids
+        const idSet = new Set<number>();
+        const idsArr = Array.from(poIdsWithLines);
+        for (let i = 0; i < idsArr.length; i += 500) {
+          const chunk = idsArr.slice(i, i + 500);
+          const { data: poData } = await sb
+            .from("purchase_orders")
+            .select("bt_po_id")
+            .in("id", chunk);
+          for (const r of (poData ?? []) as { bt_po_id: number | null }[]) {
+            if (typeof r.bt_po_id === "number") idSet.add(r.bt_po_id);
+          }
+        }
+        if (idSet.size > 0) {
+          knownPoIdsPath = path.join(
+            os.tmpdir(),
+            `bt-known-po-ids-${process.pid}-${Date.now()}.txt`,
+          );
+          await fs.writeFile(knownPoIdsPath, Array.from(idSet).join("\n"), "utf-8");
+          knownPoCount = idSet.size;
+        }
+      } catch {
+        // ignore — fall through to a full pull
+      }
+
       send({
         kind: "step:start",
         step: "purchase-orders",
-        label: "Pulling purchase orders (line items included)",
+        label: knownPoCount
+          ? `Pulling purchase orders (line items only for new POs — ${knownPoCount} already cached)`
+          : "Pulling purchase orders (line items for every PO — first run)",
       });
 
       const poArgs: string[] = ["-v"];
+      if (knownPoIdsPath) poArgs.push("--known-po-ids-file", knownPoIdsPath);
       if (headed) poArgs.push("--headed");
 
       const poRun = await runChild(
