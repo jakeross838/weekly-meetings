@@ -267,19 +267,24 @@ export async function POST(req: NextRequest) {
       let dailySince = "";
       try {
         const sb = supabaseServer();
-        const { data } = await sb
+        // DB column is log_date (the date the log was filed in BT), not date.
+        // The upload route writes `log_date: parseLogDate(r.date)`.
+        const { data, error } = await sb
           .from("daily_logs")
-          .select("date")
-          .order("date", { ascending: false, nullsFirst: false })
+          .select("log_date")
+          .order("log_date", { ascending: false, nullsFirst: false })
           .limit(1);
-        const maxDate = (data?.[0] as { date?: string } | undefined)?.date ?? null;
+        if (error) {
+          console.error("[bt/sync-all] max(log_date) query failed:", error.message);
+        }
+        const maxDate = (data?.[0] as { log_date?: string } | undefined)?.log_date ?? null;
         if (maxDate) {
           const d = new Date(maxDate + "T00:00:00Z");
           d.setUTCDate(d.getUTCDate() - 2);
           dailySince = d.toISOString().slice(0, 10);
         }
-      } catch {
-        // ignore — fall through to --days 14
+      } catch (e) {
+        console.error("[bt/sync-all] dailySince lookup threw:", e);
       }
 
       send({
