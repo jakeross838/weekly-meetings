@@ -209,7 +209,11 @@ export function BtImportAllButton() {
         }
       }
       setPassword("");
-      router.refresh();
+      // NOTE: deliberately not calling router.refresh() here. The user wants
+      // explicit control: the green "Update Supabase & refresh history"
+      // button below is what flips the "At a glance" dates above. Data
+      // already landed in Supabase during the run — the refresh just
+      // re-queries it so the page reflects reality.
     } catch (e) {
       setFatalError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -320,6 +324,34 @@ export function BtImportAllButton() {
                 </div>
               )}
 
+              {/* Explicit "saved to Supabase" success panel — appears only after a
+                  fully-successful run. Tells the user, in plain English, that
+                  every record landed in the database and gives them the button
+                  to commit the new "last sync" dates into the page they're
+                  looking at. */}
+              {doneEvent?.ok && (
+                <div className="border border-success bg-success/5 p-4 space-y-2">
+                  <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-success">
+                    ✓ Saved to Supabase
+                  </p>
+                  <ul className="text-sm text-ink-2 space-y-0.5">
+                    <li>
+                      Daily logs · {steps["daily-logs"].detail || "uploaded"}
+                    </li>
+                    <li>
+                      Purchase orders · {steps["purchase-orders"].detail || "uploaded"}
+                    </li>
+                    <li>
+                      Change orders · {steps["change-orders"].detail || "uploaded"}
+                    </li>
+                  </ul>
+                  <p className="text-xs text-ink-3 pt-1">
+                    Hit <strong>Update Supabase &amp; refresh history</strong>{" "}
+                    to flip the &ldquo;At a glance&rdquo; dates above to today.
+                  </p>
+                </div>
+              )}
+
               {fatalError && (
                 <div className="border border-urgent bg-urgent/5 p-3 text-sm text-urgent">
                   {fatalError}
@@ -336,20 +368,36 @@ export function BtImportAllButton() {
               >
                 {doneEvent ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={!canSubmit}
-                className="bg-ink text-paper px-5 py-2 text-sm font-medium disabled:opacity-50 hover:bg-accent transition-colors"
-              >
-                {busy
-                  ? "Pulling…"
-                  : doneEvent
-                    ? doneEvent.ok
-                      ? "Run again"
-                      : "Try again"
-                    : "Import all jobs"}
-              </button>
+              {/* Primary post-completion CTA — explicit "save / refresh
+                  history" button the user asked for. The save itself already
+                  happened during the stream; this button forces a
+                  router.refresh() so the page's "At a glance" panel
+                  re-queries Supabase and shows the new last-sync dates. */}
+              {doneEvent?.ok ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.refresh();
+                    closeAndClear();
+                  }}
+                  className="bg-success text-paper px-5 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  ✓ Update Supabase &amp; refresh history
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={!canSubmit}
+                  className="bg-ink text-paper px-5 py-2 text-sm font-medium disabled:opacity-50 hover:bg-accent transition-colors"
+                >
+                  {busy
+                    ? "Pulling…"
+                    : doneEvent
+                      ? "Try again"
+                      : "Import all jobs"}
+                </button>
+              )}
             </footer>
           </div>
         </div>
