@@ -28,6 +28,12 @@ import { supabaseServer } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // informational — route refuses on VERCEL=1
 
+// Module-level single-run lock. Avoids the chaos of two unified pulls
+// fighting over the same BT session (state.json) and spawning competing
+// Playwright instances. A second click while a run is in progress returns
+// a clear error event instead of starting a parallel scrape.
+let RUN_IN_PROGRESS = false;
+
 // Per-step child-process kill timers. Generous; BT can be slow.
 const DAILY_TIMEOUT_SEC = 1500; // ~25 min — 36 active jobs + photo downloads
 const PO_TIMEOUT_SEC = 2700; // ~45 min — ~1,200 POs × 1 line-items request each
@@ -180,6 +186,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  if (RUN_IN_PROGRESS) {
+    return singleLine({
+      kind: "error",
+      error:
+        "A BT sync is already in progress. Wait for it to finish, then click again. " +
+        "(Two concurrent pulls fight over the same BT session and corrupt state.)",
+    });
+  }
+
   let body: SyncBody = {};
   try {
     body = (await req.json()) as SyncBody;
@@ -220,6 +235,7 @@ export async function POST(req: NextRequest) {
   // Wipe the credential from this request's outer scope as soon as we no
   // longer need it (just before we close the stream).
   // The closures below capture the local `username`/`password` values.
+  RUN_IN_PROGRESS = true;
   const stream = new ReadableStream({
     async start(controller) {
       function send(event: Event) {
@@ -532,6 +548,28 @@ export async function POST(req: NextRequest) {
             jobsDone: poJobsDone,
             jobsTotal: poJobsTotal || undefined,
           });
+          return;
+        }
+        // Parallel line-item heartbeat from the 2-pass scraper. Lets the
+        // modal show "Line items: 150 / 1180 POs" instead of a frozen
+        // counter while the per-job loop has already finished but parallel
+        // fetches are still in flight.
+        const m3 = line.match(/\[INFO\] __main__: Line items: (\d+) \/ (\d+) POs/);
+        if (m3) {
+          send({
+            kind: "step:progress",
+            step: "purchase-orders",
+            message: `Fetching line items in parallel · ${m3[1]} / ${m3[2]} POs`,
+          });
+          return;
+        }
+        const m4 = line.match(/Fetching line items for (\d+) POs in parallel/);
+        if (m4) {
+          send({
+            kind: "step:progress",
+            step: "purchase-orders",
+            message: `Pass 2: parallel-fetching ${m4[1]} new POs' line items`,
+          });
         }
       };
 
@@ -706,6 +744,12 @@ export async function POST(req: NextRequest) {
       log("DONE", { overallOk, elapsedSec: Math.round((Date.now() - overallStart) / 1000) });
       send({ kind: "done", ok: overallOk, elapsedMs: Date.now() - overallStart });
       controller.close();
+      RUN_IN_PROGRESS = false;
+    },
+    cancel() {
+      // Client disconnected mid-stream. Release the lock so future clicks
+      // aren't permanently blocked.
+      RUN_IN_PROGRESS = false;
     },
   });
 
