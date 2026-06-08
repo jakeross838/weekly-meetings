@@ -1,6 +1,6 @@
 # Ross Built — Project State & Handoff
 
-**Last updated:** 2026-05-22 (autonomous session)
+**Last updated:** 2026-05-29 (auth + admin + brand session)
 **Read this first.** It's the single source of truth for where the project is and how to finish it.
 
 ---
@@ -82,17 +82,15 @@ That data then surfaces on **sub profiles** (crew size, inspections, timeline, p
 
 ---
 
-## 6. Deploy (HELD — your call; bigger than it looks)
+## 6. Deploy (LIVE — fully reconciled with origin/main)
 
-**Local `main` is 13 commits ahead of `origin/main`.** Your live Vercel site is running **old** code — it does NOT have the per-job AI summary, the Pull-from-Buildertrend button, the sub crew-size/checklist/vision features, or any of this session's fixes. All of that is committed locally but never deployed.
+As of 2026-05-29, `main` and `origin/main` are at the same commit (`a65fc72`) and Vercel
+auto-deploys from `main` — so everything in this document is live on
+production-cockpit.vercel.app. No held commits, no deploy gap. The May 22 "13 commits
+held" warning is resolved.
 
-I did **not** push, on purpose: an unsupervised production deploy of 13 commits of accumulated features to the tool your PMs use Monday morning is too high-stakes to do without you watching. It's **build-verified** (31 routes, 0 errors) and the prod Supabase schema is already applied, so it's ready — but you should be the one to pull the trigger:
-```powershell
-cd "P:\Claude Projects\weekly-meetings"
-git log --oneline origin/main..HEAD   # review the 13 commits first
-git push                              # triggers the Vercel production deploy
-```
-If anything looks off after deploy, Vercel's dashboard can instant-rollback to the current live build.
+If a future deploy needs a rollback, Vercel dashboard → Deployments → Promote a prior
+build. Don't `git push --force` to main.
 
 ---
 
@@ -143,6 +141,41 @@ Shipped 2026-05-22 (reliability hardening + full QA pass):
   cost-breakdown, category pills, check-off (+re-open), generate-summary;
   import BT modal; review queue + detail. One real bug (summary 502) found +
   fixed; BT scraper re-verified end-to-end (full pull → Supabase → vision → live).
+
+Shipped 2026-05-27 (real auth + admin hub + meeting UI polish):
+
+- ✅ **Real login + PM-scoped views** — moved off the user-overlay JSON to Supabase
+  (persists in prod). Visibility is driven by `jobs.pm_id` (not an overlay), with
+  `revalidatePath` on edits so PM changes show up immediately.
+- ✅ **/admin hub + /admin/jobs CRUD** — middleware verifies HMAC; an admin user
+  panel manages access.
+- ✅ **Meeting run-of-show redesign** — cards + color-coded buckets, roomier
+  layout, category sub-grouping.
+- ✅ **Import hardening** — cache-bust on PO/CO/log uploads, CO history visible,
+  local-only banner for clarity.
+- ✅ **BLUEPRINT.md** — comprehensive system extraction doc committed for handoff /
+  onboarding context.
+
+Shipped 2026-05-29 (auth go-live + admin reliability + brand v3):
+
+- ✅ **Self-signup with password + post-login "request access" flow** — new users
+  can register themselves; admin gates approval.
+- ✅ **Forgot-password + public signup with admin approval (Resend)** — email is
+  sent via Resend with a Supabase fallback if `RESEND_API_KEY` is missing.
+- ✅ **2nd admin added** (`jakeross838@gmail.com`) so Resend's free-tier
+  addressable-email rule doesn't block approval emails.
+- ✅ **7 admin sync bugs closed** in users/jobs/migrate flows; create-PM now
+  actually assigns the picked jobs; clearer `pmId` UI; real confirm modal +
+  bigger color-coded action buttons; `/subs` gated; Migrations card hidden from
+  the admin hub; "+ Add new" jump links above existing lists.
+- ✅ **Brand palette v3** — warmer base, cooler/lighter "oceanside grey-blue"
+  family; motion + blue brand band + staggered list reveals.
+- ✅ **Crew-name import fix** — strips trailing `(N)` headcount from crew names
+  so auto-sub creation matches canonical subs (no more duplicate "Acme (4)"
+  vs "Acme" subs).
+- ✅ **Manual sticky-note replaces auto density/burst-rate flag on subs** — the
+  derived signal was noisy; a human-written note is more honest and matches the
+  manual-wins philosophy.
 
 Still open — larger, need your editorial calls (don't build blind):
 
