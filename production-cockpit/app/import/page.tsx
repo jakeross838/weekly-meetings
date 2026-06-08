@@ -30,11 +30,12 @@ export default async function ImportPage() {
       .select("job_id, pm_id")
       .is("ended_at", null),
     supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
-    // Transcript import history — pull job_id too so we can render a per-job
-    // breakdown for each transcript (which jobs got todos out of it).
+    // Transcript import history — pull job too (it's a free-text job name on
+    // the todo row, not a FK) so we can render a per-job breakdown for each
+    // transcript (which jobs got todos out of it).
     supabase
       .from("todos")
-      .select("source_transcript, created_at, job_id")
+      .select("source_transcript, created_at, job")
       .not("source_transcript", "is", null)
       .order("created_at", { ascending: false })
       .limit(2000),
@@ -72,9 +73,8 @@ export default async function ImportPage() {
   const txTodos = (txRes.data ?? []) as {
     source_transcript: string | null;
     created_at: string;
-    job_id: string | null;
+    job: string | null;
   }[];
-  const jobNameById = new Map(jobs.map((j) => [j.id, j.name]));
   interface TxImport {
     name: string;
     date: string;
@@ -92,7 +92,7 @@ export default async function ImportPage() {
       importMap.set(name, ex);
     }
     ex.count += 1;
-    const jobLabel = t.job_id ? jobNameById.get(t.job_id) ?? t.job_id : "(no job)";
+    const jobLabel = t.job?.trim() || "(no job)";
     ex.byJob.set(jobLabel, (ex.byJob.get(jobLabel) ?? 0) + 1);
   }
   const transcriptImports = Array.from(importMap.values()).sort((a, b) =>
