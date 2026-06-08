@@ -31,7 +31,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 // Manual timeout used for the spawned child process. Independent of
 // `maxDuration` above so we control it without tripping any Next checks.
-const CHILD_TIMEOUT_SEC = 290;
+// BT now has ~36 active jobs (was 11 originally). At ~5–10s per job (more on
+// jobs with active photos), a full pull takes ~6–10 min. 20 min gives plenty
+// of headroom for slow days while still catching a truly hung scrape.
+const CHILD_TIMEOUT_SEC = 1200;
 
 const DEFAULT_SCRAPER_DIR = "C:\\Users\\Greg\\buildertrend-scraper";
 

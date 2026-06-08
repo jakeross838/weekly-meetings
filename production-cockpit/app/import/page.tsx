@@ -11,6 +11,7 @@ import { TranscriptImportModal } from "@/components/transcript-import-modal";
 import { BtSyncButton } from "@/components/bt-sync-button";
 import { BtPoSyncButton } from "@/components/bt-po-sync-button";
 import { BtCoSyncButton } from "@/components/bt-co-sync-button";
+import { BtImportAllButton } from "@/components/bt-import-all-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -220,93 +221,77 @@ export default async function ImportPage() {
         )}
       </Section>
 
-      {/* SECTION 3 — Daily logs */}
+      {/* SECTION 3 — Unified Buildertrend pull (daily logs + POs + COs) */}
       <Section
-        eyebrow="Buildertrend daily logs"
-        title="Pull this week&rsquo;s field activity"
+        eyebrow="Buildertrend"
+        title="Import everything from BT in one click"
         description={
           <>
-            One click logs into Buildertrend, downloads every daily log + on-site
-            photos from the past two weeks, and writes it all to the cockpit.
-            Claude then looks at the photos and writes a short summary of what
-            was happening on site. After it&apos;s done you&apos;ll see fresh
-            crew counts, weather, photo summaries, and a refreshed timeline on
-            every job page.
+            Logs into Buildertrend once and pulls daily logs (+ on-site photos),
+            every PO with line items, and every change order — for{" "}
+            <em>every active job</em>. New jobs (like a freshly-added{" "}
+            <code className="font-mono text-[11px]">Clark</code>) are auto-detected
+            from BT&apos;s job picker; nothing in the cockpit needs to be edited
+            per job.
           </>
         }
         howItWorks={
           <>
             <p className="mb-2">
-              The button spawns a Python + Playwright scraper on your laptop
-              that hits BT&apos;s JSON API directly. Credentials are passed via
-              env vars and never persisted in the browser. The scraper output
-              upserts into <code className="font-mono text-[11px]">daily_logs</code>;
-              manually-edited fields are preserved on re-pull.
+              Spawns a Python + Playwright scraper on your laptop that hits
+              BT&apos;s JSON API directly. Credentials live in the child process
+              env only (never persisted, never logged). The modal streams live
+              per-step progress: daily logs → POs → COs. Manually-edited columns
+              in any table are preserved on re-pull
+              (<code className="font-mono text-[11px]">manually_edited_fields</code>).
             </p>
             <p>
-              First-time login? Tick &ldquo;show browser&rdquo; in the modal
-              so you can complete the MFA prompt. The session sticks for ~2
-              weeks after that.
-            </p>
-          </>
-        }
-      >
-        <BtSyncButton />
-        <details className="mt-5">
-          <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
-            Already have a scraper JSON? Upload it manually
-          </summary>
-          <div className="mt-3 text-sm text-ink-3 leading-relaxed">
-            <p className="mb-4">
-              If you ran the BT scraper outside the cockpit, drop the resulting{" "}
-              <code className="font-mono text-[11px]">daily-logs.json</code>{" "}
-              here. Same upsert logic as the one-click button. Powers the
-              no-show metric on{" "}
-              <Link href="/subs" className="text-accent hover:underline">
-                /subs
-              </Link>
-              .
-            </p>
-            <DailyLogUploadForm />
-          </div>
-        </details>
-      </Section>
-
-      {/* SECTION 4 — POs + COs */}
-      <Section
-        eyebrow="Buildertrend financials"
-        title="Pull purchase orders &amp; change orders"
-        description={
-          <>
-            Refresh the accounting view: every PO (committed cost, what&apos;s
-            been paid, what&apos;s still open) and every change order. After
-            it lands you&apos;ll see updated cost-breakdown bars on each pay
-            app and a fresh portfolio rollup at the top of the home page.
-          </>
-        }
-        howItWorks={
-          <>
-            <p className="mb-2">
-              The grid pull is fast (~30s for ~1,200 POs across the whole
-              portfolio). Tick &ldquo;include line items&rdquo; for the
-              detailed breakdown per PO, but pair it with a job filter — it
-              hits one request per PO and can take 10–30 minutes across the
-              whole portfolio.
-            </p>
-            <p>
-              Edits you make in the PO ledger survive future pulls — every
-              column you touch is added to{" "}
-              <code className="font-mono text-[11px]">manually_edited_fields</code>{" "}
-              and the upserter skips it on the next sync.
+              First-time login? Tick &ldquo;Show browser window&rdquo; so you
+              can complete MFA. The session sticks for ~2 weeks after that.
+              A full pull takes ~10–20 minutes (POs with line items dominate).
             </p>
           </>
         }
         bottomGap
       >
-        <div className="flex flex-wrap gap-3">
-          <BtPoSyncButton />
-          <BtCoSyncButton />
-        </div>
+        <BtImportAllButton />
+
+        {/* Advanced — pull a single source (kept for surgical retries) */}
+        <details className="mt-6">
+          <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
+            Advanced — pull just one source
+          </summary>
+          <div className="mt-3 space-y-4 border-l-2 border-rule pl-4">
+            <p className="text-sm text-ink-3 leading-relaxed">
+              Use these if one source failed and you want to retry it alone
+              without re-pulling everything.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <BtSyncButton />
+              <BtPoSyncButton />
+              <BtCoSyncButton />
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
+                Already have a scraper JSON? Upload it manually
+              </summary>
+              <div className="mt-3 text-sm text-ink-3 leading-relaxed">
+                <p className="mb-4">
+                  If you ran the BT scraper outside the cockpit, drop the
+                  resulting{" "}
+                  <code className="font-mono text-[11px]">daily-logs.json</code>{" "}
+                  here. Same upsert logic as the one-click button. Powers the
+                  no-show metric on{" "}
+                  <Link href="/subs" className="text-accent hover:underline">
+                    /subs
+                  </Link>
+                  .
+                </p>
+                <DailyLogUploadForm />
+              </div>
+            </details>
+          </div>
+        </details>
       </Section>
     </main>
   );

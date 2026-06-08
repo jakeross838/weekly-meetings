@@ -171,13 +171,13 @@ export function BtPoSyncButton() {
 
               <div>
                 <label className="block font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-1.5">
-                  Jobs (optional)
+                  Filter jobs (optional · leave blank for ALL jobs)
                 </label>
                 <input
                   type="text"
                   value={jobs}
                   onChange={(e) => setJobs(e.target.value)}
-                  placeholder="all jobs — or e.g. Fish,Krauss"
+                  placeholder="e.g. Fish,Krauss"
                   disabled={busy}
                   className="w-full bg-paper border border-rule px-3 py-2 text-sm text-ink focus:outline-none focus:border-ink"
                 />
