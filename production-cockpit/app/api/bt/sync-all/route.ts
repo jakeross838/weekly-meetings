@@ -75,7 +75,14 @@ interface ErrorEvent {
   kind: "error";
   error: string;
 }
-type Event = StepStartEvent | StepDoneEvent | DoneEvent | ErrorEvent;
+interface StepProgressEvent {
+  kind: "step:progress";
+  step: StepName;
+  message: string;
+  jobsDone?: number;
+  jobsTotal?: number;
+}
+type Event = StepStartEvent | StepProgressEvent | StepDoneEvent | DoneEvent | ErrorEvent;
 
 function redact(text: string, password: string): string {
   if (!password) return text;
@@ -90,10 +97,12 @@ async function runChild(
   username: string,
   password: string,
   timeoutSec: number,
+  onStderrLine?: (line: string) => void,
 ): Promise<{ exitCode: number; stdout: string; stderr: string; elapsedMs: number }> {
   const startedAt = Date.now();
   let stdoutBuf = "";
   let stderrBuf = "";
+  let stderrLineBuf = "";
 
   const proc = spawn(pythonExe, [scriptPath, ...args], {
     cwd: scraperDir,
@@ -102,6 +111,11 @@ async function runChild(
       BT_USERNAME: username,
       BT_PASSWORD: password,
       PYTHONIOENCODING: "utf-8",
+      // Force unbuffered stdio so the per-job [INFO] lines arrive
+      // immediately. Without this, Python block-buffers stderr when it's a
+      // pipe (which it is here) and the modal would only see progress at
+      // ~8KB intervals — defeating the live progress UI.
+      PYTHONUNBUFFERED: "1",
     },
     shell: false,
   });
@@ -110,7 +124,16 @@ async function runChild(
     stdoutBuf += chunk.toString("utf-8");
   });
   proc.stderr.on("data", (chunk: Buffer) => {
-    stderrBuf += chunk.toString("utf-8");
+    const s = chunk.toString("utf-8");
+    stderrBuf += s;
+    if (!onStderrLine) return;
+    stderrLineBuf += s;
+    let nl: number;
+    while ((nl = stderrLineBuf.indexOf("\n")) >= 0) {
+      const line = stderrLineBuf.slice(0, nl).replace(/\r$/, "");
+      stderrLineBuf = stderrLineBuf.slice(nl + 1);
+      try { onStderrLine(line); } catch { /* ignore */ }
+    }
   });
 
   const killTimer = setTimeout(() => {
@@ -246,7 +269,7 @@ export async function POST(req: NextRequest) {
           : "Pulling daily logs (last 14 days)",
       });
 
-      const dailyArgs: string[] = ["--max-photos-per-log", "20", "-v"];
+      const dailyArgs: string[] = ["--max-photos-per-log", "10", "-v"];
       if (dailySince) {
         dailyArgs.push("--since", dailySince);
       } else {
@@ -254,6 +277,37 @@ export async function POST(req: NextRequest) {
       }
       if (headed) dailyArgs.push("--headed");
       log("daily-logs: starting", { since: dailySince || "(--days 14 fallback)" });
+
+      // Parse scrape_api.py stderr lines in real time so the modal can show
+      // per-job progress instead of a 10-min silent spinner.
+      //   "Scraping ALL N real active jobs"                     -> jobsTotal=N
+      //   "Bedi-...: 0 logs since 2026-05-25"                    -> progress tick
+      let dailyJobsDone = 0;
+      let dailyJobsTotal = 0;
+      const onDailyLine = (line: string) => {
+        const m1 = line.match(/Scraping ALL (\d+) real active jobs/);
+        if (m1) {
+          dailyJobsTotal = parseInt(m1[1], 10);
+          send({
+            kind: "step:progress",
+            step: "daily-logs",
+            message: `Discovered ${dailyJobsTotal} active jobs in BT`,
+            jobsTotal: dailyJobsTotal,
+          });
+          return;
+        }
+        const m2 = line.match(/\[INFO\] __main__: (.+?): (\d+) logs since/);
+        if (m2) {
+          dailyJobsDone += 1;
+          send({
+            kind: "step:progress",
+            step: "daily-logs",
+            message: `${m2[1]} · ${m2[2]} log${m2[2] === "1" ? "" : "s"}`,
+            jobsDone: dailyJobsDone,
+            jobsTotal: dailyJobsTotal || undefined,
+          });
+        }
+      };
 
       const dailyRun = await runChild(
         pythonExe,
@@ -263,6 +317,7 @@ export async function POST(req: NextRequest) {
         username,
         password,
         DAILY_TIMEOUT_SEC,
+        onDailyLine,
       );
       const dailyStderrTail = redact(dailyRun.stderr.slice(-3000), password);
 
@@ -420,6 +475,39 @@ export async function POST(req: NextRequest) {
       if (headed) poArgs.push("--headed");
 
       log("purchase-orders: starting", { knownPoCount, knownPoIdsPath });
+
+      // Per-job progress parser for scrape_po.py — matches lines like:
+      //   "Found N active jobs"
+      //   "Krauss-...: 23 POs · 145 line items"
+      //   "Krauss-...: 23 POs"   (when --skip-line-items)
+      let poJobsDone = 0;
+      let poJobsTotal = 0;
+      const onPoLine = (line: string) => {
+        const m1 = line.match(/Found (\d+) active jobs/);
+        if (m1) {
+          poJobsTotal = parseInt(m1[1], 10);
+          send({
+            kind: "step:progress",
+            step: "purchase-orders",
+            message: `Found ${poJobsTotal} active jobs · scanning POs`,
+            jobsTotal: poJobsTotal,
+          });
+          return;
+        }
+        const m2 = line.match(/\[INFO\] __main__: (.+?): (\d+) POs(?: · (\d+) line items)?/);
+        if (m2) {
+          poJobsDone += 1;
+          const li = m2[3] ? ` · ${m2[3]} line items` : "";
+          send({
+            kind: "step:progress",
+            step: "purchase-orders",
+            message: `${m2[1]} · ${m2[2]} PO${m2[2] === "1" ? "" : "s"}${li}`,
+            jobsDone: poJobsDone,
+            jobsTotal: poJobsTotal || undefined,
+          });
+        }
+      };
+
       const poRun = await runChild(
         pythonExe,
         scrapePo,
@@ -428,6 +516,7 @@ export async function POST(req: NextRequest) {
         username,
         password,
         PO_TIMEOUT_SEC,
+        onPoLine,
       );
       const poStderrTail = redact(poRun.stderr.slice(-3000), password);
       log("purchase-orders: scrape exit", {
@@ -495,6 +584,35 @@ export async function POST(req: NextRequest) {
       if (headed) coArgs.push("--headed");
 
       log("change-orders: starting");
+
+      // Per-job progress for scrape_co.py — matches "<JobName>: N change orders"
+      let coJobsDone = 0;
+      let coJobsTotal = 0;
+      const onCoLine = (line: string) => {
+        const m1 = line.match(/Found (\d+) active jobs/);
+        if (m1) {
+          coJobsTotal = parseInt(m1[1], 10);
+          send({
+            kind: "step:progress",
+            step: "change-orders",
+            message: `Found ${coJobsTotal} active jobs · scanning COs`,
+            jobsTotal: coJobsTotal,
+          });
+          return;
+        }
+        const m2 = line.match(/\[INFO\] __main__: (.+?): (\d+) change orders?/);
+        if (m2) {
+          coJobsDone += 1;
+          send({
+            kind: "step:progress",
+            step: "change-orders",
+            message: `${m2[1]} · ${m2[2]} change order${m2[2] === "1" ? "" : "s"}`,
+            jobsDone: coJobsDone,
+            jobsTotal: coJobsTotal || undefined,
+          });
+        }
+      };
+
       const coRun = await runChild(
         pythonExe,
         scrapeCo,
@@ -503,6 +621,7 @@ export async function POST(req: NextRequest) {
         username,
         password,
         CO_TIMEOUT_SEC,
+        onCoLine,
       );
       const coStderrTail = redact(coRun.stderr.slice(-3000), password);
       log("change-orders: scrape exit", {

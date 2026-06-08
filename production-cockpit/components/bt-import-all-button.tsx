@@ -23,6 +23,9 @@ interface StepState {
   status: StepStatus;
   label: string;
   detail: string;
+  progress?: string; // most recent per-job activity line ("Krauss · 9 logs")
+  jobsDone?: number;
+  jobsTotal?: number;
   error?: string;
   stderrTail?: string;
 }
@@ -39,6 +42,13 @@ interface StepStartEvent {
   kind: "step:start";
   step: StepName;
   label: string;
+}
+interface StepProgressEvent {
+  kind: "step:progress";
+  step: StepName;
+  message: string;
+  jobsDone?: number;
+  jobsTotal?: number;
 }
 interface StepDoneEvent {
   kind: "step:done";
@@ -67,7 +77,7 @@ interface ErrorEvent {
   kind: "error";
   error: string;
 }
-type Event = StepStartEvent | StepDoneEvent | DoneEvent | ErrorEvent;
+type Event = StepStartEvent | StepProgressEvent | StepDoneEvent | DoneEvent | ErrorEvent;
 
 export function BtImportAllButton() {
   const router = useRouter();
@@ -117,7 +127,17 @@ export function BtImportAllButton() {
     if (ev.kind === "step:start") {
       setSteps((prev) => ({
         ...prev,
-        [ev.step]: { ...prev[ev.step], status: "running", detail: ev.label },
+        [ev.step]: { ...prev[ev.step], status: "running", detail: ev.label, progress: undefined, jobsDone: undefined, jobsTotal: undefined },
+      }));
+    } else if (ev.kind === "step:progress") {
+      setSteps((prev) => ({
+        ...prev,
+        [ev.step]: {
+          ...prev[ev.step],
+          progress: ev.message,
+          jobsDone: ev.jobsDone ?? prev[ev.step].jobsDone,
+          jobsTotal: ev.jobsTotal ?? prev[ev.step].jobsTotal,
+        },
       }));
     } else if (ev.kind === "step:done") {
       const status: StepStatus = ev.ok ? "ok" : "fail";
@@ -339,12 +359,25 @@ export function BtImportAllButton() {
 }
 
 function StepRow({ step }: { step: StepState }) {
+  const showProgress = step.status === "running" && (step.progress || step.jobsTotal);
   return (
     <li className="flex items-start gap-3">
       <StepIndicator status={step.status} />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-foreground font-medium">{step.label}</p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-sm text-foreground font-medium">{step.label}</p>
+          {showProgress && step.jobsTotal ? (
+            <p className="font-mono text-[10px] tabular-nums text-accent shrink-0">
+              {step.jobsDone ?? 0} / {step.jobsTotal}
+            </p>
+          ) : null}
+        </div>
         <p className="text-xs text-ink-3 leading-snug">{step.detail}</p>
+        {showProgress && step.progress && (
+          <p className="mt-0.5 font-mono text-[11px] text-accent leading-snug truncate">
+            → {step.progress}
+          </p>
+        )}
         {step.error && (
           <p className="mt-1 text-xs text-urgent leading-snug">{step.error}</p>
         )}
