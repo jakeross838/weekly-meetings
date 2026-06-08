@@ -235,6 +235,27 @@ export async function POST(req: NextRequest) {
 
       let overallOk = true;
 
+      // Write a per-step failure dump for any non-zero scraper exit, mirroring
+      // the standalone routes. Lets us diagnose what BT replied with even
+      // after the modal closes / the stream ends.
+      async function dumpFailure(step: StepName, exitCode: number, elapsedSec: number, stderrTail: string, stdoutTail: string) {
+        try {
+          const fname = `last-failure-${step}.log`;
+          const dumpPath = path.join(scraperDir, ".session", fname);
+          await fs.mkdir(path.dirname(dumpPath), { recursive: true });
+          await fs.writeFile(
+            dumpPath,
+            `=== BT ${step} sync-all failure ${new Date().toISOString()} ===\n` +
+              `exit=${exitCode} elapsed=${elapsedSec}s\n\n` +
+              `--- stderr ---\n${stderrTail}\n\n--- stdout ---\n${stdoutTail}\n`,
+            "utf-8",
+          );
+          console.error(`[bt/sync-all] ${step} failed (exit ${exitCode}). dump at ${dumpPath}`);
+        } catch (e) {
+          console.error("[bt/sync-all] failed to write step failure dump:", e);
+        }
+      }
+
       // ─── Step 1: Daily logs ─────────────────────────────────────────
       // Incremental: ask Supabase for the most recent log date we have, then
       // tell the scraper to only pull logs on/after that day (minus a 2-day
@@ -341,6 +362,7 @@ export async function POST(req: NextRequest) {
       if (dailyRun.exitCode !== 0) {
         dailyStep.error = `scrape_api.py exited ${dailyRun.exitCode} after ${Math.round(dailyRun.elapsedMs / 1000)}s`;
         overallOk = false;
+        await dumpFailure("daily-logs", dailyRun.exitCode, Math.round(dailyRun.elapsedMs / 1000), dailyStderrTail, redact(dailyRun.stdout.slice(-3000), password));
         send(dailyStep);
       } else {
         try {
@@ -538,6 +560,7 @@ export async function POST(req: NextRequest) {
       if (poRun.exitCode !== 0) {
         poStep.error = `scrape_po.py exited ${poRun.exitCode} after ${Math.round(poRun.elapsedMs / 1000)}s`;
         overallOk = false;
+        await dumpFailure("purchase-orders", poRun.exitCode, Math.round(poRun.elapsedMs / 1000), poStderrTail, redact(poRun.stdout.slice(-3000), password));
         send(poStep);
       } else {
         try {
@@ -643,6 +666,7 @@ export async function POST(req: NextRequest) {
       if (coRun.exitCode !== 0) {
         coStep.error = `scrape_co.py exited ${coRun.exitCode} after ${Math.round(coRun.elapsedMs / 1000)}s`;
         overallOk = false;
+        await dumpFailure("change-orders", coRun.exitCode, Math.round(coRun.elapsedMs / 1000), coStderrTail, redact(coRun.stdout.slice(-3000), password));
         send(coStep);
       } else {
         try {
