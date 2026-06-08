@@ -245,10 +245,24 @@ export default async function ImportPage() {
               in any table are preserved on re-pull
               (<code className="font-mono text-[11px]">manually_edited_fields</code>).
             </p>
+            <p className="mb-2">
+              <strong>Note on the headed window:</strong> If you tick
+              &ldquo;Show browser window&rdquo; you&apos;ll see the Playwright
+              tab navigate to each BT page (DailyLogs → PurchaseOrders →
+              ChangeOrders), but the page won&apos;t visibly scroll or copy
+              text. That&apos;s by design — the data comes from JSON API
+              calls running in the background, not from screen-scraping. The
+              modal&apos;s 3-step progress UI is the real source of truth: a
+              spinning circle while a step runs, a green ✓ when records
+              upserted to Supabase, a red ✕ on failure.
+            </p>
             <p>
               First-time login? Tick &ldquo;Show browser window&rdquo; so you
               can complete MFA. The session sticks for ~2 weeks after that.
-              A full pull takes ~10–20 minutes (POs with line items dominate).
+              First full run takes ~10 min; subsequent runs are ~1–3 min
+              thanks to incremental fetching (daily logs from
+              <code className="font-mono text-[11px]"> max(date) − 2</code>,
+              PO line items skipped for IDs already in the DB).
             </p>
           </>
         }

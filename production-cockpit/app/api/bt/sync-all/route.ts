@@ -202,6 +202,13 @@ export async function POST(req: NextRequest) {
       function send(event: Event) {
         controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
       }
+      // Mirror every stream event to the dev-server console so we can see in
+      // the terminal what's happening on each step without screen-recording
+      // the modal.
+      function log(...parts: unknown[]) {
+        const t = Math.round((Date.now() - overallStart) / 1000);
+        console.log(`[bt/sync-all +${t}s]`, ...parts);
+      }
 
       let overallOk = true;
 
@@ -209,7 +216,10 @@ export async function POST(req: NextRequest) {
       // Incremental: ask Supabase for the most recent log date we have, then
       // tell the scraper to only pull logs on/after that day (minus a 2-day
       // grace window to catch late edits). First run on an empty DB falls
-      // back to 14 days. --max-photos-per-log 0 means unlimited (all photos).
+      // back to 14 days. We cap photos per log at 20 — plenty of context
+      // without letting one busy log dominate the whole run with sequential
+      // photo downloads (unlimited * 50 logs * ~25 photos = ~20min just on
+      // photos and was starving the PO/CO steps).
       let dailySince = "";
       try {
         const sb = supabaseServer();
@@ -236,13 +246,14 @@ export async function POST(req: NextRequest) {
           : "Pulling daily logs (last 14 days)",
       });
 
-      const dailyArgs: string[] = ["--max-photos-per-log", "0", "-v"];
+      const dailyArgs: string[] = ["--max-photos-per-log", "20", "-v"];
       if (dailySince) {
         dailyArgs.push("--since", dailySince);
       } else {
         dailyArgs.push("--days", "14");
       }
       if (headed) dailyArgs.push("--headed");
+      log("daily-logs: starting", { since: dailySince || "(--days 14 fallback)" });
 
       const dailyRun = await runChild(
         pythonExe,
@@ -265,6 +276,12 @@ export async function POST(req: NextRequest) {
         vision: null,
         stderrTail: dailyStderrTail,
       };
+
+      log("daily-logs: scrape exit", {
+        code: dailyRun.exitCode,
+        elapsedSec: Math.round(dailyRun.elapsedMs / 1000),
+        stderrTailFirst300: dailyStderrTail.slice(0, 300),
+      });
 
       if (dailyRun.exitCode !== 0) {
         dailyStep.error = `scrape_api.py exited ${dailyRun.exitCode} after ${Math.round(dailyRun.elapsedMs / 1000)}s`;
@@ -402,6 +419,7 @@ export async function POST(req: NextRequest) {
       if (knownPoIdsPath) poArgs.push("--known-po-ids-file", knownPoIdsPath);
       if (headed) poArgs.push("--headed");
 
+      log("purchase-orders: starting", { knownPoCount, knownPoIdsPath });
       const poRun = await runChild(
         pythonExe,
         scrapePo,
@@ -412,6 +430,11 @@ export async function POST(req: NextRequest) {
         PO_TIMEOUT_SEC,
       );
       const poStderrTail = redact(poRun.stderr.slice(-3000), password);
+      log("purchase-orders: scrape exit", {
+        code: poRun.exitCode,
+        elapsedSec: Math.round(poRun.elapsedMs / 1000),
+        stderrTailFirst300: poStderrTail.slice(0, 300),
+      });
 
       const poStep: StepDoneEvent = {
         kind: "step:done",
@@ -471,6 +494,7 @@ export async function POST(req: NextRequest) {
       const coArgs: string[] = ["-v"];
       if (headed) coArgs.push("--headed");
 
+      log("change-orders: starting");
       const coRun = await runChild(
         pythonExe,
         scrapeCo,
@@ -481,6 +505,11 @@ export async function POST(req: NextRequest) {
         CO_TIMEOUT_SEC,
       );
       const coStderrTail = redact(coRun.stderr.slice(-3000), password);
+      log("change-orders: scrape exit", {
+        code: coRun.exitCode,
+        elapsedSec: Math.round(coRun.elapsedMs / 1000),
+        stderrTailFirst300: coStderrTail.slice(0, 300),
+      });
 
       const coStep: StepDoneEvent = {
         kind: "step:done",
@@ -526,6 +555,7 @@ export async function POST(req: NextRequest) {
         send(coStep);
       }
 
+      log("DONE", { overallOk, elapsedSec: Math.round((Date.now() - overallStart) / 1000) });
       send({ kind: "done", ok: overallOk, elapsedMs: Date.now() - overallStart });
       controller.close();
     },
