@@ -30,13 +30,14 @@ export default async function ImportPage() {
       .select("job_id, pm_id")
       .is("ended_at", null),
     supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
-    // Transcript import history (derived from todos.source_transcript).
+    // Transcript import history — pull job_id too so we can render a per-job
+    // breakdown for each transcript (which jobs got todos out of it).
     supabase
       .from("todos")
-      .select("source_transcript, created_at")
+      .select("source_transcript, created_at, job_id")
       .not("source_transcript", "is", null)
       .order("created_at", { ascending: false })
-      .limit(1000),
+      .limit(2000),
     // Daily-log recency + total — enriched_at ≈ when last pulled/imported.
     supabase
       .from("daily_logs")
@@ -65,19 +66,34 @@ export default async function ImportPage() {
   const subs = (subsRes.data ?? []) as { id: string; name: string }[];
 
   // Group todos by source file into a transcript-import history; the same set
-  // (name + date) is handed to the form so it can flag a re-upload.
+  // (name + date) is handed to the form so it can flag a re-upload. Also
+  // tracks per-job breakdown (jobName -> count of todos created for it)
+  // so we can show "what transcripts hit what jobs" in the expanded view.
   const txTodos = (txRes.data ?? []) as {
     source_transcript: string | null;
     created_at: string;
+    job_id: string | null;
   }[];
-  const importMap = new Map<string, { name: string; date: string; count: number }>();
+  const jobNameById = new Map(jobs.map((j) => [j.id, j.name]));
+  interface TxImport {
+    name: string;
+    date: string;
+    count: number;
+    byJob: Map<string, number>;
+  }
+  const importMap = new Map<string, TxImport>();
   for (const t of txTodos) {
     const name = t.source_transcript;
     if (!name || name === "cockpit-import") continue;
     const date = (t.created_at ?? "").slice(0, 10);
-    const ex = importMap.get(name);
-    if (ex) ex.count += 1;
-    else importMap.set(name, { name, date, count: 1 });
+    let ex = importMap.get(name);
+    if (!ex) {
+      ex = { name, date, count: 0, byJob: new Map() };
+      importMap.set(name, ex);
+    }
+    ex.count += 1;
+    const jobLabel = t.job_id ? jobNameById.get(t.job_id) ?? t.job_id : "(no job)";
+    ex.byJob.set(jobLabel, (ex.byJob.get(jobLabel) ?? 0) + 1);
   }
   const transcriptImports = Array.from(importMap.values()).sort((a, b) =>
     b.date.localeCompare(a.date)
@@ -198,24 +214,54 @@ export default async function ImportPage() {
               Transcript history · {transcriptImports.length}
             </summary>
             <ul className="mt-2 border border-rule bg-paper divide-y divide-rule">
-              {transcriptImports.slice(0, 20).map((imp) => (
-                <li
-                  key={imp.name}
-                  className="flex items-baseline justify-between gap-3 px-4 py-2.5"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-ink-2 text-sm">
-                      {prettyImport(imp.name)}
-                    </span>
-                    <span className="block truncate font-mono text-[10px] text-ink-3 mt-0.5">
-                      {imp.name}
-                    </span>
-                  </span>
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
-                    {prettyDate(imp.date)} · {imp.count} item{imp.count === 1 ? "" : "s"}
-                  </span>
-                </li>
-              ))}
+              {transcriptImports.slice(0, 50).map((imp) => {
+                const meetingDate = extractMeetingDate(imp.name);
+                const jobsList = Array.from(imp.byJob.entries()).sort(
+                  (a, b) => b[1] - a[1],
+                );
+                return (
+                  <li key={imp.name} className="px-4 py-3 space-y-1.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-ink-2 text-sm font-medium">
+                          {prettyImport(imp.name)}
+                        </span>
+                        <span className="block truncate font-mono text-[10px] text-ink-3 mt-0.5">
+                          {imp.name}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-3 leading-tight">
+                        <span className="block">
+                          imported {prettyDate(imp.date)}
+                        </span>
+                        {meetingDate && (
+                          <span className="block text-accent">
+                            meeting {meetingDate}
+                          </span>
+                        )}
+                        <span className="block mt-0.5">
+                          {imp.count} item{imp.count === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                    </div>
+                    {/* Per-job breakdown — proves what jobs got todos out of
+                        this transcript. */}
+                    <ul className="flex flex-wrap gap-1.5 pt-1">
+                      {jobsList.map(([jobLabel, count]) => (
+                        <li
+                          key={jobLabel}
+                          className="inline-flex items-baseline gap-1 border border-rule bg-sand-2/30 px-2 py-0.5 text-[11px] text-ink-2"
+                        >
+                          <span>{jobLabel}</span>
+                          <span className="font-mono text-[9px] tabular-nums text-ink-3">
+                            {count}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
             </ul>
           </details>
         )}
@@ -367,6 +413,18 @@ function prettyDate(iso: string | null): string {
   const d = new Date(iso + "T00:00:00");
   if (Number.isNaN(d.getTime())) return iso;
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+// Pull a "Mon DD" meeting date out of the transcript filename, if it starts
+// with MM-DD (or MM/DD). Returns null when nothing parses.
+//   "05-18 Krauss Site Production Meeting-transcript.txt" -> "May 18"
+function extractMeetingDate(name: string): string | null {
+  const m = name.match(/^\s*(\d{1,2})[-_/](\d{1,2})\b/);
+  if (!m) return null;
+  const month = parseInt(m[1], 10);
+  const day = parseInt(m[2], 10);
+  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${MONTHS[month - 1]} ${day}`;
 }
 
 // Normalize a transcript filename into one consistent, easy-to-read label so
