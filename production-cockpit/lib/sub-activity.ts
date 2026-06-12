@@ -14,11 +14,13 @@
 // tests stay deterministic — no Date.now() in here.
 
 export interface DailyLogLite {
+  id?: string | null;
   log_date: string | null; // "YYYY-MM-DD"
   job_key: string; // "Fish-715 North Shore Dr"
   crews_present: string[] | null;
   absent_crews: string[] | null;
   activity: string | null; // "Tile/Trim/Drywall" — job-level day summary
+  notes?: string | null; // free-text daily-log notes (absence evidence)
 }
 
 export interface JobDays {
@@ -39,6 +41,10 @@ export interface CurrentJob {
 export interface AbsenceEvent {
   date: string;
   jobShort: string;
+  jobKey: string;
+  logId: string | null; // source daily_logs row id — the citation
+  activity: string | null; // what the site logged that day (context)
+  notes: string | null; // daily-log notes snippet (evidence)
 }
 
 export interface SubActivity {
@@ -162,7 +168,14 @@ export function aggregateSubActivity(
       const k = js + "|" + d;
       if (!seenAbs.has(k)) {
         seenAbs.add(k);
-        absences.push({ date: d, jobShort: js });
+        absences.push({
+          date: d,
+          jobShort: js,
+          jobKey: log.job_key,
+          logId: log.id ?? null,
+          activity: log.activity ?? null,
+          notes: log.notes ?? null,
+        });
       }
     }
   }

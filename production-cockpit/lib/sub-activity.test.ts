@@ -181,6 +181,27 @@ check("lastSeenDaysAgo is set relative to the anchor", () => {
   assert.equal(m.get("stucco")!.lastSeenDaysAgo, 0);
 });
 
+check("absence carries evidence (logId, activity, notes, jobKey)", () => {
+  const ev: DailyLogLite[] = [
+    {
+      id: "log-123",
+      log_date: "2026-06-05",
+      job_key: "Pou-109 Seagrape Ln",
+      crews_present: [PAINT],
+      absent_crews: [STUCCO],
+      activity: "Tile/Paint",
+      notes: "Activity Summary (...)\n\nStucco crew was a no-show today.",
+    },
+  ];
+  const a = aggregateSubActivity(ev, [STUCCO], { latest });
+  assert.equal(a.absences.length, 1);
+  const e = a.absences[0];
+  assert.equal(e.logId, "log-123");
+  assert.equal(e.jobKey, "Pou-109 Seagrape Ln");
+  assert.equal(e.activity, "Tile/Paint");
+  assert.ok((e.notes ?? "").includes("no-show"), "notes carried for citation");
+});
+
 if (failures.length > 0) {
   console.error(`\n${failures.length} FAILED, ${passed} passed:\n`);
   console.error(failures.join("\n\n"));

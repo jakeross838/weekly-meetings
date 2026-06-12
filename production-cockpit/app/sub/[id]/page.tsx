@@ -37,6 +37,14 @@ function daysBetween(a: string, b: string): number {
   );
 }
 
+// BT prepends a boilerplate "Activity Summary (...)" template to daily-log
+// notes; strip it so the absence evidence card shows only the real logged
+// context. Robust whether or not the prefix is followed by newlines.
+function stripActivityPrefix(s: string | null): string {
+  if (!s) return "";
+  return s.replace(/^Activity Summary\s*\([^)]*\)\s*/i, "").trim();
+}
+
 // crews_present / absent_crews are jsonb arrays. PostgREST's array-overlaps
 // operator (&&) does NOT work on jsonb ("operator does not exist: jsonb &&"),
 // so "row's array shares ANY name with `names`" is emulated with one jsonb
@@ -134,7 +142,7 @@ export default async function SubPage({
     // table not existing (pre-009) — aggregation just yields empties.
     supabase
       .from("daily_logs")
-      .select("log_date, job_key, crews_present, absent_crews, activity"),
+      .select("id, log_date, job_key, crews_present, absent_crews, activity, notes"),
   ]);
   const jobNameById: Record<string, string> = {};
   for (const j of ((jobsRes.data ?? []) as { id: string; name: string }[])) {
@@ -500,57 +508,162 @@ export default async function SubPage({
   const safetyItems = checklist.filter((c) => c.lens === "SAFETY");
   const scheduleItemsCk = checklist.filter((c) => c.lens === "SCHEDULE");
 
+  // Signature day-bars scale to this sub's busiest job. hasLive drives the
+  // pulsing live dot in the hero's "on site now" strip.
+  const maxJobDays = Math.max(1, ...activity.jobs.map((j) => j.days));
+  const hasLive = activity.currentJobs.some(
+    (j) => j.daysAgo <= FRESH_ON_SITE_DAYS
+  );
+
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
-      {/* Header — name + trade. Composite A-F rating removed per Jake's
-          request 2026-05-18 — facts in the metric tiles below are enough. */}
-      <header className="px-5 pt-8 pb-2">
+      {/* ── Command hero — identity + folded-in live "on site now" strip ── */}
+      <header className="relative overflow-hidden rounded-b-3xl hero-wash brand-texture px-5 pt-7 pb-8 shadow-[0_14px_34px_-22px_rgba(59,88,100,0.65)]">
         <Link
           href="/subs"
-          className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink"
+          className="relative inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-accent hover:text-ink"
         >
           ← Subs
         </Link>
-        <div className="mt-4">
-          <h1 className="font-head text-[28px] leading-none tracking-tight text-foreground">
-            <EditableText
-              value={sub.name}
-              field="name"
-              endpoint={`/api/subs/${sub.id}/edit`}
-              placeholder="sub name"
-              inputClassName="bg-paper border border-ink px-1 py-0.5 font-head text-[28px] leading-none tracking-tight text-ink focus:outline-none w-full min-w-0"
-            />
-          </h1>
-          <p className="mt-1.5 text-ink-3 text-sm">
+
+        <p className="relative mt-4 font-mono text-[10px] tracking-[0.24em] uppercase text-gold">
+          Subcontractor
+        </p>
+        <h1 className="relative mt-1 font-head text-[30px] leading-none tracking-tight text-ink">
+          <EditableText
+            value={sub.name}
+            field="name"
+            endpoint={`/api/subs/${sub.id}/edit`}
+            placeholder="sub name"
+            inputClassName="bg-paper border border-ink px-1 py-0.5 font-head text-[30px] leading-none tracking-tight text-ink focus:outline-none w-full min-w-0"
+          />
+        </h1>
+        <div className="relative mt-2 flex items-center gap-2 flex-wrap">
+          <span className="font-sans text-sm text-ink-2">
             <EditableText
               value={sub.trade}
               field="trade"
               endpoint={`/api/subs/${sub.id}/edit`}
               placeholder="add trade"
             />
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2">
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-paper/70 ring-1 ring-rule-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink">
             <span
               className={`h-2 w-2 rounded-full ${health.dotClass}`}
               aria-hidden
             />
-            <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2">
-              {health.label}
+            {health.label}
+          </span>
+        </div>
+
+        {/* Live on-site strip — folded into the hero. */}
+        <div className="relative mt-5 rounded-2xl bg-paper/80 ring-1 ring-rule-soft px-4 py-3">
+          <div className="flex items-center gap-2">
+            {hasLive && (
+              <span
+                className="h-2.5 w-2.5 rounded-full bg-success pulse-accent"
+                aria-hidden
+              />
+            )}
+            <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-accent">
+              On site now
             </span>
+            {latestLog && (
+              <span className="ml-auto font-mono text-[10px] tabular-nums text-ink-3">
+                log · {latestLog}
+              </span>
+            )}
           </div>
+          {activity.currentJobs.length > 0 ? (
+            <ul className="mt-2.5 flex flex-wrap gap-1.5">
+              {activity.currentJobs.map((j) => {
+                const fresh = j.daysAgo <= FRESH_ON_SITE_DAYS;
+                return (
+                  <li
+                    key={j.jobKey}
+                    className={`chip ${fresh ? "chip-live" : ""}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${fresh ? "bg-success" : "bg-ink-3"}`}
+                      aria-hidden
+                    />
+                    {j.jobShort}
+                    <span className="text-ink-3">
+                      {j.daysAgo === 0 ? "latest" : `${j.daysAgo}d`}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-ink-2">
+              {activity.lastSeen
+                ? `Last on site ${activity.lastSeen}.`
+                : "No daily-log presence on record."}
+            </p>
+          )}
         </div>
       </header>
 
-      {/* Edit & admin — notes, aliases, delete. Collapsed so it doesn't crowd
-          the profile; aliases feed the daily-log crew matching used above. */}
-      <section className="px-5 pt-4">
-        <details>
-          <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-2">
-            Edit details
+      {/* ── KPI tiles, floated up over the hero edge for layered depth ── */}
+      <section className="px-5 -mt-4 relative z-10">
+        <div className="grid grid-cols-3 gap-3 stagger-children">
+          <div className="kpi kpi-ink brand-texture text-paper card-lift">
+            <span className="font-mono text-[32px] font-semibold leading-none tabular-nums">
+              {openTodos.length}
+            </span>
+            <div className="mt-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper/80">
+              Open
+            </div>
+          </div>
+          <div
+            className={`kpi brand-texture card-lift ${
+              pastDue.length > 0 ? "kpi-urgent text-paper" : "kpi-quiet text-ink"
+            }`}
+          >
+            <span className="font-mono text-[32px] font-semibold leading-none tabular-nums">
+              {pastDue.length}
+            </span>
+            <div
+              className={`mt-2 font-mono text-[10px] tracking-[0.16em] uppercase ${
+                pastDue.length > 0 ? "text-paper/80" : "text-ink-2"
+              }`}
+            >
+              Past due
+            </div>
+          </div>
+          <div
+            className={`kpi brand-texture card-lift ${
+              noShowCount != null && noShowCount > 0
+                ? "kpi-urgent text-paper"
+                : "kpi-quiet text-ink"
+            }`}
+          >
+            <span className="font-mono text-[32px] font-semibold leading-none tabular-nums">
+              {noShowCount == null ? "—" : noShowCount}
+            </span>
+            <div
+              className={`mt-2 font-mono text-[10px] tracking-[0.16em] uppercase ${
+                noShowCount != null && noShowCount > 0
+                  ? "text-paper/80"
+                  : "text-ink-2"
+              }`}
+            >
+              Absences
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Edit & admin — notes, aliases, delete (collapsed). */}
+      <section className="px-5 pt-6">
+        <details className="group">
+          <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+            <span className="disc-mark text-accent">›</span> Edit details
           </summary>
-          <dl className="mt-2 grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 gap-y-2 text-sm">
+          <dl className="mt-3 grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 gap-y-2 text-sm">
             <dt className="self-start pt-1 font-mono text-[9px] uppercase tracking-wider text-ink-3">
               Notes
             </dt>
@@ -587,9 +700,8 @@ export default async function SubPage({
         </details>
       </section>
 
-      {/* Flag banner — manual toggle + single sticky-note sentence. Replaced
-          the auto-derived density / burst-rate math reasons (Jake 2026-05-29). */}
-      <section className="px-5 pt-5">
+      {/* Flag banner */}
+      <section className="px-5 pt-4">
         <FlagBanner
           subId={sub.id}
           flagged={sub.flagged_for_pm_binder}
@@ -597,144 +709,108 @@ export default async function SubPage({
         />
       </section>
 
-      {/* Four-metric tiles */}
-      <section className="px-5 pt-6">
-        <div className="grid grid-cols-3 gap-x-3 gap-y-6">
-          <Metric label="Open" value={openTodos.length} />
-          <Metric
-            label="Past due"
-            value={pastDue.length}
-            accent={pastDue.length > 0 ? "urgent" : undefined}
-          />
-          <Metric
-            label="Absences"
-            value={noShowCount == null ? "—" : noShowCount}
-            accent={
-              noShowCount != null && noShowCount > 0 ? "urgent" : undefined
-            }
-            sub={noShowCount == null ? "no log data" : "from daily logs"}
-          />
-        </div>
-      </section>
-
-      {/* On site now — jobs this sub appeared on inside the recency window of
-          the freshest daily log (so a lagging scrape still reads "on site"). */}
-      <section className="px-5 pt-8">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          On site now
-        </h2>
-        {activity.currentJobs.length > 0 ? (
-          <ul className="space-y-1.5">
-            {activity.currentJobs.map((j) => (
-              <li
-                key={j.jobKey}
-                className="flex items-baseline justify-between gap-3 py-1.5 border-b border-rule-soft last:border-b-0"
-              >
-                <span className="flex items-center gap-2 min-w-0 text-foreground text-sm">
-                  <span
-                    className={
-                      "shrink-0 h-1.5 w-1.5 rounded-full " +
-                      (j.daysAgo <= FRESH_ON_SITE_DAYS
-                        ? "bg-success"
-                        : "bg-ink-3")
-                    }
-                    aria-hidden
-                  />
-                  <span className="truncate">{j.jobShort}</span>
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-3">
-                  {j.daysAgo === 0 ? "latest log" : `${j.daysAgo}d ago`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-ink-3 text-sm">
-            {activity.lastSeen
-              ? `Not on an active job — last on site ${activity.lastSeen}.`
-              : "No daily-log presence on record."}
-          </p>
-        )}
-        {latestLog && (
-          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-            relative to latest daily log · {latestLog}
-          </p>
-        )}
-      </section>
-
-      {/* Days on jobs — distinct on-site days per job, labelled by the sub's
-          trade. This is the "how long did each phase take" view, e.g.
-          "Stucco · Fish 15d · Harlee 11d". Finer per-activity breakdown will
-          slot in here once daily logs tag activities per crew. */}
+      {/* ── Days on jobs — distinct on-site days per job as proportional bars,
+          labelled by trade. The "how long did each phase take" view. ── */}
       {activity.jobs.length > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            {sub.trade ? `${sub.trade} · days on jobs` : "Days on jobs"}
-          </h2>
-          <ul className="space-y-1">
-            {activity.jobs.map((j) => (
-              <li
-                key={j.jobKey}
-                className="flex items-baseline gap-3 py-1.5 border-b border-rule-soft last:border-b-0"
-              >
-                <span className="flex-1 min-w-0 truncate text-foreground text-sm">
-                  {j.jobShort}
-                </span>
-                <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
-                  {j.firstDate} – {j.lastDate}
-                </span>
-                <span className="shrink-0 w-10 text-right font-mono text-sm tabular-nums text-ink">
-                  {j.days}d
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-            distinct on-site days from BT daily logs · {activity.totalDays}{" "}
-            total
+        <section className="px-5 pt-9">
+          <SectionHeader
+            title={sub.trade ? `${sub.trade} · days on jobs` : "Days on jobs"}
+            right={`${activity.totalDays} total`}
+          />
+          <div className="card-surface card-lift p-4 mt-3">
+            <ul className="space-y-3.5 stagger-children">
+              {activity.jobs.map((j) => (
+                <li key={j.jobKey}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-head text-sm text-ink truncate">
+                      {j.jobShort}
+                    </span>
+                    <span className="shrink-0 font-mono text-[13px] font-medium tabular-nums text-ink">
+                      {j.days}
+                      <span className="text-ink-3 text-[11px]">d</span>
+                    </span>
+                  </div>
+                  <div className="mt-1.5 jobbar-track">
+                    <div
+                      className="jobbar-fill"
+                      style={{
+                        width: `${Math.max(6, (j.days / maxJobDays) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 font-mono text-[10px] tabular-nums text-ink-3">
+                    {j.firstDate} – {j.lastDate}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="mt-2 text-[10px] font-mono tracking-[0.16em] uppercase text-ink-3">
+            distinct on-site days from BT daily logs
           </p>
         </section>
       )}
 
-      {/* Absences — the actual no-show events behind the metric tile. */}
+      {/* ── Absences — each a cited evidence card from the source daily log ── */}
       {activity.absences.length > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-urgent mb-3">
-            Absences · {activity.absenceCount}
-          </h2>
-          <ul className="space-y-1">
-            {activity.absences.slice(0, 30).map((a, i) => (
-              <li
-                key={i}
-                className="flex items-baseline justify-between gap-3 py-1 border-b border-rule-soft last:border-b-0"
-              >
-                <span className="min-w-0 truncate text-sm text-foreground">
-                  {a.jobShort}
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-3">
-                  {a.date}
-                </span>
-              </li>
-            ))}
-            {activity.absences.length > 30 && (
-              <li className="text-center font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 pt-2">
-                + {activity.absences.length - 30} more
+        <section className="px-5 pt-9">
+          <SectionHeader title={`Absences · ${activity.absenceCount}`} urgent />
+          <ul className="mt-3 space-y-3 stagger-children">
+            {activity.absences.slice(0, 12).map((a, i) => {
+              const ctx = stripActivityPrefix(a.notes) || a.activity || "";
+              return (
+                <li key={i} className="incident card-lift p-4 pl-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-head text-[15px] text-ink truncate">
+                        {a.jobShort}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] tracking-[0.1em] uppercase">
+                        <span className="text-ink-2">
+                          <span className="text-ink-3">date</span> {a.date}
+                        </span>
+                        {a.logId && (
+                          <span className="text-ink-2">
+                            <span className="text-ink-3">log</span> #
+                            {a.logId.slice(0, 8)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="chip chip-urgent shrink-0">absent</span>
+                  </div>
+                  <p className="evidence-quote mt-3 pl-3 text-sm text-ink-2">
+                    BT marked this crew expected but absent.
+                  </p>
+                  {ctx && (
+                    <div className="mt-3 rounded-lg bg-paper/70 ring-1 ring-rule-soft px-3 py-2">
+                      <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-3">
+                        Logged that day
+                      </p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                        {ctx}
+                      </p>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {activity.absences.length > 12 && (
+              <li className="text-center font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 pt-1">
+                + {activity.absences.length - 12} more cited in the daily logs
               </li>
             )}
           </ul>
-          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
-            logged when BT marked this crew expected but absent
-          </p>
         </section>
       )}
 
       {/* Specialties — auto + manual */}
-      <section className="px-5 pt-10">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Specialties · {specialtyRows.length}
-        </h2>
-        <SpecialtiesEditor subId={sub.id} rows={specialtyRows} />
-        <p className="mt-3 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+      <section className="px-5 pt-9">
+        <SectionHeader title={`Specialties · ${specialtyRows.length}`} />
+        <div className="card-surface p-4 mt-3">
+          <SpecialtiesEditor subId={sub.id} rows={specialtyRows} />
+        </div>
+        <p className="mt-2 text-[10px] font-mono tracking-[0.16em] uppercase text-ink-3">
           auto entries come from daily logs · manual entries are declared ·{" "}
           <span className="text-accent">≈</span> shows canonical schedule item
         </p>
@@ -744,20 +820,18 @@ export default async function SubPage({
           doesn't tie inspections to a single crew, so we surface every
           inspection from days this sub was on site. */}
       {inspectionRows.length > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            Inspections · {inspectionRows.length}
-          </h2>
-          <ul className="space-y-1.5">
+        <section className="px-5 pt-9">
+          <SectionHeader title={`Inspections · ${inspectionRows.length}`} />
+          <ul className="card-surface p-4 mt-3 divide-y divide-rule-soft">
             {inspectionRows.slice(0, 20).map((r, i) => (
               <li
                 key={i}
-                className="flex items-baseline justify-between gap-3 py-1 border-b border-rule-soft last:border-b-0"
+                className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
               >
-                <span className="text-sm text-foreground leading-snug flex-1 min-w-0">
+                <span className="text-sm text-ink leading-snug flex-1 min-w-0">
                   {r.text}
                 </span>
-                <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-2">
                   {r.date ?? "—"} · {r.job}
                 </span>
               </li>
@@ -768,33 +842,32 @@ export default async function SubPage({
               </li>
             )}
           </ul>
-          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+          <p className="mt-2 text-[10px] font-mono tracking-[0.16em] uppercase text-ink-3">
             sourced from BT daily logs on days this sub was on site
           </p>
         </section>
       )}
 
       {/* F7 — Running checklist editor (safety + schedule). */}
-      <section className="px-5 pt-10">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Checklist
-        </h2>
-        <SubChecklistEditor
-          subId={sub.id}
-          safetyItems={safetyItems}
-          scheduleItems={scheduleItemsCk}
-        />
+      <section className="px-5 pt-9">
+        <SectionHeader title="Checklist" />
+        <div className="card-surface p-4 mt-3">
+          <SubChecklistEditor
+            subId={sub.id}
+            safetyItems={safetyItems}
+            scheduleItems={scheduleItemsCk}
+          />
+        </div>
       </section>
 
       {/* F8 — vision-extracted photo summaries. Only shown if at least one
           present-day log has been processed by /v2/api/daily-logs/extract-photos. */}
       {photoSummaries.length > 0 && (
-        <section className="px-5 pt-10">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-            Photo context · {photoSummaries.length} day
-            {photoSummaries.length === 1 ? "" : "s"}
-          </h2>
-          <ul className="space-y-3">
+        <section className="px-5 pt-9">
+          <SectionHeader
+            title={`Photo context · ${photoSummaries.length} day${photoSummaries.length === 1 ? "" : "s"}`}
+          />
+          <ul className="space-y-3 mt-3">
             {photoSummaries.slice(0, 10).map((p, i) => {
               const s = p.summary;
               const headline =
@@ -841,37 +914,33 @@ export default async function SubPage({
         availableCategories={availableCategories}
       />
       <section className="px-5 pt-6">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
-          Open · {filteredOpenTodos.length}
-          {catFilter && (
-            <span className="text-ink-3"> of {openTodos.length}</span>
-          )}
-        </h2>
+        <SectionHeader
+          title={`Open · ${filteredOpenTodos.length}${catFilter ? ` of ${openTodos.length}` : ""}`}
+        />
         {filteredOpenTodos.length === 0 ? (
-          <p className="text-ink-3 text-sm">
+          <p className="text-ink-2 text-sm mt-3">
             {catFilter ? `No ${catFilter} items.` : "None open."}
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="card-surface p-4 mt-3 divide-y divide-rule-soft">
             {filteredOpenTodos.map((t) => {
-              const isPastDue =
-                t.due_date != null && t.due_date < today;
+              const isPastDue = t.due_date != null && t.due_date < today;
               return (
                 <li
                   key={t.id}
-                  className={`py-1.5 min-h-[40px] ${
-                    isPastDue ? "border-l-2 border-urgent pl-2 -ml-2" : ""
+                  className={`py-2.5 first:pt-0 last:pb-0 ${
+                    isPastDue ? "border-l-2 border-urgent pl-3 -ml-1" : ""
                   }`}
                 >
                   <div className="flex gap-3 items-baseline">
-                    <p className="flex-1 min-w-0 text-foreground text-sm leading-snug">
+                    <p className="flex-1 min-w-0 text-ink text-sm leading-snug">
                       {t.edited_title ?? t.title}
-                      <span className="text-ink-3"> · {t.job}</span>
+                      <span className="text-ink-2"> · {t.job}</span>
                     </p>
                     {t.due_date && (
                       <span
-                        className={`shrink-0 text-xs font-mono ${
-                          isPastDue ? "text-urgent" : "text-ink-3"
+                        className={`shrink-0 text-xs font-mono tabular-nums ${
+                          isPastDue ? "text-urgent font-medium" : "text-ink-2"
                         }`}
                       >
                         {isPastDue
@@ -891,19 +960,20 @@ export default async function SubPage({
 
       {/* Activity timeline — chronological list of on-site days */}
       {presentDays.length > 0 && (
-        <section className="px-5 pt-10">
-          <details>
-            <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-2">
+        <section className="px-5 pt-9">
+          <details className="group">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+              <span className="disc-mark text-accent">›</span>
               On-site timeline · {presentDays.length} day
               {presentDays.length === 1 ? "" : "s"}
             </summary>
-            <ul className="mt-2 space-y-1">
+            <ul className="card-surface p-4 mt-3 divide-y divide-rule-soft">
               {presentDays.slice(0, 60).map((row, i) => (
                 <li
                   key={i}
-                  className="flex items-baseline justify-between gap-3 py-1"
+                  className="flex items-baseline justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
                 >
-                  <span className="text-sm text-ink-2">
+                  <span className="text-sm text-ink-2 tabular-nums">
                     {row.log_date ?? "—"}
                   </span>
                   <span className="font-mono text-xs text-ink-3 tabular-nums truncate">
@@ -923,12 +993,13 @@ export default async function SubPage({
 
       {/* Recently done — collapsed */}
       {doneTodos.length > 0 && (
-        <section className="px-5 pt-10">
-          <details>
-            <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 py-2">
+        <section className="px-5 pt-9">
+          <details className="group">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+              <span className="disc-mark text-accent">›</span>
               Recently done · {doneTodos.length}
             </summary>
-            <ul className="mt-2 space-y-1.5">
+            <ul className="card-surface p-4 mt-3 space-y-1.5">
               {doneTodos.map((t) => (
                 <li
                   key={t.id}
@@ -945,33 +1016,30 @@ export default async function SubPage({
   );
 }
 
-function Metric({
-  label,
-  value,
-  accent,
-  sub,
+// Section header — accent tick + font-head title + hairline rule. Replaces the
+// page's old 10px ink-3 mono eyebrows (the "hard to read" micro-labels) with a
+// real, consistent section identity.
+function SectionHeader({
+  title,
+  right,
+  urgent,
 }: {
-  label: string;
-  value: number | string;
-  accent?: "urgent";
-  sub?: string;
+  title: string;
+  right?: string;
+  urgent?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-start">
-      <span
-        className={
-          "font-mono text-[28px] font-medium leading-none tabular-nums " +
-          (accent === "urgent" ? "text-urgent" : "text-ink")
-        }
-      >
-        {value}
-      </span>
-      <span className="mt-2 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
-        {label}
-      </span>
-      {sub && (
-        <span className="mt-0.5 font-mono text-[9px] tracking-[0.12em] uppercase text-ink-3 opacity-70">
-          {sub}
+    <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-2">
+      <h2 className="flex items-center gap-2 font-head text-base text-ink">
+        <span
+          className={`section-tick${urgent ? " section-tick-urgent" : ""}`}
+          aria-hidden
+        />
+        {title}
+      </h2>
+      {right && (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-2">
+          {right}
         </span>
       )}
     </div>

@@ -284,6 +284,122 @@ main { animation: fadeUp 300ms ease-out both; }
     );
 }
 
+/* ───────── Sub profile — "Field Command" surfaces (2026-06-12) ─────────
+   Raised cards, gradient KPI tiles, proportional day-bars, incident
+   evidence cards, chips, section ticks. All colors pull from brand vars. */
+
+/* Section header accent tick — replaces the 10px ink-3 mono eyebrows. */
+.section-tick {
+  display: inline-block;
+  width: 3px;
+  height: 1.05em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 55%, var(--ink)));
+}
+.section-tick-urgent {
+  background: linear-gradient(180deg, var(--urgent), color-mix(in oklab, var(--urgent) 55%, var(--high)));
+}
+
+/* Raised card surface — kills the flat hairline-list feel. */
+.card-surface {
+  border-radius: 1rem;
+  background: linear-gradient(180deg, var(--paper) 0%, color-mix(in oklab, var(--sand) 55%, var(--paper)) 100%);
+  box-shadow: 0 1px 2px rgba(28, 28, 28, 0.04), 0 10px 24px -18px rgba(59, 88, 100, 0.45);
+  border: 1px solid var(--rule-soft);
+}
+.card-lift { transition: transform 180ms ease, box-shadow 180ms ease; }
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(28, 28, 28, 0.06), 0 18px 32px -18px rgba(59, 88, 100, 0.55);
+}
+
+/* Gradient KPI tiles — filled, colored, big numerals. */
+.kpi {
+  position: relative;
+  border-radius: 1rem;
+  padding: 0.95rem 0.95rem 0.85rem;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(28, 28, 28, 0.05), 0 10px 22px -14px rgba(59, 88, 100, 0.4);
+}
+.kpi > * { position: relative; z-index: 1; }
+.kpi-ink     { background: linear-gradient(150deg, var(--ink) 0%, color-mix(in oklab, var(--ink) 75%, var(--accent)) 100%); }
+.kpi-urgent  { background: linear-gradient(150deg, var(--urgent) 0%, color-mix(in oklab, var(--urgent) 68%, var(--ink)) 100%); }
+.kpi-quiet {
+  background: linear-gradient(150deg, var(--paper), color-mix(in oklab, var(--sand) 70%, var(--paper)));
+  box-shadow: inset 0 0 0 1px var(--rule-soft), 0 8px 18px -14px rgba(59, 88, 100, 0.35);
+}
+
+/* Proportional day-bars — signature "days on jobs" view. */
+.jobbar-track {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ink) 9%, transparent);
+  overflow: hidden;
+}
+.jobbar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 78%, var(--ink)) 0%, var(--accent) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
+  transform-origin: left center;
+  animation: barGrow 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Incident evidence card — terracotta-railed absence citation. */
+.incident {
+  position: relative;
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--urgent) 7%, var(--paper)) 0%, var(--paper) 62%);
+  border: 1px solid color-mix(in oklab, var(--urgent) 22%, var(--rule-soft));
+  box-shadow: 0 1px 2px rgba(28, 28, 28, 0.04), 0 10px 24px -18px rgba(161, 79, 61, 0.5);
+}
+.incident::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--urgent), color-mix(in oklab, var(--urgent) 55%, var(--high)));
+}
+/* Cited-testimony claim line (grafted from the "dossier" direction). */
+.evidence-quote {
+  border-left: 2px solid color-mix(in oklab, var(--urgent) 55%, transparent);
+  font-style: italic;
+}
+
+/* Chips — live on-site jobs + tags. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 10%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.chip-live {
+  background: color-mix(in oklab, var(--success) 12%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--success) 40%, transparent);
+}
+.chip-urgent {
+  background: color-mix(in oklab, var(--urgent) 14%, var(--paper));
+  color: var(--urgent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--urgent) 38%, transparent);
+  font-weight: 600;
+}
+
+/* Rotating disclosure marker for restyled <details> summaries. */
+.disc-mark { transition: transform 180ms ease; display: inline-block; }
+details[open] > summary .disc-mark { transform: rotate(90deg); }
+
 /* Respect the OS "reduce motion" setting. */
 @media (prefers-reduced-motion: reduce) {
   main { animation: none; }
@@ -292,5 +408,8 @@ main { animation: fadeUp 300ms ease-out both; }
   .stagger-children > * { animation: none; }
   .pulse-accent { animation: none; }
   .cta-sheen::after { transition: none; }
+  .jobbar-fill { animation: none; }
+  .card-lift { transition: none; }
+  .disc-mark { transition: none; }
   a, button, summary, label, select { transition: none; }
 }
