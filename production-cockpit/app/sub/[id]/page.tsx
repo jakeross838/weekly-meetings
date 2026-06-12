@@ -11,6 +11,12 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
+import {
+  DailyLogLite,
+  aggregateSubActivity,
+  latestLogDate,
+  FRESH_ON_SITE_DAYS,
+} from "@/lib/sub-activity";
 import { Header } from "@/components/header";
 import { SpecialtiesEditor, SpecialtyRow } from "./specialties-editor";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
@@ -88,6 +94,7 @@ export default async function SubPage({
     jobsRes,
     scheduleItemsRes,
     checklistRes,
+    allLogsRes,
   ] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
@@ -121,6 +128,13 @@ export default async function SubPage({
       )
       .eq("sub_id", params.id)
       .order("position", { ascending: true }),
+    // Presence/absence source for the live "on site now", per-job day counts,
+    // and absences sections. One light fetch of all logs (the table is small),
+    // aggregated in memory against this sub's name + aliases. Tolerates the
+    // table not existing (pre-009) — aggregation just yields empties.
+    supabase
+      .from("daily_logs")
+      .select("log_date, job_key, crews_present, absent_crews, activity"),
   ]);
   const jobNameById: Record<string, string> = {};
   for (const j of ((jobsRes.data ?? []) as { id: string; name: string }[])) {
@@ -136,16 +150,18 @@ export default async function SubPage({
   const candidateNames = Array.from(
     new Set([sub.name, ...((sub.aliases ?? []) as string[])])
   ).filter(Boolean);
-  let noShowCount: number | null = null;
-  if (candidateNames.length > 0) {
-    const absentRows = await logsContainingAny(
-      supabase,
-      "absent_crews",
-      candidateNames,
-      "id"
-    );
-    noShowCount = absentRows.length;
-  }
+
+  // Presence/absence rollup from the full (small) daily_logs set: days on each
+  // job, jobs this sub is on right now, and absence count + events. Replaces
+  // the old per-name absent_crews fan-out. `allLogs` is [] if the table is
+  // missing, so `activity` degrades to all-empty and the UI shows "—".
+  const allLogs = (allLogsRes.data ?? []) as DailyLogLite[];
+  const latestLog = latestLogDate(allLogs);
+  const activity = aggregateSubActivity(allLogs, candidateNames, {
+    latest: latestLog,
+  });
+  const noShowCount: number | null =
+    allLogs.length > 0 ? activity.absenceCount : null;
 
   // Phase C: activity timeline. Pull daily-log days where this sub appears
   // in crews_present + items scheduled for this sub. Tolerates the table /
@@ -591,7 +607,7 @@ export default async function SubPage({
             accent={pastDue.length > 0 ? "urgent" : undefined}
           />
           <Metric
-            label="No-shows"
+            label="Absences"
             value={noShowCount == null ? "—" : noShowCount}
             accent={
               noShowCount != null && noShowCount > 0 ? "urgent" : undefined
@@ -600,6 +616,117 @@ export default async function SubPage({
           />
         </div>
       </section>
+
+      {/* On site now — jobs this sub appeared on inside the recency window of
+          the freshest daily log (so a lagging scrape still reads "on site"). */}
+      <section className="px-5 pt-8">
+        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+          On site now
+        </h2>
+        {activity.currentJobs.length > 0 ? (
+          <ul className="space-y-1.5">
+            {activity.currentJobs.map((j) => (
+              <li
+                key={j.jobKey}
+                className="flex items-baseline justify-between gap-3 py-1.5 border-b border-rule-soft last:border-b-0"
+              >
+                <span className="flex items-center gap-2 min-w-0 text-foreground text-sm">
+                  <span
+                    className={
+                      "shrink-0 h-1.5 w-1.5 rounded-full " +
+                      (j.daysAgo <= FRESH_ON_SITE_DAYS
+                        ? "bg-success"
+                        : "bg-ink-3")
+                    }
+                    aria-hidden
+                  />
+                  <span className="truncate">{j.jobShort}</span>
+                </span>
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-3">
+                  {j.daysAgo === 0 ? "latest log" : `${j.daysAgo}d ago`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-ink-3 text-sm">
+            {activity.lastSeen
+              ? `Not on an active job — last on site ${activity.lastSeen}.`
+              : "No daily-log presence on record."}
+          </p>
+        )}
+        {latestLog && (
+          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+            relative to latest daily log · {latestLog}
+          </p>
+        )}
+      </section>
+
+      {/* Days on jobs — distinct on-site days per job, labelled by the sub's
+          trade. This is the "how long did each phase take" view, e.g.
+          "Stucco · Fish 15d · Harlee 11d". Finer per-activity breakdown will
+          slot in here once daily logs tag activities per crew. */}
+      {activity.jobs.length > 0 && (
+        <section className="px-5 pt-10">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 mb-3">
+            {sub.trade ? `${sub.trade} · days on jobs` : "Days on jobs"}
+          </h2>
+          <ul className="space-y-1">
+            {activity.jobs.map((j) => (
+              <li
+                key={j.jobKey}
+                className="flex items-baseline gap-3 py-1.5 border-b border-rule-soft last:border-b-0"
+              >
+                <span className="flex-1 min-w-0 truncate text-foreground text-sm">
+                  {j.jobShort}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-3">
+                  {j.firstDate} – {j.lastDate}
+                </span>
+                <span className="shrink-0 w-10 text-right font-mono text-sm tabular-nums text-ink">
+                  {j.days}d
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+            distinct on-site days from BT daily logs · {activity.totalDays}{" "}
+            total
+          </p>
+        </section>
+      )}
+
+      {/* Absences — the actual no-show events behind the metric tile. */}
+      {activity.absences.length > 0 && (
+        <section className="px-5 pt-10">
+          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-urgent mb-3">
+            Absences · {activity.absenceCount}
+          </h2>
+          <ul className="space-y-1">
+            {activity.absences.slice(0, 30).map((a, i) => (
+              <li
+                key={i}
+                className="flex items-baseline justify-between gap-3 py-1 border-b border-rule-soft last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-sm text-foreground">
+                  {a.jobShort}
+                </span>
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-3">
+                  {a.date}
+                </span>
+              </li>
+            ))}
+            {activity.absences.length > 30 && (
+              <li className="text-center font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 pt-2">
+                + {activity.absences.length - 30} more
+              </li>
+            )}
+          </ul>
+          <p className="mt-2 text-[10px] font-mono tracking-[0.18em] uppercase text-ink-3">
+            logged when BT marked this crew expected but absent
+          </p>
+        </section>
+      )}
 
       {/* Specialties — auto + manual */}
       <section className="px-5 pt-10">
