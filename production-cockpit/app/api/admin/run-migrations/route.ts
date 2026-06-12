@@ -343,6 +343,31 @@ CREATE INDEX IF NOT EXISTS password_reset_tokens_email_lower_idx
     ON public.password_reset_tokens (lower(email));
 CREATE INDEX IF NOT EXISTS password_reset_tokens_expires_idx
     ON public.password_reset_tokens (expires_at);
+
+-- 013: per-(sub × canonical specialty × job) durations with cited daily-log
+-- evidence. Derived ('auto') from daily_logs; manual rows win. Powers the
+-- "Specialties tracked" section on /sub/[id].
+CREATE TABLE IF NOT EXISTS public.sub_specialty_durations (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    sub_id text NOT NULL REFERENCES public.subs(id) ON DELETE CASCADE,
+    specialty text NOT NULL,
+    trade text,
+    job_key text NOT NULL,
+    job_short text NOT NULL,
+    active_days int NOT NULL DEFAULT 0,
+    first_date date,
+    last_date date,
+    span_days int,
+    log_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+    evidence_dates jsonb NOT NULL DEFAULT '[]'::jsonb,
+    sample_quote text,
+    confidence text NOT NULL DEFAULT 'medium' CHECK (confidence IN ('high','medium','low')),
+    source text NOT NULL DEFAULT 'auto' CHECK (source IN ('auto','manual')),
+    generated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (sub_id, specialty, job_short)
+);
+CREATE INDEX IF NOT EXISTS sub_spec_dur_sub_idx ON public.sub_specialty_durations (sub_id);
+CREATE INDEX IF NOT EXISTS sub_spec_dur_specialty_idx ON public.sub_specialty_durations (specialty);
 `;
 
 function projectRefFromUrl(url: string): string | null {

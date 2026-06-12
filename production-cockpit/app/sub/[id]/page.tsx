@@ -103,6 +103,7 @@ export default async function SubPage({
     scheduleItemsRes,
     checklistRes,
     allLogsRes,
+    specDurRes,
   ] = await Promise.all([
     supabase.from("subs").select("*").eq("id", params.id).maybeSingle(),
     supabase
@@ -143,6 +144,14 @@ export default async function SubPage({
     supabase
       .from("daily_logs")
       .select("id, log_date, job_key, crews_present, absent_crews, activity, notes"),
+    // Per-(specialty × job) durations with cited evidence, derived from the
+    // daily logs (auto) + any manual overrides. Tolerates table-missing.
+    supabase
+      .from("sub_specialty_durations")
+      .select(
+        "specialty, trade, job_short, active_days, first_date, last_date, span_days, log_ids, sample_quote, confidence, source"
+      )
+      .eq("sub_id", params.id),
   ]);
   const jobNameById: Record<string, string> = {};
   for (const j of ((jobsRes.data ?? []) as { id: string; name: string }[])) {
@@ -515,12 +524,56 @@ export default async function SubPage({
     (j) => j.daysAgo <= FRESH_ON_SITE_DAYS
   );
 
+  // Specialty durations — group the per-(specialty × job) evidence rows into
+  // one card per consolidated specialty, with the per-job breakdown that cites
+  // each duration's dates. Auto rows are derived from the daily logs; manual
+  // rows (if any) are authored and win.
+  type SpecDurRow = {
+    specialty: string;
+    trade: string | null;
+    job_short: string;
+    active_days: number;
+    first_date: string | null;
+    last_date: string | null;
+    span_days: number | null;
+    log_ids: string[] | null;
+    sample_quote: string | null;
+    confidence: "high" | "medium" | "low";
+    source: "auto" | "manual";
+  };
+  const specDurRows = (specDurRes.data ?? []) as SpecDurRow[];
+  const specByName = new Map<
+    string,
+    {
+      specialty: string;
+      trade: string | null;
+      totalDays: number;
+      jobs: SpecDurRow[];
+      quote: string | null;
+    }
+  >();
+  for (const r of specDurRows) {
+    const rec =
+      specByName.get(r.specialty) ??
+      { specialty: r.specialty, trade: r.trade, totalDays: 0, jobs: [], quote: null };
+    rec.totalDays += r.active_days;
+    rec.jobs.push(r);
+    if (!rec.quote && r.sample_quote) rec.quote = r.sample_quote;
+    specByName.set(r.specialty, rec);
+  }
+  const specialtyDurations = Array.from(specByName.values())
+    .map((s) => ({
+      ...s,
+      jobs: [...s.jobs].sort((a, b) => b.active_days - a.active_days),
+    }))
+    .sort((a, b) => b.totalDays - a.totalDays);
+
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
 
       {/* ── Command hero — identity + folded-in live "on site now" strip ── */}
-      <header className="relative overflow-hidden rounded-b-3xl hero-wash brand-texture px-5 pt-7 pb-8 shadow-[0_14px_34px_-22px_rgba(59,88,100,0.65)]">
+      <header className="relative overflow-hidden hero-wash brand-texture px-5 pt-7 pb-8 shadow-[0_14px_34px_-22px_rgba(59,88,100,0.65)]">
         <Link
           href="/subs"
           className="relative inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-accent hover:text-ink"
@@ -549,7 +602,7 @@ export default async function SubPage({
               placeholder="add trade"
             />
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-paper/70 ring-1 ring-rule-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink">
+          <span className="inline-flex items-center gap-1.5 bg-paper/70 ring-1 ring-rule-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink">
             <span
               className={`h-2 w-2 rounded-full ${health.dotClass}`}
               aria-hidden
@@ -559,7 +612,7 @@ export default async function SubPage({
         </div>
 
         {/* Live on-site strip — folded into the hero. */}
-        <div className="relative mt-5 rounded-2xl bg-paper/80 ring-1 ring-rule-soft px-4 py-3">
+        <div className="relative mt-5 bg-paper/80 ring-1 ring-rule-soft px-4 py-3">
           <div className="flex items-center gap-2">
             {hasLive && (
               <span
@@ -660,7 +713,7 @@ export default async function SubPage({
       {/* Edit & admin — notes, aliases, delete (collapsed). */}
       <section className="px-5 pt-6">
         <details className="group">
-          <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+          <summary className="inline-flex cursor-pointer items-center gap-1.5 bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
             <span className="disc-mark text-accent">›</span> Edit details
           </summary>
           <dl className="mt-3 grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 gap-y-2 text-sm">
@@ -751,6 +804,66 @@ export default async function SubPage({
         </section>
       )}
 
+      {/* ── Specialty durations — consolidated canonical specialties, each
+          tracking how long this sub takes per job, with the dates cited. ── */}
+      {specialtyDurations.length > 0 && (
+        <section className="px-5 pt-9">
+          <SectionHeader
+            title="Specialties tracked"
+            right={`${specialtyDurations.length}`}
+          />
+          <ul className="mt-3 space-y-3 stagger-children">
+            {specialtyDurations.map((s) => (
+              <li key={s.specialty} className="card-surface card-lift p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-head text-[15px] text-ink truncate">
+                    {s.specialty}
+                  </h3>
+                  <span className="shrink-0 font-mono text-[14px] tabular-nums text-ink">
+                    {s.totalDays}
+                    <span className="text-ink-3 text-[11px]">d total</span>
+                  </span>
+                </div>
+                <p className="mt-0.5 font-mono text-[10px] tracking-[0.12em] uppercase text-ink-3">
+                  {s.trade ?? "—"} · {s.jobs.length} job
+                  {s.jobs.length === 1 ? "" : "s"}
+                </p>
+                <ul className="mt-2.5 space-y-1.5">
+                  {s.jobs.map((j) => (
+                    <li
+                      key={j.job_short}
+                      className="flex items-baseline gap-3 text-sm"
+                    >
+                      <span className="w-16 shrink-0 truncate text-ink">
+                        {j.job_short}
+                      </span>
+                      <span className="shrink-0 font-mono text-[13px] tabular-nums text-ink">
+                        {j.active_days}
+                        <span className="text-ink-3 text-[11px]">d</span>
+                      </span>
+                      <span className="flex-1 min-w-0 truncate font-mono text-[10px] tabular-nums text-ink-2">
+                        {j.first_date} – {j.last_date}
+                        {j.confidence !== "high" && (
+                          <span className="text-ink-3"> · {j.confidence}</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {s.quote && (
+                  <p className="evidence-quote mt-2.5 pl-3 text-[12px] italic text-ink-2">
+                    &ldquo;{s.quote}&rdquo;
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] font-mono tracking-[0.16em] uppercase text-ink-3">
+            days per specialty per job · derived from BT daily-log activity · dates cited
+          </p>
+        </section>
+      )}
+
       {/* ── Absences — each a cited evidence card from the source daily log ── */}
       {activity.absences.length > 0 && (
         <section className="px-5 pt-9">
@@ -783,7 +896,7 @@ export default async function SubPage({
                     BT marked this crew expected but absent.
                   </p>
                   {ctx && (
-                    <div className="mt-3 rounded-lg bg-paper/70 ring-1 ring-rule-soft px-3 py-2">
+                    <div className="mt-3 bg-paper/70 ring-1 ring-rule-soft px-3 py-2">
                       <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-3">
                         Logged that day
                       </p>
@@ -962,7 +1075,7 @@ export default async function SubPage({
       {presentDays.length > 0 && (
         <section className="px-5 pt-9">
           <details className="group">
-            <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
               <span className="disc-mark text-accent">›</span>
               On-site timeline · {presentDays.length} day
               {presentDays.length === 1 ? "" : "s"}
@@ -995,7 +1108,7 @@ export default async function SubPage({
       {doneTodos.length > 0 && (
         <section className="px-5 pt-9">
           <details className="group">
-            <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 bg-paper ring-1 ring-rule-soft px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 hover:text-ink hover:ring-rule">
               <span className="disc-mark text-accent">›</span>
               Recently done · {doneTodos.length}
             </summary>

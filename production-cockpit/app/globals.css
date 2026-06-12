@@ -300,9 +300,10 @@ main { animation: fadeUp 300ms ease-out both; }
   background: linear-gradient(180deg, var(--urgent), color-mix(in oklab, var(--urgent) 55%, var(--high)));
 }
 
-/* Raised card surface — kills the flat hairline-list feel. */
+/* Raised card surface — kills the flat hairline-list feel. Square corners
+   (Jake 2026-06-12 — "make the sub page boxes not round"). */
 .card-surface {
-  border-radius: 1rem;
+  border-radius: 0;
   background: linear-gradient(180deg, var(--paper) 0%, color-mix(in oklab, var(--sand) 55%, var(--paper)) 100%);
   box-shadow: 0 1px 2px rgba(28, 28, 28, 0.04), 0 10px 24px -18px rgba(59, 88, 100, 0.45);
   border: 1px solid var(--rule-soft);
@@ -316,7 +317,7 @@ main { animation: fadeUp 300ms ease-out both; }
 /* Gradient KPI tiles — filled, colored, big numerals. */
 .kpi {
   position: relative;
-  border-radius: 1rem;
+  border-radius: 0;
   padding: 0.95rem 0.95rem 0.85rem;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(28, 28, 28, 0.05), 0 10px 22px -14px rgba(59, 88, 100, 0.4);
@@ -333,14 +334,14 @@ main { animation: fadeUp 300ms ease-out both; }
 .jobbar-track {
   position: relative;
   height: 0.6rem;
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--ink) 9%, transparent);
   overflow: hidden;
 }
 .jobbar-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 78%, var(--ink)) 0%, var(--accent) 100%);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
   transform-origin: left center;
@@ -351,7 +352,7 @@ main { animation: fadeUp 300ms ease-out both; }
 /* Incident evidence card — terracotta-railed absence citation. */
 .incident {
   position: relative;
-  border-radius: 0.9rem;
+  border-radius: 0;
   overflow: hidden;
   background: linear-gradient(180deg, color-mix(in oklab, var(--urgent) 7%, var(--paper)) 0%, var(--paper) 62%);
   border: 1px solid color-mix(in oklab, var(--urgent) 22%, var(--rule-soft));
@@ -375,7 +376,7 @@ main { animation: fadeUp 300ms ease-out both; }
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0.22rem 0.6rem;
   font-family: var(--font-mono);
   font-size: 10px;
