@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { VersionFooter } from "@/components/version-footer";
 import "./globals.css";
 
 const head = Space_Grotesk({
@@ -53,6 +54,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
+        <VersionFooter />
       </body>
     </html>
   );
