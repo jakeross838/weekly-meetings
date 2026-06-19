@@ -71,6 +71,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Canonicalize each item's job to a real jobs.name. The job page matches
+  // todos.job to jobs.name EXACTLY, so a slightly-off name from the extractor
+  // ("Kraus" → "Krauss") would silently orphan the to-do off its job page.
+  // Exact (case/punctuation-insensitive) match wins; else a prefix match;
+  // else keep what we were given.
+  const { data: jobsData } = await supabase.from("jobs").select("name");
+  const knownJobNames = ((jobsData ?? []) as { name: string }[]).map((j) => j.name);
+  const nrm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const canonJob = (raw: string): string => {
+    const r = nrm(raw);
+    if (!r) return raw || "Unknown";
+    const exact = knownJobNames.find((n) => nrm(n) === r);
+    if (exact) return exact;
+    const partial = knownJobNames.find((n) => {
+      const nn = nrm(n);
+      return nn.startsWith(r) || r.startsWith(nn);
+    });
+    return partial ?? (raw || "Unknown");
+  };
+
   // Build rows
   const now = Date.now();
   const rows = items.map((item, i) => {
@@ -83,7 +103,7 @@ export async function POST(req: NextRequest) {
     return {
       id: `${jobPrefix}-${suffix}`,
       pm_id: pmId,
-      job: item.job || "Unknown",
+      job: canonJob(item.job),
       // Hard guarantee: no broad timeframe survives onto the active to-do
       // list. Resolve "tomorrow"/"by Friday"/etc. to an exact date (or strip
       // vague spans) against the meeting date — even if the operator hand-typed
