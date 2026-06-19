@@ -11,6 +11,7 @@
 // Returns the new summary + meta counts.
 
 import { NextRequest, NextResponse } from "next/server";
+import { businessToday, businessDateOffset } from "@/lib/today";
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
@@ -48,7 +49,7 @@ function buildPrompt(
   openTodos: Array<Record<string, unknown>>,
   doneTodos: Array<Record<string, unknown>>
 ): string {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = businessToday();
   return `You are summarizing a Ross Built custom-home job for the Monday meeting binder.
 
 JOB:
@@ -128,9 +129,7 @@ export async function POST(
     address: string | null;
   };
 
-  const sinceIso = new Date(Date.now() - windowDays * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const sinceIso = businessDateOffset(-windowDays);
 
   const [logsRes, openRes, doneRes] = await Promise.all([
     supabase
@@ -281,6 +280,10 @@ export async function POST(
   }
 
   const elapsedMs = Date.now() - startedAt;
+  // Stamp the generation time now (when Claude actually produced the summary),
+  // so the "refreshed X ago" label is correct even if the DB insert fails and
+  // we fall back to the in-memory meta.
+  const generatedAt = new Date().toISOString();
 
   // Persist. We keep history so we can diff later.
   const insertRes = await supabase
@@ -288,6 +291,7 @@ export async function POST(
     .insert({
       job_id: job.id,
       summary: parsed,
+      generated_at: generatedAt,
       last_data_through: lastDataThrough,
       log_count: logs.length,
       photo_count: photoCount,
@@ -305,8 +309,7 @@ export async function POST(
   // panel still renders and the operator knows what to fix.
   const persisted = !insertRes.error;
   const metaBase = {
-    generated_at:
-      insertRes.data?.generated_at ?? new Date().toISOString(),
+    generated_at: insertRes.data?.generated_at ?? generatedAt,
     log_count: logs.length,
     photo_count: photoCount,
     open_todo_count: openTodos.length,

@@ -323,6 +323,7 @@ export function AccountingTable({
       )}
       <p className="mt-2 text-[10px] font-mono tracking-[0.14em] uppercase text-ink-3">
         click a row ▸ for line items · click any cell to edit · ✕ deletes
+        <span className="sm:hidden text-accent"> · swipe table sideways →</span>
       </p>
     </div>
   );

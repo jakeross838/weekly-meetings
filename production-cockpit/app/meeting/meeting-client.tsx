@@ -12,6 +12,7 @@ import { CATEGORIES, styleFor } from "@/lib/categories";
 
 export interface MeetingItem {
   id: string;
+  source: "item" | "todo"; // which table — drives the delete endpoint
   title: string;
   daysOver: number | null; // set when past due
   daysTo: number | null; // set when due in the future
@@ -363,8 +364,12 @@ function ItemRow({ it, pastDue }: { it: MeetingItem; pastDue?: boolean }) {
             : `${it.daysTo}d`}
       </span>
       <DeleteButton
-        endpoint={`/api/todos/${it.id}/delete`}
-        label="to-do"
+        endpoint={
+          it.source === "item"
+            ? `/v2/api/items/${it.id}/delete`
+            : `/api/todos/${it.id}/delete`
+        }
+        label={it.source === "item" ? "item" : "to-do"}
         className="self-center text-sm"
       />
     </li>

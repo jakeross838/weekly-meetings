@@ -24,6 +24,7 @@ import {
 } from "./job-summary-panel";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
 import { jobKeyMatchesName } from "@/lib/job-key";
+import { businessToday } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ interface RowData {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessToday();
 }
 
 export default async function V2JobPage({
@@ -124,7 +125,7 @@ export default async function V2JobPage({
         .eq("status", "complete")
         .gte("completed_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
         .order("completed_at", { ascending: false })
-        .limit(20),
+        .limit(100),
       supabase
         .from("todos")
         .select("id, title, edited_title, completed_at")
@@ -132,7 +133,7 @@ export default async function V2JobPage({
         .eq("status", "COMPLETE")
         .gte("completed_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
         .order("completed_at", { ascending: false })
-        .limit(20),
+        .limit(100),
       supabase
         .from("ingestion_events")
         .select("id, proposed_count")

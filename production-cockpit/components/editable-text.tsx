@@ -5,7 +5,7 @@
 // router.refresh(); Esc cancels. `type="money"`/`"number"` send a parsed
 // number (strips $ and commas). Modeled on the checklist-editor inline pattern.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type EditType = "text" | "textarea" | "number" | "money" | "date";
@@ -37,6 +37,23 @@ export function EditableText({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const cancelRef = useRef(false);
+  const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+
+  // Belt-and-suspenders to the `autoFocus` attribute: focus + move the caret to
+  // the end whenever we enter edit mode (autoFocus can be skipped when the node
+  // mounts inside a conditional/portaled subtree).
+  useEffect(() => {
+    if (!editing) return;
+    const el = fieldRef.current;
+    if (!el) return;
+    el.focus();
+    const end = el.value.length;
+    try {
+      el.setSelectionRange(end, end);
+    } catch {
+      /* number/date inputs don't support setSelectionRange — ignore */
+    }
+  }, [editing]);
 
   function start() {
     setErr(null);
@@ -101,6 +118,9 @@ export function EditableText({
       <span className="inline-flex items-center gap-1 w-full">
         {type === "textarea" ? (
           <textarea
+            ref={(el) => {
+              fieldRef.current = el;
+            }}
             autoFocus
             rows={2}
             disabled={busy}
@@ -118,6 +138,9 @@ export function EditableText({
           />
         ) : (
           <input
+            ref={(el) => {
+              fieldRef.current = el;
+            }}
             autoFocus
             disabled={busy}
             value={draft}

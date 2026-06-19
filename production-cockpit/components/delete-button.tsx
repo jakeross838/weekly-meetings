@@ -68,7 +68,7 @@ export function DeleteButton({
   if (step === "confirm" || step === "warn") {
     const isWarn = step === "warn";
     return (
-      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] shrink-0">
+      <span className="inline-flex items-center gap-2 font-mono text-xs shrink-0">
         <span className={isWarn ? "text-urgent" : "text-ink-3"}>
           {isWarn ? warnMsg : confirmLabel ?? "Delete?"}
         </span>
@@ -76,7 +76,7 @@ export function DeleteButton({
           type="button"
           onClick={() => del(isWarn)}
           disabled={busy}
-          className="text-urgent hover:underline disabled:opacity-50"
+          className="px-2 py-1 text-urgent hover:underline disabled:opacity-50"
         >
           {isWarn ? "delete anyway" : "yes"}
         </button>
@@ -84,7 +84,7 @@ export function DeleteButton({
           type="button"
           onClick={cancel}
           disabled={busy}
-          className="text-ink-3 hover:text-ink"
+          className="px-2 py-1 text-ink-3 hover:text-ink"
         >
           {isWarn ? "keep" : "no"}
         </button>

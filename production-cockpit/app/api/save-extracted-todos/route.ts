@@ -13,6 +13,7 @@ interface SaveItem {
   due_date: string | null;
   category: string;
   type: string;
+  source_excerpt?: string | null;
 }
 
 interface SaveBody {
@@ -96,7 +97,9 @@ export async function POST(req: NextRequest) {
       created_at: `${meetingDate}T00:00:00Z`,
       sub_id: item.sub_id || null,
       source_transcript: body.source_label || "cockpit-import",
-      source_excerpt: null,
+      // Keep the verbatim transcript snippet Claude grounded each item in, so
+      // the to-do stays auditable back to what was actually said.
+      source_excerpt: item.source_excerpt || null,
     };
   });
 

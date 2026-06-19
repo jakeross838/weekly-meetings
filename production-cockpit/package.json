@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsc lib/scrub-relative-dates.ts lib/scrub-relative-dates.test.ts lib/sub-health.ts lib/sub-health.test.ts lib/sub-activity.ts lib/sub-activity.test.ts lib/sub-name.ts lib/sub-name.test.ts lib/job-key.ts lib/job-key.test.ts --outDir .tmp-tdd --module commonjs --target ES2020 --skipLibCheck --moduleResolution node --esModuleInterop && node .tmp-tdd/scrub-relative-dates.test.js && node .tmp-tdd/sub-health.test.js && node .tmp-tdd/sub-activity.test.js && node .tmp-tdd/sub-name.test.js && node .tmp-tdd/job-key.test.js"
+    "test": "tsc lib/scrub-relative-dates.ts lib/scrub-relative-dates.test.ts lib/sub-health.ts lib/sub-health.test.ts lib/sub-activity.ts lib/sub-activity.test.ts lib/sub-name.ts lib/sub-name.test.ts lib/job-key.ts lib/job-key.test.ts lib/today.ts lib/today.test.ts --outDir .tmp-tdd --module commonjs --target ES2020 --skipLibCheck --moduleResolution node --esModuleInterop && node .tmp-tdd/scrub-relative-dates.test.js && node .tmp-tdd/sub-health.test.js && node .tmp-tdd/sub-activity.test.js && node .tmp-tdd/sub-name.test.js && node .tmp-tdd/job-key.test.js && node .tmp-tdd/today.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

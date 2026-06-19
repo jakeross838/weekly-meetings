@@ -410,9 +410,11 @@ const MONTHS = [
 // One readable date format everywhere in the history: "2026-05-18" → "May 18".
 function prettyDate(iso: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso + "T00:00:00");
+  // Accept both "YYYY-MM-DD" and full ISO timestamps: take the date part and
+  // read it in UTC so the label is tz-stable and never "Invalid Date".
+  const d = new Date(iso.slice(0, 10) + "T00:00:00Z");
   if (Number.isNaN(d.getTime())) return iso;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
 // Pull a "Mon DD" meeting date out of the transcript filename, if it starts

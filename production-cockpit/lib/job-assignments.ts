@@ -9,6 +9,7 @@
 // previous PM would keep seeing the job. Always go through these helpers.
 
 import { supabaseServer } from "./supabase";
+import { businessToday } from "./today";
 
 // Close any active job_pm_assignments rows for this job and (optionally)
 // open a fresh one for the new pmId. Pass `null` to unassign.
@@ -17,7 +18,7 @@ export async function syncJobPmAssignment(
   newPmId: string | null
 ): Promise<void> {
   const sb = supabaseServer();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessToday();
   const { error: closeErr } = await sb
     .from("job_pm_assignments")
     .update({ ended_at: today })

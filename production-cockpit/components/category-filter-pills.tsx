@@ -16,10 +16,21 @@ export function CategoryFilterPills({
   activeCategory,
   availableCategories,
 }: Props) {
+  // Only offer filters for categories that actually have items, in canonical
+  // order, plus any non-canonical category present in the data. When the caller
+  // doesn't pass availableCategories at all, fall back to the full canonical set.
   const known = new Set(CATEGORIES as readonly string[]);
-  const data = (availableCategories ?? []).filter((c) => !known.has(c));
-  const list = [...CATEGORIES, ...data];
-  if (list.length === 0) return null;
+  let list: string[];
+  if (availableCategories == null) {
+    list = [...CATEGORIES];
+  } else {
+    const avail = new Set(availableCategories);
+    const canonical = (CATEGORIES as readonly string[]).filter((c) => avail.has(c));
+    const extras = availableCategories.filter((c) => c && !known.has(c));
+    list = [...canonical, ...extras];
+  }
+  // A lone category needs no filter row (the "All" pill would be redundant).
+  if (list.length <= 1) return null;
 
   return (
     <div className="px-5 pt-4 pb-2">

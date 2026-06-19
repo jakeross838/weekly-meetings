@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "@/lib/supabase";
+import { businessToday, businessDateOffset } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,9 +48,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const job = jobRes.data as { id: string; name: string; address: string | null };
 
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const sinceIso = new Date(Date.now() - lookbackDays * 86_400_000).toISOString().slice(0, 10);
-  const untilIso = new Date(Date.now() + lookaheadDays * 86_400_000).toISOString().slice(0, 10);
+  const todayIso = businessToday();
+  const sinceIso = businessDateOffset(-lookbackDays);
+  const untilIso = businessDateOffset(lookaheadDays);
 
   const [payRes, poRes, logsRes, openRes] = await Promise.all([
     supabase.from("pay_app_line_items").select("scheduled_value, total_completed").eq("job_id", jobId),
@@ -118,7 +119,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const data = {
     contract_value: sched > 0 ? usd(sched) : "unknown",
     billed_to_date: sched > 0 ? usd(comp) : "unknown",
-    percent_complete: pct,
+    // Send "unknown" (not null) so the prompt's "omit unknowns" rule applies
+    // instead of Claude seeing a literal null.
+    percent_complete: pct !== null ? `${pct}%` : "unknown",
     committed_to_vendors: committed > 0 ? usd(committed) : "unknown",
     open_commitments: outstanding > 0 ? usd(outstanding) : usd(0),
     recent_activity: logs.map((l) => ({

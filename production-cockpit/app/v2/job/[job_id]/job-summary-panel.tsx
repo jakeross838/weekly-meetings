@@ -54,7 +54,9 @@ interface Props {
 }
 
 function relativeAge(iso: string): string {
-  const d = (Date.now() - new Date(iso).getTime()) / 1000;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "recently";
+  const d = (Date.now() - t) / 1000;
   if (d < 60) return "just now";
   if (d < 3600) return `${Math.round(d / 60)}m ago`;
   if (d < 86400) return `${Math.round(d / 3600)}h ago`;

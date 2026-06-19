@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES, styleFor } from "@/lib/categories";
+import { businessToday } from "@/lib/today";
 
 interface PMOpt {
   id: string;
@@ -120,7 +121,7 @@ interface ExtractResp {
   jobs_mentioned?: string[];
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => businessToday();
 
 interface RowState {
   enabled: boolean;
@@ -289,6 +290,7 @@ export function ImportForm({
         category: r.category,
         type: r.type,
         sub_id: r.sub_id,
+        source_excerpt: r.source_excerpt,
       });
     });
     try {

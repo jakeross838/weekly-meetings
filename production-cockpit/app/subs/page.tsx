@@ -10,6 +10,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
+import { businessToday, businessDateOffset } from "@/lib/today";
 import {
   DailyLogLite,
   buildNameIndex,
@@ -45,7 +46,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   const flaggedFilter = searchParams.flagged === "1";
   const onsiteFilter = searchParams.onsite === "1";
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = businessToday();
 
   const [subsRes, openTodosRes, jobsRes, assignRes, logsRes] =
     await Promise.all([
@@ -103,9 +104,7 @@ export default async function SubsPage({ searchParams }: { searchParams: SP }) {
   }[];
   const logs = (logsRes.data ?? []) as DailyLogLite[];
 
-  const in7Iso = new Date(Date.now() + 7 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const in7Iso = businessDateOffset(7);
   const openBySub: Record<
     string,
     { open: number; past_due: number; due_soon: number }

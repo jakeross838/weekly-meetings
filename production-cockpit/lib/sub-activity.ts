@@ -165,7 +165,9 @@ export function aggregateSubActivity(
     const absent = log.absent_crews ?? [];
     if (!hit && absent.some((c) => c && want.has(nkey(c)))) {
       const js = shortJob(log.job_key);
-      const k = js + "|" + d;
+      // Dedupe on the FULL job_key (not the short label) so two distinct jobs
+      // that share a first word can't collapse each other's absences.
+      const k = log.job_key + "|" + d;
       if (!seenAbs.has(k)) {
         seenAbs.add(k);
         absences.push({
@@ -286,7 +288,7 @@ export function aggregateAllSubs(
       const id = nameIndex.get(nkey(c));
       if (!id || presentIds.has(id)) continue; // present wins
       const a = get(id);
-      const k = jobShort + "|" + d;
+      const k = log.job_key + "|" + d; // full job_key — see aggregateSubActivity
       if (a.absKeys.has(k)) continue; // dedupe duplicate logs
       a.absKeys.add(k);
       a.absences += 1;

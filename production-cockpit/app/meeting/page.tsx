@@ -14,6 +14,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { subHealth } from "@/lib/sub-health";
+import { businessToday, businessDateOffset } from "@/lib/today";
 import { Header } from "@/components/header";
 import { MeetingAgenda, MeetingJob, MeetingItem } from "./meeting-client";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
@@ -39,6 +40,25 @@ type TodoRow = {
   sub_id: string | null;
   category: string | null;
 };
+type ItemRowDB = {
+  id: string;
+  title: string;
+  target_date: string | null;
+  sub_id: string | null;
+  category: string | null;
+  owner: string | null;
+  job_id: string | null;
+};
+// One normalized commitment (todo OR v2 item) used to build the agenda.
+type Entry = {
+  id: string;
+  source: "item" | "todo";
+  title: string;
+  date: string | null;
+  sub_id: string | null;
+  subName: string | null;
+  category: string | null;
+};
 type SubRow = {
   id: string;
   name: string;
@@ -49,16 +69,22 @@ type SubRow = {
 export default async function MeetingPage({ searchParams }: { searchParams: SP }) {
   const supabase = supabaseServer();
   const pmFilter = searchParams.pm ?? "";
-  const today = new Date().toISOString().slice(0, 10);
-  const in7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const today = businessToday();
+  const in7 = businessDateOffset(7);
 
-  const [jobsRes, todosRes, subsRes, pmsRes, assignRes, pendingRes, payAppRes] =
+  const [jobsRes, todosRes, itemsRes, subsRes, pmsRes, assignRes, pendingRes, payAppRes] =
     await Promise.all([
       supabase.from("jobs").select("id, name, address, pm_id").order("name"),
       supabase
         .from("todos")
         .select("id, title, edited_title, job, due_date, sub_id, category")
         .in("status", OPEN_STATUSES as Status[]),
+      // v2 items belong on the agenda exactly like todos (the job page merges
+      // them), so the Monday run-of-show and its counts stay complete.
+      supabase
+        .from("items")
+        .select("id, title, target_date, sub_id, category, owner, job_id")
+        .in("status", ["open", "in_progress", "blocked"]),
       supabase
         .from("subs")
         .select("id, name, flagged_for_pm_binder, flag_note")
@@ -81,6 +107,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
   const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
   const todos = (todosRes.data ?? []) as TodoRow[];
+  const items = (itemsRes.data ?? []) as ItemRowDB[];
   const subs = (subsRes.data ?? []) as SubRow[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
   const assignments = (assignRes.data ?? []) as {
@@ -111,14 +138,15 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
   // Global per-sub commitment tally (across every job) — drives the health
   // pill, so a sub flagged on one job still reads its true status here.
   const subTally = new Map<string, { pastDue: number; dueSoon: number }>();
-  for (const t of todos) {
-    if (!t.sub_id) continue;
-    const rec = subTally.get(t.sub_id) ?? { pastDue: 0, dueSoon: 0 };
-    if (t.due_date && t.due_date < today) rec.pastDue += 1;
-    else if (t.due_date && t.due_date >= today && t.due_date <= in7)
-      rec.dueSoon += 1;
-    subTally.set(t.sub_id, rec);
-  }
+  const tallySub = (subId: string | null, date: string | null) => {
+    if (!subId) return;
+    const rec = subTally.get(subId) ?? { pastDue: 0, dueSoon: 0 };
+    if (date && date < today) rec.pastDue += 1;
+    else if (date && date >= today && date <= in7) rec.dueSoon += 1;
+    subTally.set(subId, rec);
+  };
+  for (const t of todos) tallySub(t.sub_id, t.due_date);
+  for (const i of items) tallySub(i.sub_id, i.target_date);
 
   // Pay-app totals per job.
   const paySched = new Map<string, number>();
@@ -148,39 +176,68 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
     arr.push(t);
     todosByJob.set(t.job, arr);
   }
+  // items.job_id is the slug ("krauss"); jobs.id matches it.
+  const itemsByJobId = new Map<string, ItemRowDB[]>();
+  for (const i of items) {
+    if (!i.job_id) continue;
+    const arr = itemsByJobId.get(i.job_id) ?? [];
+    arr.push(i);
+    itemsByJobId.set(i.job_id, arr);
+  }
 
   const daysBetween = (a: string, b: string) =>
-    Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
+    Math.floor((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
 
   const meetingJobs: MeetingJob[] = [];
   for (const j of jobs) {
     if (pmFilter && pmForJob(j) !== pmFilter) continue;
-    const jobTodos = todosByJob.get(j.name) ?? [];
+    // Merge both commitment sources for this job into one normalized list.
+    const entries: Entry[] = [
+      ...(todosByJob.get(j.name) ?? []).map((t) => ({
+        id: t.id,
+        source: "todo" as const,
+        title: t.edited_title ?? t.title,
+        date: t.due_date,
+        sub_id: t.sub_id,
+        subName: t.sub_id ? subById.get(t.sub_id)?.name ?? null : null,
+        category: t.category ?? null,
+      })),
+      ...(itemsByJobId.get(j.id) ?? []).map((i) => ({
+        id: i.id,
+        source: "item" as const,
+        title: i.title,
+        date: i.target_date,
+        sub_id: i.sub_id,
+        subName: i.sub_id
+          ? subById.get(i.sub_id)?.name ?? null
+          : i.owner ?? null,
+        category: i.category ?? null,
+      })),
+    ];
 
-    const lite = (t: TodoRow): MeetingItem => ({
-      id: t.id,
-      title: t.edited_title ?? t.title,
-      daysOver:
-        t.due_date && t.due_date < today ? daysBetween(t.due_date, today) : null,
-      daysTo:
-        t.due_date && t.due_date >= today ? daysBetween(today, t.due_date) : null,
-      subName: t.sub_id ? subById.get(t.sub_id)?.name ?? null : null,
-      category: t.category ?? null,
+    const lite = (e: Entry): MeetingItem => ({
+      id: e.id,
+      source: e.source,
+      title: e.title,
+      daysOver: e.date && e.date < today ? daysBetween(e.date, today) : null,
+      daysTo: e.date && e.date >= today ? daysBetween(today, e.date) : null,
+      subName: e.subName,
+      category: e.category,
     });
 
-    const pastDue = jobTodos
-      .filter((t) => t.due_date && t.due_date < today)
+    const pastDue = entries
+      .filter((e) => e.date && e.date < today)
       .map(lite)
       .sort((a, b) => (b.daysOver ?? 0) - (a.daysOver ?? 0));
-    const dueSoon = jobTodos
-      .filter((t) => t.due_date && t.due_date >= today && t.due_date <= in7)
+    const dueSoon = entries
+      .filter((e) => e.date && e.date >= today && e.date <= in7)
       .map(lite)
       .sort((a, b) => (a.daysTo ?? 0) - (b.daysTo ?? 0));
-    const laterCount = jobTodos.length - pastDue.length - dueSoon.length;
+    const laterCount = entries.length - pastDue.length - dueSoon.length;
 
     // Subs on this job that aren't GREEN — routed in as "watch" rows.
     const jobSubIds = Array.from(
-      new Set(jobTodos.map((t) => t.sub_id).filter(Boolean) as string[])
+      new Set(entries.map((e) => e.sub_id).filter(Boolean) as string[])
     );
     const attentionSubs = jobSubIds
       .map((sid) => {

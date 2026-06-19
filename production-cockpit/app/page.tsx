@@ -9,6 +9,7 @@ import { Header } from "@/components/header";
 import { RequestAccessCard } from "@/components/request-access-card";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
 import { jobKeyMatchesName } from "@/lib/job-key";
+import { businessToday } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function Page({
 }) {
   const supabase = supabaseServer();
   const pmFilter = searchParams.pm ?? "";
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = businessToday();
 
   const [jobsRes, openTodosRes, openItemsRes, pmsRes, assignRes, pendingRes] =
     await Promise.all([

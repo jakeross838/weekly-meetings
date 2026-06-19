@@ -18,8 +18,21 @@ export function CategoryPillEdit({ id, source, category }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [value, setValue] = useState<string | null>(category);
   const ref = useRef<HTMLDivElement | null>(null);
+
+  // Open upward when the pill sits low in the viewport, so the (up-to-280px)
+  // menu never spills off the bottom of the screen.
+  function toggle() {
+    setOpen((o) => {
+      if (!o && ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        setDropUp(window.innerHeight - rect.bottom < 300);
+      }
+      return !o;
+    });
+  }
 
   useEffect(() => setValue(category), [category]);
 
@@ -80,7 +93,7 @@ export function CategoryPillEdit({ id, source, category }: Props) {
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setOpen((o) => !o);
+          toggle();
         }}
         disabled={busy}
         className={`mt-1 inline-block font-mono text-[9px] tracking-[0.12em] px-1.5 py-0.5 hover:ring-1 hover:ring-ink/30 transition ${styleFor(value)} ${busy ? "opacity-50" : ""}`}
@@ -90,7 +103,9 @@ export function CategoryPillEdit({ id, source, category }: Props) {
       </button>
       {open && (
         <div
-          className="absolute z-10 left-0 top-full mt-1 bg-paper border border-rule shadow-lg min-w-[140px] max-h-[280px] overflow-y-auto"
+          className={`absolute z-10 left-0 bg-paper border border-rule shadow-lg min-w-[140px] max-h-[280px] overflow-y-auto ${
+            dropUp ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
           role="menu"
         >
           <button

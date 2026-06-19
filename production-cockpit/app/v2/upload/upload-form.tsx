@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { businessToday } from "@/lib/today";
 
 export function UploadForm({
   jobs,
@@ -16,7 +17,7 @@ export function UploadForm({
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState(jobs[0]?.id ?? "");
   const [meetingType, setMeetingType] = useState<"site" | "office" | "spontaneous">("site");
-  const [meetingDate, setMeetingDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [meetingDate, setMeetingDate] = useState(() => businessToday());
   const [pmId, setPmId] = useState(() => {
     const a = assignments.find((x) => x.job_id === jobs[0]?.id);
     return a?.pm_id ?? pms[0]?.id ?? "";

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase";
 import { Sub, Todo, OPEN_STATUSES, Status } from "@/lib/types";
+import { businessToday, businessDateOffset } from "@/lib/today";
 import { subHealth } from "@/lib/sub-health";
 import {
   DailyLogLite,
@@ -28,7 +29,7 @@ import { FlagBanner } from "@/components/flag-banner";
 export const dynamic = "force-dynamic";
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessToday();
 }
 
 function daysBetween(a: string, b: string): number {
@@ -290,7 +291,7 @@ export default async function SubPage({
   const pastDue = openTodos.filter(
     (t) => t.due_date != null && t.due_date < today
   );
-  const in7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const in7 = businessDateOffset(7);
   const dueSoon = openTodos.filter(
     (t) => t.due_date != null && t.due_date >= today && t.due_date <= in7
   ).length;

@@ -116,8 +116,10 @@ export function EditRowModal({
   return (
     <ModalPortal>
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
-      onClick={onClose}
+      className="fixed inset-0 z-50 bg-ink/40 flex items-end sm:items-center justify-center"
+      onClick={() => {
+        if (!busy) onClose();
+      }}
     >
       <div
         className="bg-paper w-full sm:max-w-md sm:rounded sm:my-8 p-5 max-h-[90vh] overflow-y-auto"
