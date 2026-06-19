@@ -309,7 +309,10 @@ export async function POST(req: NextRequest) {
   try {
     const resp = await client.messages.create({
       model: "claude-opus-4-7",
-      max_tokens: 8000,
+      // 16k (not 8k): a busy multi-job meeting can produce 20-30 items, each with
+      // a source_excerpt. At 8k the tool response truncated mid-array, leaving a
+      // malformed item that crashed post-processing. 16k clears realistic meetings.
+      max_tokens: 16000,
       tools: [extractTool],
       tool_choice: { type: "tool", name: "emit_action_items" },
       messages: [
@@ -344,7 +347,20 @@ export async function POST(req: NextRequest) {
   // date, and strips genuinely vague spans ("ASAP", "soon", "this week"). The
   // same util runs again at the save boundary so manual edits can't reintroduce
   // a relative phrase. See lib/scrub-relative-dates.ts.
-  for (const item of parsed.items ?? []) {
+  // A truncated/malformed tool response can leave a non-object entry in `items`
+  // (e.g. a partial string when output hits max_tokens). Filter to well-formed
+  // items so a bad element can't crash the function — that uncaught
+  // "Cannot create property 'title' on string" was the empty-body 500.
+  const items: ExtractedItem[] = (
+    Array.isArray(parsed?.items) ? parsed.items : []
+  ).filter(
+    (it) =>
+      it != null &&
+      typeof it === "object" &&
+      typeof (it as { title?: unknown }).title === "string"
+  ) as ExtractedItem[];
+
+  for (const item of items) {
     item.title = scrubRelativeDates(item.title ?? "", meetingDate);
   }
 
@@ -354,7 +370,7 @@ export async function POST(req: NextRequest) {
     { sub_id: string | null; sub_name: string | null; items: ExtractedItem[] }
   > = {};
   const noSubKey = "__no_sub__";
-  for (const item of parsed.items ?? []) {
+  for (const item of items) {
     let sid: string | null = null;
     let sname: string | null = null;
     if (item.sub_name) {
@@ -382,6 +398,6 @@ export async function POST(req: NextRequest) {
       ? Array.from(new Set(parsed.jobs_mentioned.filter(Boolean)))
       : [],
     grouped: Object.values(groupedBySub),
-    totalItems: (parsed.items ?? []).length,
+    totalItems: items.length,
   });
 }
