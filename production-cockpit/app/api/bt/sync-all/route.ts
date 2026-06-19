@@ -45,6 +45,7 @@ interface SyncBody {
   username?: string;
   password?: string;
   headed?: boolean;
+  kind?: string; // "manual" (default) | "auto" (scheduled headless run)
 }
 
 type StepName = "daily-logs" | "purchase-orders" | "change-orders";
@@ -202,11 +203,13 @@ export async function POST(req: NextRequest) {
     return singleLine({ kind: "error", error: "Invalid JSON body" });
   }
 
-  const username = body.username?.trim();
-  const password = body.password ?? "";
-  if (!username || !password) {
-    return singleLine({ kind: "error", error: "username and password required" });
-  }
+  // Creds: the modal supplies them for a manual run; the scheduled/headless run
+  // sends none, so fall back to server env (BT_USERNAME / BT_PASSWORD set in
+  // .env.local). If both are empty the scraper falls back to its saved BT
+  // session — only a session expiry then needs a manual refresh.
+  const username = body.username?.trim() || process.env.BT_USERNAME?.trim() || "";
+  const password = body.password ?? process.env.BT_PASSWORD ?? "";
+  const kind = body.kind === "auto" ? "auto" : "manual";
 
   const scraperDir = process.env.BT_SCRAPER_DIR || DEFAULT_SCRAPER_DIR;
   const pythonExe = path.join(scraperDir, ".venv", "Scripts", "python.exe");
@@ -739,6 +742,32 @@ export async function POST(req: NextRequest) {
           overallOk = false;
         }
         send(coStep);
+      }
+
+      // Record the run so the app shows a real, authoritative "last synced"
+      // time (independent of whether any row's data date changed). Best-effort.
+      try {
+        const sb = supabaseServer();
+        await sb.from("sync_runs").insert({
+          kind,
+          started_at: new Date(overallStart).toISOString(),
+          finished_at: new Date().toISOString(),
+          ok: overallOk,
+          daily_jobs: dailyStep.scrape.jobCount ?? null,
+          daily_logs: dailyStep.scrape.logCount ?? null,
+          daily_photos: dailyStep.scrape.photoCount ?? null,
+          po_jobs: poStep.scrape.jobCount ?? null,
+          po_count: poStep.scrape.poCount ?? null,
+          po_line_items: poStep.scrape.lineItemCount ?? null,
+          co_jobs: coStep.scrape.jobCount ?? null,
+          co_count: coStep.scrape.coCount ?? null,
+          error:
+            [dailyStep.error, poStep.error, coStep.error]
+              .filter(Boolean)
+              .join(" | ") || null,
+        });
+      } catch (e) {
+        console.error("[bt/sync-all] failed to record sync_runs:", e);
       }
 
       log("DONE", { overallOk, elapsedSec: Math.round((Date.now() - overallStart) / 1000) });

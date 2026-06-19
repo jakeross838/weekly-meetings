@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   const supabase = supabaseServer();
-  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes, poRes, coRes] = await Promise.all([
+  const [pmsRes, jobsRes, assignRes, subsRes, txRes, dlRes, poRes, coRes, syncRunRes] = await Promise.all([
     supabase
       .from("pms")
       .select("id, full_name, active")
@@ -56,6 +56,14 @@ export default async function ImportPage() {
       .from("change_orders")
       .select("scraped_at", { count: "exact" })
       .order("scraped_at", { ascending: false, nullsFirst: false })
+      .limit(1),
+    // Authoritative "last synced" — one row per full BT sync run (manual or the
+    // every-12h scheduled job). Independent of whether any record's date moved.
+    supabase
+      .from("sync_runs")
+      .select("kind, finished_at, ok, daily_logs, po_count, co_count")
+      .not("finished_at", "is", null)
+      .order("finished_at", { ascending: false })
       .limit(1),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
@@ -110,6 +118,14 @@ export default async function ImportPage() {
   const coRows = (coRes.data ?? []) as { scraped_at: string | null }[];
   const coCount = coRes.count ?? null;
   const lastCoPull = coRows[0]?.scraped_at ? coRows[0].scraped_at.slice(0, 10) : null;
+  const lastSync = ((syncRunRes?.data ?? [])[0] ?? null) as {
+    kind: string;
+    finished_at: string;
+    ok: boolean | null;
+    daily_logs: number | null;
+    po_count: number | null;
+    co_count: number | null;
+  } | null;
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -154,6 +170,39 @@ export default async function ImportPage() {
         }
       >
         <div className="border border-rule bg-paper p-5 space-y-2.5 text-sm">
+          {lastSync ? (
+            <div
+              className={`-mx-5 -mt-5 mb-2 px-5 py-3 border-b border-rule ${
+                lastSync.ok === false ? "bg-urgent/5" : "bg-accent/5"
+              }`}
+            >
+              <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
+                Last full Buildertrend sync
+              </div>
+              <div className="mt-1 text-foreground">
+                <span className="font-medium">{agoLabel(lastSync.finished_at)}</span>
+                <span className="text-ink-3">
+                  {" · "}
+                  {lastSync.kind === "auto" ? "auto · every 12h" : "manual"}
+                  {lastSync.ok === false ? " · ⚠ had errors" : ""}
+                </span>
+              </div>
+              <div className="mt-0.5 text-ink-3 text-xs">
+                {prettyDate(lastSync.finished_at)} · {lastSync.daily_logs ?? 0} logs ·{" "}
+                {lastSync.po_count ?? 0} POs · {lastSync.co_count ?? 0} COs
+              </div>
+            </div>
+          ) : (
+            <div className="-mx-5 -mt-5 mb-2 px-5 py-3 border-b border-rule bg-sand-2/40">
+              <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
+                Last full Buildertrend sync
+              </div>
+              <div className="mt-1 text-ink-3">
+                No full sync recorded yet — runs automatically every 12h, or hit
+                the button below.
+              </div>
+            </div>
+          )}
           <HistoryRow label="Purchase orders" when={lastPoPull} count={poCount} unit="POs" />
           <HistoryRow label="Change orders" when={lastCoPull} count={coCount} unit="COs" />
           <HistoryRow label="Daily logs" when={lastDailyImport} count={dailyCount} unit="logs" />
@@ -408,6 +457,22 @@ const MONTHS = [
 ];
 
 // One readable date format everywhere in the history: "2026-05-18" → "May 18".
+// Relative "X ago" for an exact instant (sync finished_at). Timezone-agnostic
+// (it's a duration), so it reads correctly regardless of server/viewer TZ.
+function agoLabel(iso: string | null): string {
+  if (!iso) return "never";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "unknown";
+  if (ms < 0) return "just now";
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}
+
 function prettyDate(iso: string | null): string {
   if (!iso) return "—";
   // Accept both "YYYY-MM-DD" and full ISO timestamps: take the date part and
