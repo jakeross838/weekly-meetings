@@ -6,6 +6,7 @@
 
 import { useState, type ComponentProps } from "react";
 import { ImportForm } from "@/components/import-form";
+import { ModalPortal } from "@/components/modal-portal";
 
 export function TranscriptImportModal(props: ComponentProps<typeof ImportForm>) {
   const [open, setOpen] = useState(false);
@@ -20,6 +21,7 @@ export function TranscriptImportModal(props: ComponentProps<typeof ImportForm>) 
       </button>
 
       {open && (
+        <ModalPortal>
         <div
           className="fixed inset-0 z-50 bg-ink/50 flex items-start justify-center overflow-y-auto px-3 py-6"
           onClick={(e) => {
@@ -44,6 +46,7 @@ export function TranscriptImportModal(props: ComponentProps<typeof ImportForm>) 
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   );

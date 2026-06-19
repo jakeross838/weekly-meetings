@@ -40,7 +40,7 @@ export default async function ReviewDetailPage({
       .eq("ingestion_event_id", ingestion_event_id)
       .order("change_type", { ascending: true })
       .order("created_at", { ascending: true }),
-    supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
+    supabase.from("subs").select("id, name, trade").eq("hidden", false).order("name"),
     supabase.from("jobs").select("id, name").order("name"),
   ]);
 

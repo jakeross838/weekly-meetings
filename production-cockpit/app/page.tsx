@@ -8,6 +8,7 @@ import { OPEN_STATUSES, Status } from "@/lib/types";
 import { Header } from "@/components/header";
 import { RequestAccessCard } from "@/components/request-access-card";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
+import { jobKeyMatchesName } from "@/lib/job-key";
 
 export const dynamic = "force-dynamic";
 
@@ -27,28 +28,40 @@ export default async function Page({
   const pmFilter = searchParams.pm ?? "";
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  const [jobsRes, openTodosRes, pmsRes, assignRes, pendingRes] = await Promise.all([
-    supabase.from("jobs").select("id, name, address, pm_id").order("name"),
-    supabase
-      .from("todos")
-      .select("job, due_date")
-      .in("status", OPEN_STATUSES as Status[]),
-    supabase.from("pms").select("id, full_name"),
-    supabase
-      .from("job_pm_assignments")
-      .select("job_id, pm_id")
-      .is("ended_at", null),
-    supabase
-      .from("ingestion_events")
-      .select("job_id")
-      .in("review_state", ["pending", "in_review"]),
-  ]);
+  const [jobsRes, openTodosRes, openItemsRes, pmsRes, assignRes, pendingRes] =
+    await Promise.all([
+      supabase.from("jobs").select("id, name, address, pm_id").order("name"),
+      supabase
+        .from("todos")
+        .select("job, due_date")
+        .in("status", OPEN_STATUSES as Status[]),
+      // v2 items count toward the portfolio totals exactly like they do on the
+      // job page (which merges items + todos). Counting todos only here made the
+      // dashboard under-report by every open item.
+      supabase
+        .from("items")
+        .select("job_id, target_date")
+        .in("status", ["open", "in_progress", "blocked"]),
+      supabase.from("pms").select("id, full_name"),
+      supabase
+        .from("job_pm_assignments")
+        .select("job_id, pm_id")
+        .is("ended_at", null),
+      supabase
+        .from("ingestion_events")
+        .select("job_id")
+        .in("review_state", ["pending", "in_review"]),
+    ]);
 
   const user = await currentUser();
   const allJobs = (jobsRes.data ?? []) as JobRow[];
   const todos = (openTodosRes.data ?? []) as {
     job: string | null;
     due_date: string | null;
+  }[];
+  const items = (openItemsRes.data ?? []) as {
+    job_id: string | null;
+    target_date: string | null;
   }[];
   const pms = (pmsRes.data ?? []) as { id: string; full_name: string }[];
   const assignments = (assignRes.data ?? []) as {
@@ -76,7 +89,7 @@ export default async function Page({
   const allowedJobNames = jobs.map((j) => j.name);
   const isPoVisible = (jobKey: string | null): boolean => {
     if (!jobKey) return false;
-    return allowedJobNames.some((n) => jobKey.startsWith(n));
+    return allowedJobNames.some((n) => jobKeyMatchesName(jobKey, n));
   };
   let poCommitted = 0;
   let poPaid = 0;
@@ -117,7 +130,9 @@ export default async function Page({
   const activePmByJob = new Map<string, string>();
   for (const a of assignments) activePmByJob.set(a.job_id, a.pm_id);
 
-  // Index counts by job (todos.job is text, matching the job.id slug)
+  // Index counts by job. todos.job is the display name ("Krauss"); items.job_id
+  // is the slug ("krauss"). Keep two maps and combine them in countsFor so the
+  // portfolio totals equal what each job page shows (items + todos).
   const openByJob = new Map<string, { open: number; past_due: number }>();
   for (const t of todos) {
     if (!t.job) continue;
@@ -126,6 +141,14 @@ export default async function Page({
     if (t.due_date && t.due_date < todayIso) rec.past_due += 1;
     openByJob.set(t.job, rec);
   }
+  const openByJobId = new Map<string, { open: number; past_due: number }>();
+  for (const i of items) {
+    if (!i.job_id) continue;
+    const rec = openByJobId.get(i.job_id) ?? { open: 0, past_due: 0 };
+    rec.open += 1;
+    if (i.target_date && i.target_date < todayIso) rec.past_due += 1;
+    openByJobId.set(i.job_id, rec);
+  }
 
   const pendingByJob = new Map<string, number>();
   for (const e of pending) {
@@ -133,10 +156,13 @@ export default async function Page({
     pendingByJob.set(e.job_id, (pendingByJob.get(e.job_id) ?? 0) + 1);
   }
 
-  // todos.job stores the display name ("Krauss"), jobs.id is the slug ("krauss").
-  // Match by job.name.
-  const countsFor = (j: JobRow) =>
-    openByJob.get(j.name) ?? { open: 0, past_due: 0 };
+  // Combine todo counts (keyed by display name) with item counts (keyed by
+  // slug) for each job.
+  const countsFor = (j: JobRow) => {
+    const t = openByJob.get(j.name) ?? { open: 0, past_due: 0 };
+    const i = openByJobId.get(j.id) ?? { open: 0, past_due: 0 };
+    return { open: t.open + i.open, past_due: t.past_due + i.past_due };
+  };
 
   // Which PM "owns" a job: active assignment wins, else the legacy jobs.pm_id.
   const pmForJob = (j: JobRow) => activePmByJob.get(j.id) ?? j.pm_id ?? null;

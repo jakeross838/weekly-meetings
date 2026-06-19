@@ -49,6 +49,7 @@ export interface ClaimLite {
 export interface SubOpt {
   id: string;
   name: string;
+  trade?: string | null;
 }
 
 export interface JobOpt {
@@ -380,7 +381,7 @@ export function ReviewForm({
                                   <option value="">— no sub —</option>
                                   {subs.map((s) => (
                                     <option key={s.id} value={s.id}>
-                                      {s.name}
+                                      {s.trade ? `${s.name} — ${s.trade}` : s.name}
                                     </option>
                                   ))}
                                 </select>

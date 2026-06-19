@@ -8,6 +8,7 @@
 //   · Color-coded action button (urgent for destructive, accent for safe)
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ModalPortal } from "@/components/modal-portal";
 
 export interface ConfirmModalProps {
   open: boolean;
@@ -75,6 +76,7 @@ export function ConfirmModal({
       : "bg-ink hover:bg-accent text-paper";
 
   return (
+    <ModalPortal>
     <div
       role="dialog"
       aria-modal="true"
@@ -82,7 +84,7 @@ export function ConfirmModal({
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();
       }}
-      style={{ animation: "fadeUp 180ms ease-out both" }}
+      style={{ animation: "fadeUp 180ms ease-out backwards" }}
     >
       <div className="w-full max-w-md bg-paper border border-rule shadow-2xl">
         <header className="px-5 pt-5 pb-3 border-b border-rule">
@@ -132,5 +134,6 @@ export function ConfirmModal({
         </footer>
       </div>
     </div>
+    </ModalPortal>
   );
 }

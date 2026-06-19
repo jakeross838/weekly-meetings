@@ -162,7 +162,15 @@ a, button, summary, label, select {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-main { animation: fadeUp 300ms ease-out both; }
+/* fill-mode `backwards` (not `both`): the entrance still plays, but once it
+   ends the element reverts to its base style with NO lingering transform. A
+   retained `transform: translateY(0)` (matrix(1,0,0,1,0,0)) is non-`none`, and
+   any non-none transform turns <main> into the containing block for every
+   position:fixed descendant — which made full-screen modals resolve `inset-0`
+   against the whole page instead of the viewport, landing them off-screen.
+   Modals also portal to <body> (components/modal-portal.tsx) as belt-and-
+   suspenders, but keeping <main> transform-free is the real fix. */
+main { animation: fadeUp 300ms ease-out backwards; }
 
 /* Loading skeleton shimmer (Next.js loading.tsx states). */
 @keyframes shimmer {
@@ -221,7 +229,9 @@ main { animation: fadeUp 300ms ease-out both; }
    `.stagger-children` and every direct child fades in with a small
    increasing delay (capped at 12 items so we don't get tiny offsets). */
 .stagger-children > * {
-  animation: fadeUp 380ms ease-out both;
+  /* `backwards` not `both` — same containing-block footgun as <main> above:
+     `both` would leave each row with a lingering identity transform. */
+  animation: fadeUp 380ms ease-out backwards;
 }
 .stagger-children > *:nth-child(1)  { animation-delay:  40ms; }
 .stagger-children > *:nth-child(2)  { animation-delay:  80ms; }

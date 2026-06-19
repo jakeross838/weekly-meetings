@@ -29,7 +29,7 @@ export default async function ImportPage() {
       .from("job_pm_assignments")
       .select("job_id, pm_id")
       .is("ended_at", null),
-    supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
+    supabase.from("subs").select("id, name, trade").eq("hidden", false).order("name"),
     // Transcript import history — pull job too (it's a free-text job name on
     // the todo row, not a FK) so we can render a per-job breakdown for each
     // transcript (which jobs got todos out of it).

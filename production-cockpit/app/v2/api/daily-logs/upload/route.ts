@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
+import { normalizeSubName } from "@/lib/sub-name";
 
 export const dynamic = "force-dynamic";
 
@@ -202,10 +203,15 @@ function slugifySub(name: string): string {
 // Auto-create a sub profile for any crew BT logged that we don't already have,
 // so its trade performance has somewhere to show. Rules honored:
 //  - crew names are BT ground-truth (a human picked them in BT), not AI guesses
-//  - existing/human-curated subs are NEVER modified (match by name + aliases,
-//    insert-only, ignoreDuplicates), so manual data always wins
-//  - new rows are marked source='auto' (mirrors sub_specialties.source) so the
-//    auto vs. human distinction stays visible
+//  - existing/human-curated subs are NEVER overwritten — we only ever ADD an
+//    alias to them; manual fields always win
+//  - a crew name that is the same vendor written differently (e.g. "Metro
+//    Electric, LLC" vs an existing "Metro Electric") is attached as an ALIAS to
+//    the existing sub instead of spawning a duplicate row. Match precedence:
+//    exact name/alias first, then normalized name (lib/sub-name.ts). This is
+//    what stops the catalog from filling up with LLC/Inc near-duplicates.
+//  - genuinely new names become rows marked source='auto' (mirrors
+//    sub_specialties.source) so the auto vs. human distinction stays visible
 async function ensureSubsForCrews(
   supabase: ReturnType<typeof supabaseServer>,
   crewNames: Set<string>
@@ -215,35 +221,71 @@ async function ensureSubsForCrews(
     .from("subs")
     .select("id, name, aliases");
   if (error) return 0; // never block the daily-log upload on a subs hiccup
-  const known = new Set<string>();
+  const known = new Set<string>(); // exact lc of every name + alias
   const ids = new Set<string>();
+  const byNorm = new Map<string, { id: string; aliases: string[] }>();
   for (const s of (existing ?? []) as {
     id: string;
     name: string;
     aliases: string[] | null;
   }[]) {
     ids.add(s.id);
+    const aliases = (s.aliases ?? []).map(String);
     known.add(s.name.trim().toLowerCase());
-    for (const a of s.aliases ?? []) known.add(String(a).trim().toLowerCase());
+    for (const a of aliases) known.add(a.trim().toLowerCase());
+    // First writer wins on a normalized-key collision so we attach variants to a
+    // stable, already-existing profile rather than bouncing between rows.
+    const nk = normalizeSubName(s.name);
+    if (nk && !byNorm.has(nk)) byNorm.set(nk, { id: s.id, aliases });
   }
+
+  const existingIds = new Set(((existing ?? []) as { id: string }[]).map((s) => s.id));
   const toCreate: {
     id: string;
     name: string;
     source: string;
     flagged_for_pm_binder: boolean;
+    aliases?: string[];
   }[] = [];
+  const byId = new Map<string, { id: string; aliases: string[] }>(); // for alias appends
+
   for (const raw of Array.from(crewNames)) {
     const name = raw.trim();
     const lc = name.toLowerCase();
     if (!lc || CREW_LABELS_TO_STRIP.has(name) || known.has(lc)) continue;
+
+    // Same vendor, different spelling → attach as an ALIAS to the matched sub
+    // (existing or one we're about to create), never a duplicate row.
+    const nk = normalizeSubName(name);
+    const match = nk ? byNorm.get(nk) : undefined;
+    if (match) {
+      known.add(lc);
+      if (!match.aliases.some((a) => a.trim().toLowerCase() === lc)) {
+        match.aliases.push(name);
+      }
+      continue;
+    }
+
     let id = slugifySub(name);
     const base = id;
     let i = 2;
     while (ids.has(id)) id = `${base}-${i++}`;
     ids.add(id);
     known.add(lc);
-    toCreate.push({ id, name, source: "auto", flagged_for_pm_binder: false });
+    const row = { id, name, source: "auto", flagged_for_pm_binder: false, aliases: [] as string[] };
+    toCreate.push(row);
+    const ref = { id, aliases: row.aliases };
+    byId.set(id, ref);
+    if (nk) byNorm.set(nk, ref); // later variants in this batch attach here too
   }
+
+  // Persist alias appends to EXISTING subs (additive; manual fields untouched).
+  // New subs carry their aliases in the insert payload below, so skip those.
+  for (const [, ref] of Array.from(byNorm.entries())) {
+    if (!existingIds.has(ref.id) || ref.aliases.length === 0) continue;
+    await supabase.from("subs").update({ aliases: ref.aliases }).eq("id", ref.id);
+  }
+
   if (toCreate.length === 0) return 0;
   const { error: insErr } = await supabase
     .from("subs")

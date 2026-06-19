@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "@/lib/supabase";
 import { scrubRelativeDates } from "@/lib/scrub-relative-dates";
+import { normalizeSubName } from "@/lib/sub-name";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow up to 60s for Claude call
@@ -212,9 +213,20 @@ export async function POST(req: NextRequest) {
     name: string;
     aliases: string[] | null;
   }[];
+  // Resolve the AI's sub_name against canonical names, every alias, and a
+  // legal-suffix-normalized key — so "Walter" (alias), "Metro Electric, LLC"
+  // (suffix variant), and the exact name all map to the right sub id.
   const subByName: Record<string, { id: string; name: string }> = {};
+  const subByNorm: Record<string, { id: string; name: string }> = {};
   for (const s of subCatalog) {
-    subByName[s.name.toLowerCase()] = { id: s.id, name: s.name };
+    const entry = { id: s.id, name: s.name };
+    subByName[s.name.trim().toLowerCase()] = entry;
+    for (const a of s.aliases ?? []) {
+      const k = String(a).trim().toLowerCase();
+      if (k) subByName[k] = entry;
+    }
+    const nk = normalizeSubName(s.name);
+    if (nk && !(nk in subByNorm)) subByNorm[nk] = entry;
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -343,7 +355,9 @@ export async function POST(req: NextRequest) {
     let sid: string | null = null;
     let sname: string | null = null;
     if (item.sub_name) {
-      const matched = subByName[item.sub_name.toLowerCase()];
+      const matched =
+        subByName[item.sub_name.trim().toLowerCase()] ??
+        subByNorm[normalizeSubName(item.sub_name)];
       if (matched) {
         sid = matched.id;
         sname = matched.name;

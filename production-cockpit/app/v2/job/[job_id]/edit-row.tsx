@@ -6,10 +6,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
+import { ModalPortal } from "@/components/modal-portal";
 
 export interface SubOpt {
   id: string;
   name: string;
+  trade?: string | null;
 }
 
 export interface RowEditValues {
@@ -112,6 +114,7 @@ export function EditRowModal({
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
       onClick={onClose}
@@ -169,7 +172,7 @@ export function EditRowModal({
               <option value="">— none —</option>
               {subs.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.trade ? `${s.name} — ${s.trade}` : s.name}
                 </option>
               ))}
             </select>
@@ -215,5 +218,6 @@ export function EditRowModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

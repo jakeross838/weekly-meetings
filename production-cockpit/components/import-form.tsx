@@ -17,6 +17,7 @@ interface JobOpt {
 interface SubOpt {
   id: string;
   name: string;
+  trade?: string | null;
 }
 
 interface Assignment {
@@ -502,7 +503,7 @@ export function ImportForm({
                                   <option value="">— no sub —</option>
                                   {subs.map((s) => (
                                     <option key={s.id} value={s.id}>
-                                      {s.name}
+                                      {s.trade ? `${s.name} — ${s.trade}` : s.name}
                                     </option>
                                   ))}
                                 </select>

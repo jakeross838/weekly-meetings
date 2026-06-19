@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ModalPortal } from "@/components/modal-portal";
 
 const USERNAME_KEY = "bt-sync-username";
 
@@ -238,6 +239,7 @@ export function BtImportAllButton() {
       </button>
 
       {open && (
+        <ModalPortal>
         <div
           className="fixed inset-0 z-50 bg-ink/50 flex items-end sm:items-center justify-center px-3 py-4"
           onClick={(e) => {
@@ -401,6 +403,7 @@ export function BtImportAllButton() {
             </footer>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   );

@@ -23,6 +23,7 @@ import {
   SummaryMeta,
 } from "./job-summary-panel";
 import { currentUser, canSeeJobByPm } from "@/lib/auth";
+import { jobKeyMatchesName } from "@/lib/job-key";
 
 export const dynamic = "force-dynamic";
 
@@ -137,7 +138,7 @@ export default async function V2JobPage({
         .select("id, proposed_count")
         .eq("job_id", job_id)
         .in("review_state", ["pending", "in_review"]),
-      supabase.from("subs").select("id, name").eq("hidden", false).order("name"),
+      supabase.from("subs").select("id, name, trade").eq("hidden", false).order("name"),
       // F9 — latest job_summaries row for this job. Tolerates missing table.
       supabase
         .from("job_summaries")
@@ -152,7 +153,7 @@ export default async function V2JobPage({
       // to compute pending vs. analyzed counts for the summary panel.
       supabase
         .from("daily_logs")
-        .select("id, photo_urls, photo_summary")
+        .select("id, job_key, photo_urls, photo_summary")
         .ilike("job_key", `${job.name}%`)
         .not("photo_urls", "is", null)
         .limit(500),
@@ -167,7 +168,7 @@ export default async function V2JobPage({
       supabase
         .from("purchase_orders")
         .select(
-          "id, po_number, title, vendor, approval_status, work_status, paid_status, cost, amount_paid, amount_remaining, pct_billed, cost_codes, date_added"
+          "id, job_key, po_number, title, vendor, approval_status, work_status, paid_status, cost, amount_paid, amount_remaining, pct_billed, cost_codes, date_added"
         )
         .ilike("job_key", `${job.name}%`)
         .eq("hidden", false)
@@ -175,7 +176,7 @@ export default async function V2JobPage({
       // Change orders for this job (matched by job_key prefix like POs).
       supabase
         .from("change_orders")
-        .select("id, co_number, title, status, owner_price, date_approved")
+        .select("id, job_key, co_number, title, status, owner_price, date_approved")
         .ilike("job_key", `${job.name}%`)
         .eq("hidden", false)
         .order("date_added", { ascending: false }),
@@ -211,7 +212,11 @@ export default async function V2JobPage({
     sub: { id: string; name: string } | null;
   };
 
-  const subs = (subsRes.data ?? []) as { id: string; name: string }[];
+  const subs = (subsRes.data ?? []) as {
+    id: string;
+    name: string;
+    trade: string | null;
+  }[];
 
   // F9 — summary + photo-status derivation. Both pieces are graceful:
   // if the table doesn't exist, summary is null, photoLogs is empty.
@@ -246,9 +251,10 @@ export default async function V2JobPage({
     photoLogsRes && !photoLogsRes.error
       ? ((photoLogsRes.data ?? []) as {
           id: string;
+          job_key: string | null;
           photo_urls: unknown;
           photo_summary: unknown;
-        }[])
+        }[]).filter((l) => jobKeyMatchesName(l.job_key, job.name))
       : [];
   let totalPhotos = 0;
   let initialPendingPhotos = 0;
@@ -295,7 +301,9 @@ export default async function V2JobPage({
   // Purchase orders + their line items (committed costs / outstanding).
   const purchaseOrders =
     purchaseOrdersRes && !purchaseOrdersRes.error
-      ? ((purchaseOrdersRes.data ?? []) as POForJob[])
+      ? ((purchaseOrdersRes.data ?? []) as POForJob[]).filter((p) =>
+          jobKeyMatchesName(p.job_key, job.name)
+        )
       : [];
   const poLinesByPo = new Map<string, POLine[]>();
   if (purchaseOrders.length > 0) {
@@ -328,7 +336,9 @@ export default async function V2JobPage({
   const openPoCount = purchaseOrders.filter(
     (p) => (Number(p.amount_remaining) || 0) > 0
   ).length;
-  const changeOrders = (changeOrdersRes.data ?? []) as ChangeOrderRow[];
+  const changeOrders = ((changeOrdersRes.data ?? []) as (ChangeOrderRow & {
+    job_key: string | null;
+  })[]).filter((c) => jobKeyMatchesName(c.job_key, job.name));
 
   const items = ((itemsRes.data ?? []) as unknown) as RawItem[];
   const todos = ((todosRes.data ?? []) as unknown) as RawTodo[];
@@ -538,6 +548,7 @@ export default async function V2JobPage({
 
 type POForJob = {
   id: string;
+  job_key: string | null;
   po_number: string | null;
   title: string | null;
   vendor: string | null;
@@ -698,7 +709,7 @@ function CategorySection({
   category: string;
   rows: RowData[];
   today: string;
-  subs: { id: string; name: string }[];
+  subs: { id: string; name: string; trade: string | null }[];
 }) {
   if (rows.length === 0) return null;
   const isUncat = category === "(uncategorized)";
