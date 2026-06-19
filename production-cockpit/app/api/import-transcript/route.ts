@@ -5,7 +5,10 @@ import { scrubRelativeDates } from "@/lib/scrub-relative-dates";
 import { normalizeSubName } from "@/lib/sub-name";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Allow up to 60s for Claude call
+// Up to 300s (Vercel's current max on all plans). The Opus extraction over a
+// long, multi-job office transcript can take 60-90s; the old 60s cap timed out
+// mid-call and returned a non-JSON 504, surfacing as "Unexpected token 'A'".
+export const maxDuration = 300;
 
 interface ExtractedItem {
   title: string;

@@ -12,7 +12,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { businessToday, businessDateOffset } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // Claude client-summary call — give it room
 const MODEL = "claude-opus-4-7";
 
 interface ClientSummary {

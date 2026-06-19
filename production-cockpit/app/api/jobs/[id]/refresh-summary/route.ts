@@ -17,7 +17,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // Claude summary over 30 days of data — give it room
 
 const MODEL = "claude-opus-4-7";
 const DEFAULT_WINDOW_DAYS = 30;

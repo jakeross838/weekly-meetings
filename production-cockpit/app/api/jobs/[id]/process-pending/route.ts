@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300; // Claude vision over many photos — give it room
 
 export async function POST(
   req: NextRequest,

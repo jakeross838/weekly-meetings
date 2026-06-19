@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES, styleFor } from "@/lib/categories";
 import { businessToday } from "@/lib/today";
+import { fetchJson } from "@/lib/fetch-json";
 
 interface PMOpt {
   id: string;
@@ -227,7 +228,7 @@ export function ImportForm({
     const pmName = pms.find((p) => p.id === pmId)?.full_name ?? pmId;
     setProcessing(true);
     try {
-      const res = await fetch("/api/import-transcript", {
+      const data = await fetchJson("/api/import-transcript", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -238,12 +239,6 @@ export function ImportForm({
           meeting_type: meetingType,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setError(data.error || `HTTP ${res.status}`);
-        setProcessing(false);
-        return;
-      }
       setExtract(data);
       // Default per-row state: everything enabled, original values from extractor
       const init: Record<string, RowState> = {};
@@ -294,7 +289,7 @@ export function ImportForm({
       });
     });
     try {
-      const res = await fetch("/api/save-extracted-todos", {
+      await fetchJson("/api/save-extracted-todos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -304,12 +299,6 @@ export function ImportForm({
           items,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setError(data.error || `HTTP ${res.status}`);
-        setSaving(false);
-        return;
-      }
       start(() => router.push(`/?pm=${pmId}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

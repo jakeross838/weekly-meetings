@@ -23,7 +23,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300; // Claude vision over a photo batch — give it room
 
 // Photos in daily_logs.photo_urls may be either remote URLs (presigned BT,
 // public hosts, etc.) or absolute local file paths written by the

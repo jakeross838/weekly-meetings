@@ -6,6 +6,7 @@
 // the homeowner.
 
 import { useState } from "react";
+import { fetchJson } from "@/lib/fetch-json";
 
 interface ClientSummary {
   greeting: string;
@@ -30,17 +31,11 @@ export function ClientSummaryPanel({ jobId }: { jobId: string }) {
     setPeriod(p);
     setCopied(false);
     try {
-      const r = await fetch(`/api/jobs/${jobId}/client-summary`, {
+      const j = await fetchJson(`/api/jobs/${jobId}/client-summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ period: p }),
       });
-      const j = await r.json();
-      if (!r.ok || !j.ok) {
-        setErr(j.error || `HTTP ${r.status}`);
-        setBusy(false);
-        return;
-      }
       setSummary(j.summary as ClientSummary);
       setBusy(false);
     } catch (e) {

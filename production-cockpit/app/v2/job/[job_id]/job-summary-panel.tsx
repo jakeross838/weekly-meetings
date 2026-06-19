@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchJson } from "@/lib/fetch-json";
 
 export interface JobSummary {
   headline: string;
@@ -88,16 +89,11 @@ export function JobSummaryPanel({
     setBusy("refresh");
     setErr(null);
     try {
-      const r = await fetch(`/api/jobs/${jobId}/refresh-summary`, {
+      const data = await fetchJson(`/api/jobs/${jobId}/refresh-summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ window_days: 30 }),
       });
-      const data = await r.json();
-      if (!r.ok || data.ok === false) {
-        setErr(data.error || `HTTP ${r.status}`);
-        return;
-      }
       setSummary(data.summary);
       setMeta(data.meta);
       router.refresh();
@@ -113,14 +109,9 @@ export function JobSummaryPanel({
     setBusy("process");
     setErr(null);
     try {
-      const r = await fetch(`/api/jobs/${jobId}/process-pending`, {
+      const data = await fetchJson(`/api/jobs/${jobId}/process-pending`, {
         method: "POST",
       });
-      const data = await r.json();
-      if (!r.ok || data.ok === false) {
-        setErr(data.error || `HTTP ${r.status}`);
-        return;
-      }
       // Backend returned per-log results. Trust the processed count and
       // assume any leftover failures are still pending.
       const processed = data.processed ?? 0;
