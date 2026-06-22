@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
 import { normalizeSubName } from "@/lib/sub-name";
+import { guardSyncWrite } from "@/lib/sync-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -294,6 +295,8 @@ async function ensureSubsForCrews(
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await guardSyncWrite(req);
+  if (denied) return denied;
   const supabase = supabaseServer();
 
   let body: Body = {};

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase";
+import { guardSyncWrite } from "@/lib/sync-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -53,6 +54,8 @@ function coRow(co: CORecord, scrapedAt: string): Record<string, unknown> {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await guardSyncWrite(req);
+  if (denied) return denied;
   const supabase = supabaseServer();
   let body: {
     payload?: { byJob?: Record<string, CORecord[]> };
