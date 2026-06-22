@@ -12,6 +12,7 @@ import { supabaseServer } from "@/lib/supabase";
 import { OPEN_STATUSES, Status } from "@/lib/types";
 import { CheckOffButton } from "./check-off-button";
 import { RowClient } from "./row-client";
+import { AddTodoButton } from "./add-todo";
 import { CategoryFilterPills } from "@/components/category-filter-pills";
 import { AccountingTable } from "@/components/accounting-table";
 import { ClientSummaryPanel } from "@/components/client-summary-panel";
@@ -46,6 +47,20 @@ interface RowData {
 
 function todayIso(): string {
   return businessToday();
+}
+
+// Format a completion timestamp (ISO, UTC) as "M/D" in the business timezone
+// (America/New_York) so a late-evening check-off doesn't read as the next day.
+// Used for the "done on" stamp in the Done-this-week list.
+function doneDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    month: "numeric",
+    day: "numeric",
+  });
 }
 
 export default async function V2JobPage({
@@ -505,6 +520,10 @@ export default async function V2JobPage({
         availableCategories={availableCategories}
       />
 
+      <div className="px-5 pt-6">
+        <AddTodoButton jobId={job.id} subs={subs} />
+      </div>
+
       {actionable.length === 0 && (
         <p className="px-5 pt-8 text-ink-3 text-sm">
           {catFilter ? `No ${catFilter} items.` : "All clear."}
@@ -534,9 +553,17 @@ export default async function V2JobPage({
                   className="flex gap-3 items-baseline py-1 min-h-[32px]"
                 >
                   <CheckOffButton itemId={r.id} source={r.source} completed />
-                  <span className="text-ink-3 text-sm line-through">
+                  <span className="flex-1 min-w-0 text-ink-3 text-sm line-through">
                     {r.title}
                   </span>
+                  {r.completed_at && (
+                    <span
+                      className="shrink-0 font-mono text-[11px] tabular-nums text-ink-3"
+                      title={`Completed ${r.completed_at.slice(0, 10)}`}
+                    >
+                      {doneDate(r.completed_at)}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -617,16 +644,20 @@ function PayAppProgress({
   const over = completed - scheduled;
   return (
     <section className="px-5 pt-2">
-      <div className="border border-rule p-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+      <details open className="group border border-rule">
+        <summary className="flex cursor-pointer list-none items-baseline justify-between p-4 select-none">
+          <span className="flex items-baseline gap-2 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+            <span className="transition-transform group-open:rotate-90" aria-hidden>
+              ›
+            </span>
             Contract progress
-          </h2>
+          </span>
           <span className={`font-mono text-sm tabular-nums ${tone.text}`}>
             {pct.toFixed(0)}%
           </span>
-        </div>
-        <div className="mt-3 h-2 w-full bg-sand-2 overflow-hidden">
+        </summary>
+        <div className="px-4 pb-4">
+        <div className="h-2 w-full bg-sand-2 overflow-hidden">
           <div className={`h-full ${tone.bar}`} style={{ width: `${clamped}%` }} />
         </div>
         <p className="mt-2 text-ink-3 text-xs">
@@ -693,7 +724,8 @@ function PayAppProgress({
             </ul>
           </details>
         )}
-      </div>
+        </div>
+      </details>
     </section>
   );
 }

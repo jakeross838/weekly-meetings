@@ -387,6 +387,40 @@ export async function POST(req: NextRequest) {
         dailyStep.error = `scrape_api.py exited ${dailyRun.exitCode} after ${Math.round(dailyRun.elapsedMs / 1000)}s`;
         overallOk = false;
         await dumpFailure("daily-logs", dailyRun.exitCode, Math.round(dailyRun.elapsedMs / 1000), dailyStderrTail, redact(dailyRun.stdout.slice(-3000), password));
+        // Best-effort partial recovery: scrape_api.py writes daily-logs.json
+        // incrementally (one write per job), so a kill mid-run still leaves
+        // every job it finished on disk. If that file is from THIS run (fresh
+        // mtime), upload what it managed to scrape so a near-complete pull isn't
+        // thrown away. Stays a partial (ok=false); vision is skipped this round
+        // and picked up on the next clean run.
+        try {
+          const stat = await fs.stat(dailyOutput).catch(() => null);
+          if (stat && stat.mtimeMs >= overallStart) {
+            const raw = await fs.readFile(dailyOutput, "utf-8");
+            const payload = JSON.parse(raw) as { byJob?: Record<string, unknown[]> };
+            const byJob = payload.byJob ?? {};
+            dailyStep.scrape.jobCount = Object.keys(byJob).length;
+            for (const rows of Object.values(byJob)) {
+              if (!Array.isArray(rows)) continue;
+              dailyStep.scrape.logCount! += rows.length;
+              for (const r of rows) {
+                const arr = (r as { photo_urls?: unknown[] })?.photo_urls;
+                if (Array.isArray(arr)) dailyStep.scrape.photoCount! += arr.length;
+              }
+            }
+            if ((dailyStep.scrape.logCount ?? 0) > 0) {
+              const upR = await fetch(`${origin}/v2/api/daily-logs/upload`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source: "cockpit-bt-sync-all-partial", payload }),
+              });
+              dailyStep.upload = (await upR.json().catch(() => ({}))) as Record<string, unknown>;
+              dailyStep.error += ` — recovered ${dailyStep.scrape.logCount} log(s) from ${dailyStep.scrape.jobCount} job(s) scraped before the exit`;
+            }
+          }
+        } catch (e) {
+          console.error("[bt/sync-all] partial daily-logs recovery failed:", e);
+        }
         send(dailyStep);
       } else {
         try {
