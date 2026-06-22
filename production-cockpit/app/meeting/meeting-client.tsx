@@ -8,12 +8,14 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DeleteButton } from "@/components/delete-button";
+import { EditableText } from "@/components/editable-text";
 import { CATEGORIES, styleFor } from "@/lib/categories";
 
 export interface MeetingItem {
   id: string;
-  source: "item" | "todo"; // which table — drives the delete endpoint
+  source: "item" | "todo"; // which table — drives the edit/delete endpoint
   title: string;
+  due_date: string | null; // raw yyyy-mm-dd, so the date is inline-editable
   daysOver: number | null; // set when past due
   daysTo: number | null; // set when due in the future
   subName: string | null;
@@ -305,7 +307,7 @@ function CategoryGroups({
     return (
       <ul className={pastDue ? "divide-y divide-urgent/15" : "divide-y divide-rule"}>
         {items.map((it) => (
-          <ItemRow key={it.id} it={it} pastDue={pastDue} />
+          <ItemRow key={`${it.source}:${it.id}`} it={it} pastDue={pastDue} />
         ))}
       </ul>
     );
@@ -331,7 +333,7 @@ function CategoryGroups({
           </div>
           <ul className={divider}>
             {g.items.map((it) => (
-              <ItemRow key={it.id} it={it} pastDue={pastDue} />
+              <ItemRow key={`${it.source}:${it.id}`} it={it} pastDue={pastDue} />
             ))}
           </ul>
         </div>
@@ -341,28 +343,47 @@ function CategoryGroups({
 }
 
 function ItemRow({ it, pastDue }: { it: MeetingItem; pastDue?: boolean }) {
+  // Inline edits route to the id-in-URL edit endpoints so the shared
+  // <EditableText> (which POSTs only { [field]: value }) works unchanged.
+  // todos store the date as `due_date`; v2 items as `target_date`.
+  const editEndpoint =
+    it.source === "item" ? `/v2/api/items/${it.id}/edit` : `/api/todos/${it.id}/edit`;
+  const dateField = it.source === "item" ? "target_date" : "due_date";
+  const dateLabel = pastDue
+    ? `${it.daysOver}d over`
+    : it.daysTo === 0
+      ? "today"
+      : `${it.daysTo}d`;
+
   return (
     <li className="flex gap-4 items-baseline px-4 py-4">
       <span className="flex-1 min-w-0 text-foreground text-sm leading-relaxed">
-        {it.title}
+        <EditableText
+          value={it.title}
+          endpoint={editEndpoint}
+          field="title"
+          type="text"
+          label="Click to edit task"
+          className="text-foreground text-sm leading-relaxed"
+        />
         {it.subName && (
           <span className="ml-2 inline-block font-mono text-[10px] uppercase tracking-[0.1em] text-ink-3">
             · {it.subName}
           </span>
         )}
       </span>
-      <span
+      <EditableText
+        value={it.due_date}
+        endpoint={editEndpoint}
+        field={dateField}
+        type="date"
+        display={dateLabel}
+        label="Click to edit due date"
         className={
           "shrink-0 font-mono text-xs tabular-nums whitespace-nowrap " +
           (pastDue ? "text-urgent" : "text-ink-3")
         }
-      >
-        {pastDue
-          ? `${it.daysOver}d over`
-          : it.daysTo === 0
-            ? "today"
-            : `${it.daysTo}d`}
-      </span>
+      />
       <DeleteButton
         endpoint={
           it.source === "item"

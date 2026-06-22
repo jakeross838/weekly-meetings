@@ -368,6 +368,32 @@ CREATE TABLE IF NOT EXISTS public.sub_specialty_durations (
 );
 CREATE INDEX IF NOT EXISTS sub_spec_dur_sub_idx ON public.sub_specialty_durations (sub_id);
 CREATE INDEX IF NOT EXISTS sub_spec_dur_specialty_idx ON public.sub_specialty_durations (specialty);
+
+-- Buildertrend sync audit log — one row per full sync run (manual, or the
+-- every-12h scheduled job). Powers the authoritative "last synced Xh ago"
+-- banner on /import. Written by /api/bt/sync-all; read by /import. Without this
+-- table the sync-all route's metadata insert fails silently, so the banner
+-- never populates even though the pull itself succeeded.
+CREATE TABLE IF NOT EXISTS public.sync_runs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind text NOT NULL CHECK (kind IN ('manual', 'auto')),
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    ok boolean NOT NULL DEFAULT false,
+    daily_jobs int,
+    daily_logs int,
+    daily_photos int,
+    po_jobs int,
+    po_count int,
+    po_line_items int,
+    co_jobs int,
+    co_count int,
+    error text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sync_runs_finished_idx
+    ON public.sync_runs (finished_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS sync_runs_kind_idx ON public.sync_runs (kind);
 `;
 
 function projectRefFromUrl(url: string): string | null {
@@ -508,7 +534,8 @@ export async function POST(req: NextRequest) {
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='purchase_orders' AND column_name='hidden')                                    AS has_po_hidden,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='po_line_items' AND column_name='manually_edited_fields')                      AS has_poli_manual,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name ='daily_logs' AND column_name='manually_edited_fields')                         AS has_dl_manual,
-        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='change_orders')                                                               AS has_change_orders
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='change_orders')                                                               AS has_change_orders,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name ='sync_runs')                                                                   AS has_sync_runs
     `);
     const verified = verifyRes.rows[0] as Record<string, unknown>;
     // Flag any boolean check that came back false so the operator sees

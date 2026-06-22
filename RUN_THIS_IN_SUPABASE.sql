@@ -5,7 +5,7 @@
 -- This is the manual-paste MIRROR of MIGRATIONS_SQL in
 -- production-cockpit/app/api/admin/run-migrations/route.ts (the /admin/migrate
 -- button runs the same statements over a direct pg connection). Keep the two in
--- sync — if you edit one, edit the other. Last synced: 2026-05-20.
+-- sync — if you edit one, edit the other. Last synced: 2026-06-22.
 
 CREATE TABLE IF NOT EXISTS public.daily_logs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -304,3 +304,29 @@ CREATE INDEX IF NOT EXISTS password_reset_tokens_email_lower_idx
     ON public.password_reset_tokens (lower(email));
 CREATE INDEX IF NOT EXISTS password_reset_tokens_expires_idx
     ON public.password_reset_tokens (expires_at);
+
+-- Buildertrend sync audit log — one row per full sync run (manual, or the
+-- every-12h scheduled job). Powers the authoritative "last synced Xh ago"
+-- banner on /import. Written by /api/bt/sync-all; read by /import. Without this
+-- table the sync-all route's metadata insert fails silently, so the banner
+-- never populates even though the pull itself succeeded.
+CREATE TABLE IF NOT EXISTS public.sync_runs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind text NOT NULL CHECK (kind IN ('manual', 'auto')),
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    ok boolean NOT NULL DEFAULT false,
+    daily_jobs int,
+    daily_logs int,
+    daily_photos int,
+    po_jobs int,
+    po_count int,
+    po_line_items int,
+    co_jobs int,
+    co_count int,
+    error text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sync_runs_finished_idx
+    ON public.sync_runs (finished_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS sync_runs_kind_idx ON public.sync_runs (kind);

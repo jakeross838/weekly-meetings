@@ -219,6 +219,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
       id: e.id,
       source: e.source,
       title: e.title,
+      due_date: e.date,
       daysOver: e.date && e.date < today ? daysBetween(e.date, today) : null,
       daysTo: e.date && e.date >= today ? daysBetween(today, e.date) : null,
       subName: e.subName,

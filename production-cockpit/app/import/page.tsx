@@ -12,6 +12,7 @@ import { BtSyncButton } from "@/components/bt-sync-button";
 import { BtPoSyncButton } from "@/components/bt-po-sync-button";
 import { BtCoSyncButton } from "@/components/bt-co-sync-button";
 import { BtImportAllButton } from "@/components/bt-import-all-button";
+import { BtCloudSyncButton } from "@/components/bt-cloud-sync-button";
 import { DailyLogUploadForm } from "../v2/daily-logs/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ export default async function ImportPage() {
       .select("kind, finished_at, ok, daily_logs, po_count, co_count")
       .not("finished_at", "is", null)
       .order("finished_at", { ascending: false })
-      .limit(1),
+      .limit(10),
   ]);
   const pms = (pmsRes.data ?? []) as PM[];
   const jobs = (jobsRes.data ?? []) as { id: string; name: string }[];
@@ -118,14 +119,15 @@ export default async function ImportPage() {
   const coRows = (coRes.data ?? []) as { scraped_at: string | null }[];
   const coCount = coRes.count ?? null;
   const lastCoPull = coRows[0]?.scraped_at ? coRows[0].scraped_at.slice(0, 10) : null;
-  const lastSync = ((syncRunRes?.data ?? [])[0] ?? null) as {
+  const syncRuns = (syncRunRes?.data ?? []) as {
     kind: string;
     finished_at: string;
     ok: boolean | null;
     daily_logs: number | null;
     po_count: number | null;
     co_count: number | null;
-  } | null;
+  }[];
+  const lastSync = syncRuns[0] ?? null;
 
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
@@ -212,6 +214,35 @@ export default async function ImportPage() {
             count={transcriptImports.length || null}
             unit="files"
           />
+          {syncRuns.length > 0 && (
+            <details className="!mt-3 border-t border-rule pt-2">
+              <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-1">
+                Sync history · {syncRuns.length}
+              </summary>
+              <ul className="mt-2 divide-y divide-rule">
+                {syncRuns.map((s, i) => (
+                  <li
+                    key={i}
+                    className="flex items-baseline justify-between gap-3 py-1.5"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={s.ok === false ? "text-urgent" : "text-success"}>
+                        {s.ok === false ? "✗" : "✓"}
+                      </span>
+                      <span className="text-ink-2">{agoLabel(s.finished_at)}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-3">
+                        {s.kind === "auto" ? "auto" : "manual"}
+                      </span>
+                    </span>
+                    <span className="font-mono text-[10px] tabular-nums text-ink-3">
+                      {s.daily_logs ?? 0} logs · {s.po_count ?? 0} POs ·{" "}
+                      {s.co_count ?? 0} COs
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       </Section>
 
@@ -363,18 +394,23 @@ export default async function ImportPage() {
         }
         bottomGap
       >
-        <BtImportAllButton />
+        <BtCloudSyncButton />
 
-        {/* Advanced — pull a single source (kept for surgical retries) */}
+        {/* Advanced — local-only pulls that run the scraper on THIS computer
+            (need the laptop + `npm run dev`). The cloud button above is what
+            works from any device. */}
         <details className="mt-6">
           <summary className="cursor-pointer font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink py-2">
-            Advanced — pull just one source
+            Advanced — run a pull from this computer (local only)
           </summary>
           <div className="mt-3 space-y-4 border-l-2 border-rule pl-4">
             <p className="text-sm text-ink-3 leading-relaxed">
-              Use these if one source failed and you want to retry it alone
-              without re-pulling everything.
+              These run the scraper on the machine you&apos;re on (they need the
+              laptop with <code className="font-mono text-[11px]">npm run dev</code>).
+              The one-click below pulls everything; the three after it retry a
+              single source.
             </p>
+            <BtImportAllButton />
             <div className="flex flex-wrap gap-3">
               <BtSyncButton />
               <BtPoSyncButton />
