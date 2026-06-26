@@ -62,6 +62,7 @@ type Entry = {
 type SubRow = {
   id: string;
   name: string;
+  trade: string | null;
   flagged_for_pm_binder: boolean;
   flag_note: string | null;
 };
@@ -87,7 +88,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         .in("status", ["open", "in_progress", "blocked"]),
       supabase
         .from("subs")
-        .select("id, name, flagged_for_pm_binder, flag_note")
+        .select("id, name, trade, flagged_for_pm_binder, flag_note")
         .eq("hidden", false),
       supabase.from("pms").select("id, full_name"),
       supabase
@@ -255,6 +256,8 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
           status: h.status,
           dotClass: h.dotClass,
           reason: s?.flag_note ?? null,
+          trade: s?.trade ?? null,
+          flagged: s?.flagged_for_pm_binder ?? false,
         };
       })
       .filter((s) => s.status !== "green")

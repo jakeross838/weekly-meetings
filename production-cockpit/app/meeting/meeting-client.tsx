@@ -5,8 +5,9 @@
 // can step through jobs in the meeting and watch progress. Ephemeral by
 // design (resets on reload) — covering a job is a meeting gesture, not data.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeleteButton } from "@/components/delete-button";
 import { EditableText } from "@/components/editable-text";
 import { CATEGORIES, styleFor } from "@/lib/categories";
@@ -52,6 +53,8 @@ export interface AttentionSub {
   status: "red" | "yellow" | "green";
   dotClass: string;
   reason: string | null;
+  trade: string | null;
+  flagged: boolean;
 }
 export interface MeetingJob {
   id: string;
@@ -397,24 +400,155 @@ function ItemRow({ it, pastDue }: { it: MeetingItem; pastDue?: boolean }) {
   );
 }
 
+// The "Subs to watch" chips are no longer plain links — clicking one opens a
+// small popover so a PM can edit/flag/remove the sub in the moment without
+// leaving the run-of-show. Edits route to the existing /api/subs/[id]/edit and
+// /delete endpoints; router.refresh() (via the shared components) repaints the
+// agenda. There's deliberately no "add a sub here": a sub only appears under a
+// job because it has an open commitment on it, so "add" lives on /subs, not on
+// a per-job watch list that's derived, not stored.
 function SubChip({ sub }: { sub: AttentionSub }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const endpoint = `/api/subs/${sub.id}/edit`;
+
   return (
-    <li>
-      <Link
-        href={`/sub/${sub.id}`}
-        className="inline-flex items-center gap-1.5 border border-rule bg-paper px-2 py-1 text-xs hover:border-ink-2 hover:bg-oceanside/30 transition-colors group"
-        title={sub.reason ?? undefined}
+    <li ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={sub.reason ?? "Edit sub"}
+        className={
+          "inline-flex items-center gap-1.5 border bg-paper px-2 py-1 text-xs transition-colors " +
+          (open
+            ? "border-ink-2 bg-oceanside/30"
+            : "border-rule hover:border-ink-2 hover:bg-oceanside/30")
+        }
       >
         <span className={`shrink-0 h-2 w-2 rounded-full ${sub.dotClass}`} />
-        <span className="text-foreground group-hover:text-accent transition-colors">
-          {sub.name}
-        </span>
+        <span className="text-foreground">{sub.name}</span>
+        {sub.flagged && <span className="shrink-0 text-gold">⚑</span>}
         {sub.reason && (
           <span className="text-ink-3 font-mono text-[10px] uppercase tracking-[0.1em] hidden sm:inline">
             · {sub.reason}
           </span>
         )}
-      </Link>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 cursor-default space-y-2.5 border border-ink-2 bg-paper p-3 text-left shadow-lg">
+          <div>
+            <FieldLabel>Name</FieldLabel>
+            <EditableText
+              value={sub.name}
+              endpoint={endpoint}
+              field="name"
+              type="text"
+              className="text-foreground text-sm"
+            />
+          </div>
+          <div>
+            <FieldLabel>Trade</FieldLabel>
+            <EditableText
+              value={sub.trade}
+              endpoint={endpoint}
+              field="trade"
+              type="text"
+              placeholder="add a trade…"
+              className="text-foreground text-sm"
+            />
+          </div>
+          <div>
+            <FieldLabel>Watch</FieldLabel>
+            <FlagToggle id={sub.id} flagged={sub.flagged} />
+            <div className="mt-1.5">
+              <EditableText
+                value={sub.reason}
+                endpoint={endpoint}
+                field="flag_note"
+                type="text"
+                placeholder="why we're watching…"
+                className="text-ink-2 text-xs"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-rule pt-2">
+            <Link
+              href={`/sub/${sub.id}`}
+              className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-2 hover:text-accent transition-colors"
+            >
+              View profile →
+            </Link>
+            <DeleteButton
+              endpoint={`/api/subs/${sub.id}/delete`}
+              label={sub.name}
+              className="text-sm"
+            />
+          </div>
+        </div>
+      )}
     </li>
+  );
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3 mb-0.5">
+      {children}
+    </div>
+  );
+}
+
+// Toggles flagged_for_pm_binder — the single "watch this sub" signal that
+// drives sub health and why the chip is here. Posts to the same edit route.
+function FlagToggle({ id, flagged }: { id: string; flagged: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function toggle() {
+    setBusy(true);
+    try {
+      await fetch(`/api/subs/${id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged_for_pm_binder: !flagged }),
+      });
+    } catch {
+      /* leave the toggle as-is on a network error */
+    }
+    setBusy(false);
+    router.refresh();
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      className={
+        "inline-flex items-center gap-1 border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors disabled:opacity-50 " +
+        (flagged
+          ? "border-gold text-gold"
+          : "border-rule text-ink-3 hover:border-ink hover:text-ink")
+      }
+    >
+      <span>{flagged ? "⚑" : "☆"}</span>
+      <span>{flagged ? "flagged" : "flag for binder"}</span>
+    </button>
   );
 }

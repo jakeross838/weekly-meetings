@@ -50,5 +50,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   revalidatePath("/subs");
   revalidatePath("/sub/[id]", "page");
+  revalidatePath("/meeting");
   return NextResponse.json({ ok: true });
 }
