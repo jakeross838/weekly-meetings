@@ -300,6 +300,11 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
   const totalPastDue = meetingJobs.reduce((s, j) => s + j.pastDue.length, 0);
   const totalDueSoon = meetingJobs.reduce((s, j) => s + j.dueSoon.length, 0);
 
+  // Full (non-hidden) roster for the per-job "assign a sub" picker.
+  const subOptions = subs
+    .map((s) => ({ id: s.id, name: s.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <main className="max-w-[560px] mx-auto min-h-screen bg-background pb-24">
       <Header />
@@ -339,7 +344,7 @@ export default async function MeetingPage({ searchParams }: { searchParams: SP }
         </div>
       )}
 
-      <MeetingAgenda jobs={meetingJobs} />
+      <MeetingAgenda jobs={meetingJobs} subs={subOptions} />
     </main>
   );
 }

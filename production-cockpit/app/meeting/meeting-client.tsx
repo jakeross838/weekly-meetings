@@ -5,7 +5,7 @@
 // can step through jobs in the meeting and watch progress. Ephemeral by
 // design (resets on reload) — covering a job is a meeting gesture, not data.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeleteButton } from "@/components/delete-button";
@@ -68,7 +68,14 @@ export interface MeetingJob {
   attentionSubs: AttentionSub[];
 }
 
-export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
+// Full sub roster (id + name), passed once and reused by every job's
+// "assign a sub" picker.
+export interface SubOption {
+  id: string;
+  name: string;
+}
+
+export function MeetingAgenda({ jobs, subs }: { jobs: MeetingJob[]; subs: SubOption[] }) {
   const [covered, setCovered] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
     setCovered((prev) => {
@@ -113,6 +120,7 @@ export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
             <JobCard
               key={j.id}
               job={j}
+              subs={subs}
               index={i + 1}
               covered={covered.has(j.id)}
               onToggle={() => toggle(j.id)}
@@ -126,11 +134,13 @@ export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
 
 function JobCard({
   job,
+  subs,
   index,
   covered,
   onToggle,
 }: {
   job: MeetingJob;
+  subs: SubOption[];
   index: number;
   covered: boolean;
   onToggle: () => void;
@@ -247,6 +257,9 @@ function JobCard({
               )}
             </div>
           )}
+          {/* Always available while the card is open — assigning a sub creates
+              a to-do on this job, which is what actually links a sub to it. */}
+          <AssignSub jobId={job.id} subs={subs} />
         </div>
       )}
     </li>
@@ -550,5 +563,138 @@ function FlagToggle({ id, flagged }: { id: string; flagged: boolean }) {
       <span>{flagged ? "⚑" : "☆"}</span>
       <span>{flagged ? "flagged" : "flag for binder"}</span>
     </button>
+  );
+}
+
+// Assign a sub to this job by creating a to-do on it (the only thing that
+// actually links a sub to a job — subs surface on the agenda via their open
+// commitments). Posts to the shared /api/todos/create route, tagged SUB-TRADE.
+function AssignSub({ jobId, subs }: { jobId: string; subs: SubOption[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [subId, setSubId] = useState("");
+  const [title, setTitle] = useState("");
+  const [due, setDue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function reset() {
+    setSubId("");
+    setTitle("");
+    setDue("");
+    setErr(null);
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!subId) {
+      setErr("pick a sub");
+      return;
+    }
+    if (!title.trim()) {
+      setErr("add a task");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/todos/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: jobId,
+          sub_id: subId,
+          title: title.trim(),
+          due_date: due || undefined,
+          category: "SUB-TRADE",
+        }),
+      });
+      if (!r.ok) {
+        const b = await r.json().catch(() => ({}));
+        setErr(b.error || `HTTP ${r.status}`);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+      reset();
+      setOpen(false);
+      router.refresh();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-4 inline-flex items-center gap-1.5 border border-rule px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 hover:border-ink hover:bg-oceanside/30 hover:text-ink transition-colors"
+      >
+        ＋ assign a sub
+      </button>
+    );
+  }
+
+  const inputCls =
+    "w-full bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink";
+
+  return (
+    <form onSubmit={submit} className="mt-4 space-y-2 border border-rule bg-sand/40 p-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-2">
+        Assign a sub
+      </div>
+      <select
+        value={subId}
+        onChange={(e) => setSubId(e.target.value)}
+        className={inputCls}
+      >
+        <option value="">Select a sub…</option>
+        {subs.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="what do they need to do?"
+        className={inputCls}
+      />
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          className="bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink"
+        />
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+          due (optional)
+        </span>
+      </div>
+      {err && <div className="text-urgent text-xs">{err}</div>}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={busy}
+          className="bg-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-paper hover:bg-ink/90 disabled:opacity-50 transition-colors"
+        >
+          {busy ? "adding…" : "add"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+          className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-ink transition-colors"
+        >
+          cancel
+        </button>
+      </div>
+    </form>
   );
 }
