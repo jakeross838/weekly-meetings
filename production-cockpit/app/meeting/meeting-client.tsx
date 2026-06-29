@@ -5,8 +5,9 @@
 // can step through jobs in the meeting and watch progress. Ephemeral by
 // design (resets on reload) — covering a job is a meeting gesture, not data.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeleteButton } from "@/components/delete-button";
 import { EditableText } from "@/components/editable-text";
 import { CATEGORIES, styleFor } from "@/lib/categories";
@@ -52,6 +53,8 @@ export interface AttentionSub {
   status: "red" | "yellow" | "green";
   dotClass: string;
   reason: string | null;
+  trade: string | null;
+  flagged: boolean;
 }
 export interface MeetingJob {
   id: string;
@@ -65,7 +68,14 @@ export interface MeetingJob {
   attentionSubs: AttentionSub[];
 }
 
-export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
+// Full sub roster (id + name), passed once and reused by every job's
+// "assign a sub" picker.
+export interface SubOption {
+  id: string;
+  name: string;
+}
+
+export function MeetingAgenda({ jobs, subs }: { jobs: MeetingJob[]; subs: SubOption[] }) {
   const [covered, setCovered] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
     setCovered((prev) => {
@@ -110,6 +120,7 @@ export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
             <JobCard
               key={j.id}
               job={j}
+              subs={subs}
               index={i + 1}
               covered={covered.has(j.id)}
               onToggle={() => toggle(j.id)}
@@ -123,11 +134,13 @@ export function MeetingAgenda({ jobs }: { jobs: MeetingJob[] }) {
 
 function JobCard({
   job,
+  subs,
   index,
   covered,
   onToggle,
 }: {
   job: MeetingJob;
+  subs: SubOption[];
   index: number;
   covered: boolean;
   onToggle: () => void;
@@ -244,6 +257,9 @@ function JobCard({
               )}
             </div>
           )}
+          {/* Always available while the card is open — assigning a sub creates
+              a to-do on this job, which is what actually links a sub to it. */}
+          <AssignSub jobId={job.id} subs={subs} />
         </div>
       )}
     </li>
@@ -397,24 +413,288 @@ function ItemRow({ it, pastDue }: { it: MeetingItem; pastDue?: boolean }) {
   );
 }
 
+// The "Subs to watch" chips are no longer plain links — clicking one opens a
+// small popover so a PM can edit/flag/remove the sub in the moment without
+// leaving the run-of-show. Edits route to the existing /api/subs/[id]/edit and
+// /delete endpoints; router.refresh() (via the shared components) repaints the
+// agenda. There's deliberately no "add a sub here": a sub only appears under a
+// job because it has an open commitment on it, so "add" lives on /subs, not on
+// a per-job watch list that's derived, not stored.
 function SubChip({ sub }: { sub: AttentionSub }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const endpoint = `/api/subs/${sub.id}/edit`;
+
   return (
-    <li>
-      <Link
-        href={`/sub/${sub.id}`}
-        className="inline-flex items-center gap-1.5 border border-rule bg-paper px-2 py-1 text-xs hover:border-ink-2 hover:bg-oceanside/30 transition-colors group"
-        title={sub.reason ?? undefined}
+    <li ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={sub.reason ?? "Edit sub"}
+        className={
+          "inline-flex items-center gap-1.5 border bg-paper px-2 py-1 text-xs transition-colors " +
+          (open
+            ? "border-ink-2 bg-oceanside/30"
+            : "border-rule hover:border-ink-2 hover:bg-oceanside/30")
+        }
       >
         <span className={`shrink-0 h-2 w-2 rounded-full ${sub.dotClass}`} />
-        <span className="text-foreground group-hover:text-accent transition-colors">
-          {sub.name}
-        </span>
+        <span className="text-foreground">{sub.name}</span>
+        {sub.flagged && <span className="shrink-0 text-gold">⚑</span>}
         {sub.reason && (
           <span className="text-ink-3 font-mono text-[10px] uppercase tracking-[0.1em] hidden sm:inline">
             · {sub.reason}
           </span>
         )}
-      </Link>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 cursor-default space-y-2.5 border border-ink-2 bg-paper p-3 text-left shadow-lg">
+          <div>
+            <FieldLabel>Name</FieldLabel>
+            <EditableText
+              value={sub.name}
+              endpoint={endpoint}
+              field="name"
+              type="text"
+              className="text-foreground text-sm"
+            />
+          </div>
+          <div>
+            <FieldLabel>Trade</FieldLabel>
+            <EditableText
+              value={sub.trade}
+              endpoint={endpoint}
+              field="trade"
+              type="text"
+              placeholder="add a trade…"
+              className="text-foreground text-sm"
+            />
+          </div>
+          <div>
+            <FieldLabel>Watch</FieldLabel>
+            <FlagToggle id={sub.id} flagged={sub.flagged} />
+            <div className="mt-1.5">
+              <EditableText
+                value={sub.reason}
+                endpoint={endpoint}
+                field="flag_note"
+                type="text"
+                placeholder="why we're watching…"
+                className="text-ink-2 text-xs"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-rule pt-2">
+            <Link
+              href={`/sub/${sub.id}`}
+              className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-2 hover:text-accent transition-colors"
+            >
+              View profile →
+            </Link>
+            <DeleteButton
+              endpoint={`/api/subs/${sub.id}/delete`}
+              label={sub.name}
+              className="text-sm"
+            />
+          </div>
+        </div>
+      )}
     </li>
+  );
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3 mb-0.5">
+      {children}
+    </div>
+  );
+}
+
+// Toggles flagged_for_pm_binder — the single "watch this sub" signal that
+// drives sub health and why the chip is here. Posts to the same edit route.
+function FlagToggle({ id, flagged }: { id: string; flagged: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function toggle() {
+    setBusy(true);
+    try {
+      await fetch(`/api/subs/${id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged_for_pm_binder: !flagged }),
+      });
+    } catch {
+      /* leave the toggle as-is on a network error */
+    }
+    setBusy(false);
+    router.refresh();
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      className={
+        "inline-flex items-center gap-1 border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors disabled:opacity-50 " +
+        (flagged
+          ? "border-gold text-gold"
+          : "border-rule text-ink-3 hover:border-ink hover:text-ink")
+      }
+    >
+      <span>{flagged ? "⚑" : "☆"}</span>
+      <span>{flagged ? "flagged" : "flag for binder"}</span>
+    </button>
+  );
+}
+
+// Assign a sub to this job by creating a to-do on it (the only thing that
+// actually links a sub to a job — subs surface on the agenda via their open
+// commitments). Posts to the shared /api/todos/create route, tagged SUB-TRADE.
+function AssignSub({ jobId, subs }: { jobId: string; subs: SubOption[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [subId, setSubId] = useState("");
+  const [title, setTitle] = useState("");
+  const [due, setDue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function reset() {
+    setSubId("");
+    setTitle("");
+    setDue("");
+    setErr(null);
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!subId) {
+      setErr("pick a sub");
+      return;
+    }
+    if (!title.trim()) {
+      setErr("add a task");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/todos/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: jobId,
+          sub_id: subId,
+          title: title.trim(),
+          due_date: due || undefined,
+          category: "SUB-TRADE",
+        }),
+      });
+      if (!r.ok) {
+        const b = await r.json().catch(() => ({}));
+        setErr(b.error || `HTTP ${r.status}`);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+      reset();
+      setOpen(false);
+      router.refresh();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-4 inline-flex items-center gap-1.5 border border-rule px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 hover:border-ink hover:bg-oceanside/30 hover:text-ink transition-colors"
+      >
+        ＋ assign a sub
+      </button>
+    );
+  }
+
+  const inputCls =
+    "w-full bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink";
+
+  return (
+    <form onSubmit={submit} className="mt-4 space-y-2 border border-rule bg-sand/40 p-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-2">
+        Assign a sub
+      </div>
+      <select
+        value={subId}
+        onChange={(e) => setSubId(e.target.value)}
+        className={inputCls}
+      >
+        <option value="">Select a sub…</option>
+        {subs.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="what do they need to do?"
+        className={inputCls}
+      />
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          className="bg-paper border border-rule px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-ink"
+        />
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+          due (optional)
+        </span>
+      </div>
+      {err && <div className="text-urgent text-xs">{err}</div>}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={busy}
+          className="bg-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-paper hover:bg-ink/90 disabled:opacity-50 transition-colors"
+        >
+          {busy ? "adding…" : "add"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+          className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-ink transition-colors"
+        >
+          cancel
+        </button>
+      </div>
+    </form>
   );
 }
