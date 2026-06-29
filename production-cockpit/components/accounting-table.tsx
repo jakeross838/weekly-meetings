@@ -398,7 +398,7 @@ function PORow({
           {po.pct_billed != null ? `${Math.round(Number(po.pct_billed))}%` : "—"}
         </td>
         <td className="px-2 py-2 align-top text-right">
-          <DeleteButton endpoint={`/v2/api/purchase-orders/${po.id}/delete`} label={`PO ${po.po_number ?? ""}`.trim()} confirmLabel="Delete?" />
+          <DeleteButton endpoint={`/v2/api/purchase-orders/${po.id}/delete`} label={`PO ${po.po_number ?? ""}`.trim()} />
         </td>
       </tr>
       {isOpen && lines.length > 0 && (

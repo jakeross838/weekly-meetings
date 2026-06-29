@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 export interface SpecialtyRow {
   name: string;
@@ -46,6 +47,7 @@ export function SpecialtiesEditor({
     {}
   );
   const [editingDuration, setEditingDuration] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
   async function add() {
     const name = newName.trim();
@@ -78,7 +80,7 @@ export function SpecialtiesEditor({
     }
   }
 
-  async function remove(name: string) {
+  async function remove(name: string): Promise<boolean> {
     setBusy(true);
     setErr(null);
     try {
@@ -94,11 +96,13 @@ export function SpecialtiesEditor({
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         setErr(body.error || `HTTP ${r.status}`);
-      } else {
-        router.refresh();
+        return false;
       }
+      router.refresh();
+      return true;
     } catch (e) {
       setErr((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -259,7 +263,7 @@ export function SpecialtiesEditor({
                   {r.source === "manual" && (
                     <button
                       type="button"
-                      onClick={() => remove(r.name)}
+                      onClick={() => setPendingRemove(r.name)}
                       disabled={busy}
                       className="text-ink-3 hover:text-urgent text-xs"
                       aria-label={`Remove ${r.name}`}
@@ -339,6 +343,26 @@ export function SpecialtiesEditor({
         )}
         {err && <p className="mt-2 text-xs text-urgent">{err}</p>}
       </div>
+      <ConfirmModal
+        open={pendingRemove !== null}
+        title="Confirm delete"
+        subject={pendingRemove || "this specialty"}
+        body={
+          <div>
+            <p>Remove this manual specialty? This can’t be undone.</p>
+            {err && <p className="mt-2 text-urgent">{err}</p>}
+          </div>
+        }
+        confirmLabel="Delete"
+        tone="urgent"
+        busy={busy}
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={async () => {
+          if (!pendingRemove) return;
+          const ok = await remove(pendingRemove);
+          if (ok) setPendingRemove(null);
+        }}
+      />
     </div>
   );
 }

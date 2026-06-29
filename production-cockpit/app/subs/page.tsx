@@ -405,7 +405,6 @@ function SubRow({
       <DeleteButton
         endpoint={`/api/subs/${sub.id}/delete`}
         label={sub.name}
-        confirmLabel="Delete?"
         className="self-center pr-4 pl-1 text-sm"
       />
     </li>

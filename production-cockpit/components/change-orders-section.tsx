@@ -93,7 +93,6 @@ export function ChangeOrdersSection({ cos }: { cos: ChangeOrderRow[] }) {
                 <DeleteButton
                   endpoint={`/v2/api/change-orders/${c.id}/delete`}
                   label={`CO ${c.co_number ?? ""}`.trim()}
-                  confirmLabel="Delete?"
                 />
               </li>
             ))}

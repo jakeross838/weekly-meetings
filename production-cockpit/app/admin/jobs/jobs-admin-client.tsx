@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 interface Job {
   id: string;
@@ -19,6 +20,7 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Job | null>(null);
 
   async function patch(id: string, patch: Partial<Job>) {
     setBusyId(id);
@@ -40,26 +42,21 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
     }
   }
 
-  async function remove(id: string, name: string | null) {
-    const ok = confirm(
-      `Remove "${name ?? id}"?\n\n` +
-        "This removes the job row. Existing purchase orders, daily logs, " +
-        "todos, and pay-app rows for this job will stay in the DB but no " +
-        "longer surface in the cockpit. This is hard to undo."
-    );
-    if (!ok) return;
-    setBusyId(id);
+  async function doRemove(job: Job): Promise<boolean> {
+    setBusyId(job.id);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/jobs?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
+      const r = await fetch(
+        `/api/admin/jobs?id=${encodeURIComponent(job.id)}`,
+        { method: "DELETE" }
+      );
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) {
         setError(j.error ?? `HTTP ${r.status}`);
-      } else {
-        router.refresh();
+        return false;
       }
+      router.refresh();
+      return true;
     } finally {
       setBusyId(null);
     }
@@ -96,13 +93,35 @@ export function JobsAdminClient({ jobs, pms }: { jobs: Job[]; pms: PM[] }) {
             pms={pms}
             busy={busyId === j.id}
             onPatch={(p) => patch(j.id, p)}
-            onRemove={() => remove(j.id, j.name)}
+            onRemove={() => setPendingDelete(j)}
           />
         ))}
       </ul>
 
       <div id="add-job" />
       <AddJobForm pms={pms} onAdded={() => router.refresh()} />
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="Remove job"
+        subject={pendingDelete?.name ?? pendingDelete?.id ?? "this job"}
+        body={
+          <p>
+            This removes the job row. Existing purchase orders, daily logs,
+            todos, and pay-app rows for this job stay in the DB but no longer
+            surface in the cockpit. This is hard to undo.
+          </p>
+        }
+        confirmLabel="Remove job"
+        tone="urgent"
+        busy={pendingDelete ? busyId === pendingDelete.id : false}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          const ok = await doRemove(pendingDelete);
+          if (ok) setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

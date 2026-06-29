@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 export type ChecklistLens = "SAFETY" | "SCHEDULE";
 
@@ -64,6 +65,7 @@ function ChecklistColumn({
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [pendingRemove, setPendingRemove] = useState<ChecklistItem | null>(null);
 
   async function call(body: Record<string, unknown>) {
     setBusy(true);
@@ -111,8 +113,8 @@ function ChecklistColumn({
     });
   }
 
-  async function remove(item: ChecklistItem) {
-    await call({ action: "remove", item_id: item.id });
+  function remove(item: ChecklistItem) {
+    return call({ action: "remove", item_id: item.id });
   }
 
   async function saveEdit(item: ChecklistItem) {
@@ -204,7 +206,7 @@ function ChecklistColumn({
               </div>
               <button
                 type="button"
-                onClick={() => remove(item)}
+                onClick={() => setPendingRemove(item)}
                 disabled={busy}
                 className="text-ink-3 hover:text-urgent text-xs shrink-0"
                 aria-label={`Remove ${item.item_text}`}
@@ -265,6 +267,26 @@ function ChecklistColumn({
         )}
         {err && <p className="mt-2 text-xs text-urgent">{err}</p>}
       </div>
+      <ConfirmModal
+        open={pendingRemove !== null}
+        title="Confirm delete"
+        subject={pendingRemove?.item_text || "this item"}
+        body={
+          <div>
+            <p>Remove this checklist item? This can’t be undone.</p>
+            {err && <p className="mt-2 text-urgent">{err}</p>}
+          </div>
+        }
+        confirmLabel="Delete"
+        tone="urgent"
+        busy={busy}
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={async () => {
+          if (!pendingRemove) return;
+          const ok = await remove(pendingRemove);
+          if (ok) setPendingRemove(null);
+        }}
+      />
     </div>
   );
 }
