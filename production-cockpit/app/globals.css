@@ -96,8 +96,13 @@ body {
 /* Desktop view toggle — when the user opts into desktop view (a `view-desktop`
    class on <html>, set by components/view-toggle.tsx + the inline script in
    layout.tsx), widen every page's mobile column. No effect on phones: their
-   viewport is already narrower than 560px, so a larger max-width is a no-op. */
-html.view-desktop .max-w-\[560px\] { max-width: 1100px; }
+   viewport is already narrower than 560px, so a larger max-width is a no-op.
+   Most pages cap at 560px, but a few (admin users/jobs at 720px, the v2 review
+   detail at 640px) use a wider column — list those here too so desktop view
+   widens them as well instead of leaving them pinned at their narrow width. */
+html.view-desktop .max-w-\[560px\],
+html.view-desktop .max-w-\[640px\],
+html.view-desktop .max-w-\[720px\] { max-width: 1100px; }
 
 /* Square corners on form controls; everything else can have a subtle radius
    for the modern luxury feel. */

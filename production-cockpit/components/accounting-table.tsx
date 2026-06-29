@@ -76,6 +76,7 @@ export function AccountingTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
 
   const statuses = useMemo(
     () =>
@@ -214,14 +215,23 @@ export function AccountingTable({
   return (
     <div className="w-full">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h2 className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3">
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Show purchase orders" : "Hide purchase orders"}
+          className="flex items-baseline gap-1.5 font-mono text-[10px] tracking-[0.22em] uppercase text-ink-3 hover:text-ink transition-colors"
+        >
+          <span aria-hidden className="text-ink-3">{collapsed ? "▸" : "▾"}</span>
           Purchase orders · {filtered.length}
-        </h2>
+        </button>
         <span className="font-mono text-xs tabular-nums text-foreground">{money(totals.cost)} committed</span>
         <span className="font-mono text-xs tabular-nums text-ink-2">{money(totals.paid)} paid</span>
         <span className="font-mono text-xs tabular-nums text-urgent">{money(totals.out)} left</span>
       </div>
 
+      {!collapsed && (
+        <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={statusFilter}
@@ -325,6 +335,8 @@ export function AccountingTable({
         click a row ▸ for line items · click any cell to edit · ✕ deletes
         <span className="sm:hidden text-accent"> · swipe table sideways →</span>
       </p>
+        </>
+      )}
     </div>
   );
 }
