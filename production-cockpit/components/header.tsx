@@ -24,6 +24,9 @@ export async function Header() {
           <Link href="/meeting" className="hover:text-ink transition-colors">
             Meeting
           </Link>
+          <Link href="/weekly" className="hover:text-ink transition-colors">
+            Weekly
+          </Link>
           <Link href="/" className="hover:text-ink transition-colors">
             Jobs
           </Link>

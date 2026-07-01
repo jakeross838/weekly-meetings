@@ -1,0 +1,10 @@
+# Never commit the MSAL token cache (it holds live refresh tokens).
+.token_cache.bin
+*.token_cache.bin
+
+# Optional local env override for this service (secrets).
+.env
+
+# Python noise
+__pycache__/
+*.pyc

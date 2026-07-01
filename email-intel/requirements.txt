@@ -1,0 +1,14 @@
+# Ross Built - Email Intel: capture service dependencies.
+#   pip install -r requirements.txt
+#
+# Intentionally tiny: stdlib + requests + msal, matching the prototype's style.
+# We talk to Supabase over its raw PostgREST API with the service key (plain
+# requests), so the heavy `supabase` client is NOT required.
+
+msal>=1.24            # Microsoft auth: device-code (Phase 1) + client-credentials (Phase 4)
+requests>=2.31        # Graph, Anthropic, and Supabase REST calls
+python-dotenv>=1.0    # load the repo-root .env (SUPABASE_URL / *_KEY / ANTHROPIC_API_KEY)
+
+# Optional: only if you'd rather use the official Supabase client instead of raw
+# REST. This service does NOT need it; raw REST via requests keeps deps light.
+# supabase>=2.0
